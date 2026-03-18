@@ -1,0 +1,31 @@
+/**
+ * Typesense Instant Search — minimal CSS
+ *
+ * Tailwind utility classes in the template handle the majority of styling.
+ * This file covers only what Tailwind cannot (e.g. [x-cloak] reset).
+ */
+
+/**
+ * Hide Alpine.js components until the framework is initialised.
+ * Without this rule, components flash visible on page load.
+ */
+[x-cloak] {
+    display: none !important;
+}
+
+.typesense-instant-search {
+    /* Layout shell — flex handled via Tailwind */
+}
+
+.typesense-facet-sidebar {
+    /* Sidebar — width handled via Tailwind w-64 */
+}
+
+.typesense-product-grid {
+    /* Grid — columns handled via Tailwind grid-cols-* */
+}
+
+.typesense-product-card img {
+    /* Ensure consistent image rendering across browsers */
+    image-rendering: auto;
+}
