@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <add id="RunAsRoot_TypeSense::typesense"
+             title="TypeSense"
+             module="RunAsRoot_TypeSense"
+             parent="Magento_Backend::stores"
+             resource="RunAsRoot_TypeSense::typesense"
+             sortOrder="100"/>
+        <add id="RunAsRoot_TypeSense::dashboard"
+             title="Dashboard"
+             module="RunAsRoot_TypeSense"
+             parent="RunAsRoot_TypeSense::typesense"
+             action="typesense/dashboard/index"
+             resource="RunAsRoot_TypeSense::dashboard"
+             sortOrder="10"/>
+        <add id="RunAsRoot_TypeSense::collections"
+             title="Collections"
+             module="RunAsRoot_TypeSense"
+             parent="RunAsRoot_TypeSense::typesense"
+             action="typesense/collection/index"
+             resource="RunAsRoot_TypeSense::collections"
+             sortOrder="20"/>
+        <add id="RunAsRoot_TypeSense::synonyms"
+             title="Synonyms"
+             module="RunAsRoot_TypeSense"
+             parent="RunAsRoot_TypeSense::typesense"
+             action="typesense/synonym/index"
+             resource="RunAsRoot_TypeSense::synonyms"
+             sortOrder="40"/>
+        <add id="RunAsRoot_TypeSense::query_merchandiser"
+             title="Query Merchandiser"
+             module="RunAsRoot_TypeSense"
+             parent="RunAsRoot_TypeSense::typesense"
+             action="typesense/querymerchandiser/index"
+             resource="RunAsRoot_TypeSense::query_merchandiser"
+             sortOrder="60"/>
+        <add id="RunAsRoot_TypeSense::landing_pages"
+             title="Landing Pages"
+             module="RunAsRoot_TypeSense"
+             parent="RunAsRoot_TypeSense::typesense"
+             action="typesense/landingpage/index"
+             resource="RunAsRoot_TypeSense::landing_pages"
+             sortOrder="70"/>
+    </menu>
+</config>

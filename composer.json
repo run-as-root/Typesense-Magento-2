@@ -1,0 +1,26 @@
+{
+    "name": "run-as-root/magento2-typesense",
+    "description": "Open-source Typesense search integration for Magento 2 / Mage-OS with visual merchandising",
+    "type": "magento2-module",
+    "license": "MIT",
+    "version": "0.1.0",
+    "require": {
+        "php": "^8.3",
+        "typesense/typesense-php": "^4.9"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5",
+        "phpstan/phpstan": "^1.10"
+    },
+    "autoload": {
+        "files": ["registration.php"],
+        "psr-4": {
+            "RunAsRoot\\TypeSense\\": ""
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "RunAsRoot\\TypeSense\\Test\\": "Test/"
+        }
+    }
+}

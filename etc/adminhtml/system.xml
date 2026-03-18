@@ -1,0 +1,235 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <tab id="run_as_root_typesense" translate="label" sortOrder="400">
+            <label>TypeSense</label>
+        </tab>
+        <section id="run_as_root_typesense" translate="label" type="text"
+                 sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+            <class>separator-top</class>
+            <label>TypeSense Search</label>
+            <tab>run_as_root_typesense</tab>
+            <resource>RunAsRoot_TypeSense::configuration</resource>
+
+            <!-- General Settings -->
+            <group id="general" translate="label" type="text"
+                   sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>General Settings</label>
+                <field id="enabled" translate="label comment" type="select"
+                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable TypeSense Search</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="protocol" translate="label" type="select"
+                       sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Protocol</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\Protocol</source_model>
+                </field>
+                <field id="host" translate="label comment" type="text"
+                       sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Host</label>
+                    <comment>Typesense server hostname (e.g., localhost or typesense.example.com)</comment>
+                </field>
+                <field id="port" translate="label" type="text"
+                       sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Port</label>
+                    <validate>validate-digits</validate>
+                </field>
+                <field id="api_key" translate="label comment" type="obscure"
+                       sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Admin API Key</label>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <comment>Server-side admin key. Never exposed to frontend.</comment>
+                </field>
+                <field id="search_only_api_key" translate="label comment" type="text"
+                       sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Search-Only API Key</label>
+                    <comment>Used on the frontend for search requests.</comment>
+                </field>
+                <field id="index_prefix" translate="label comment" type="text"
+                       sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Index Prefix</label>
+                    <comment>Prefix for all collection names (e.g., rar → rar_products_default)</comment>
+                </field>
+                <field id="log_enabled" translate="label" type="select"
+                       sortOrder="80" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable Logging</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+            </group>
+
+            <!-- Indexing Settings -->
+            <group id="indexing" translate="label" type="text"
+                   sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Indexing</label>
+                <field id="batch_size" translate="label comment" type="text"
+                       sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Batch Size</label>
+                    <comment>Number of documents per import batch. Default: 200</comment>
+                    <validate>validate-digits</validate>
+                </field>
+                <field id="product_enabled" translate="label" type="select"
+                       sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Product Indexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="category_enabled" translate="label" type="select"
+                       sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Category Indexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="cms_page_enabled" translate="label" type="select"
+                       sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable CMS Page Indexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="suggestion_enabled" translate="label" type="select"
+                       sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Suggestion Indexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="zero_downtime_enabled" translate="label comment" type="select"
+                       sortOrder="60" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Zero-Downtime Reindexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Creates new collection, imports, then swaps alias atomically.</comment>
+                </field>
+                <field id="cron_enabled" translate="label" type="select"
+                       sortOrder="70" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable Cron Reindexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="cron_schedule" translate="label comment" type="text"
+                       sortOrder="80" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Cron Schedule</label>
+                    <comment>Cron expression. Default: 0 2 * * * (daily at 2 AM)</comment>
+                    <depends>
+                        <field id="cron_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="queue_enabled" translate="label comment" type="select"
+                       sortOrder="90" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Use Message Queue</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Process full reindex asynchronously via RabbitMQ/MySQL queue.</comment>
+                </field>
+            </group>
+
+            <!-- Search Settings -->
+            <group id="search" translate="label" type="text"
+                   sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Search</label>
+                <field id="typo_tolerance_enabled" translate="label" type="select"
+                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Typo Tolerance</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="typo_tolerance_min_word_length" translate="label comment" type="text"
+                       sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Minimum Word Length for Typo Tolerance</label>
+                    <validate>validate-digits</validate>
+                </field>
+                <field id="highlight_enabled" translate="label" type="select"
+                       sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Highlighting</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="query_suggestions_enabled" translate="label" type="select"
+                       sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Query Suggestions</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+            </group>
+
+            <!-- Instant Search -->
+            <group id="instant_search" translate="label" type="text"
+                   sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Instant Search Result Page</label>
+                <field id="enabled" translate="label" type="select"
+                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Instant Search</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="products_per_page" translate="label" type="text"
+                       sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Products Per Page</label>
+                    <validate>validate-digits</validate>
+                </field>
+                <field id="replace_category_page" translate="label comment" type="select"
+                       sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Replace Category Pages</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Use TypeSense for category product listings.</comment>
+                </field>
+                <field id="image_type" translate="label" type="select"
+                       sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Image Type</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\ImageType</source_model>
+                </field>
+                <field id="image_width" translate="label" type="text"
+                       sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Image Width</label>
+                    <validate>validate-digits</validate>
+                </field>
+                <field id="image_height" translate="label" type="text"
+                       sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Image Height</label>
+                    <validate>validate-digits</validate>
+                </field>
+            </group>
+
+            <!-- Autocomplete -->
+            <group id="autocomplete" translate="label" type="text"
+                   sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Autocomplete</label>
+                <field id="enabled" translate="label" type="select"
+                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Autocomplete</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="product_count" translate="label" type="text"
+                       sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Product Suggestions Count</label>
+                    <validate>validate-digits</validate>
+                </field>
+                <field id="category_count" translate="label" type="text"
+                       sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Category Suggestions Count</label>
+                    <validate>validate-digits</validate>
+                </field>
+                <field id="cms_page_count" translate="label" type="text"
+                       sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>CMS Page Suggestions Count</label>
+                    <validate>validate-digits</validate>
+                </field>
+                <field id="suggestion_count" translate="label" type="text"
+                       sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Query Suggestions Count</label>
+                    <validate>validate-digits</validate>
+                </field>
+            </group>
+
+            <!-- Merchandising -->
+            <group id="merchandising" translate="label" type="text"
+                   sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Merchandising</label>
+                <field id="category_merchandiser_enabled" translate="label" type="select"
+                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Category Merchandiser</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="query_merchandiser_enabled" translate="label" type="select"
+                       sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Query Merchandiser</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="landing_page_enabled" translate="label" type="select"
+                       sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Landing Pages</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>
