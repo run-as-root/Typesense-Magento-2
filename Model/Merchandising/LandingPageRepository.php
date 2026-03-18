@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Merchandising;
 
+use Magento\Framework\Api\SearchCriteria\CollectionProcessorInterface;
 use Magento\Framework\Api\SearchCriteriaInterface;
 use Magento\Framework\Api\SearchResultsInterface;
 use Magento\Framework\Api\SearchResultsInterfaceFactory;
@@ -22,6 +23,7 @@ class LandingPageRepository implements LandingPageRepositoryInterface
         private readonly LandingPageResource $resource,
         private readonly CollectionFactory $collectionFactory,
         private readonly SearchResultsInterfaceFactory $searchResultsFactory,
+        private readonly CollectionProcessorInterface $collectionProcessor,
     ) {
     }
 
@@ -62,6 +64,7 @@ class LandingPageRepository implements LandingPageRepositoryInterface
     public function getList(SearchCriteriaInterface $searchCriteria): SearchResultsInterface
     {
         $collection = $this->collectionFactory->create();
+        $this->collectionProcessor->process($searchCriteria, $collection);
 
         $searchResults = $this->searchResultsFactory->create();
         $searchResults->setSearchCriteria($searchCriteria);

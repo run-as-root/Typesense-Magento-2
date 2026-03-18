@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Test\Unit\Model\Merchandising;
 
+use Magento\Framework\Api\SearchCriteria\CollectionProcessorInterface;
 use Magento\Framework\Api\SearchCriteriaInterface;
 use Magento\Framework\Api\SearchResultsInterface;
 use Magento\Framework\Api\SearchResultsInterfaceFactory;
@@ -27,6 +28,7 @@ final class CategoryMerchandisingRepositoryTest extends TestCase
     private CategoryMerchandisingResource&MockObject $resource;
     private CollectionFactory&MockObject $collectionFactory;
     private SearchResultsInterfaceFactory&MockObject $searchResultsFactory;
+    private CollectionProcessorInterface&MockObject $collectionProcessor;
     private CategoryMerchandisingRepository $sut;
 
     protected function setUp(): void
@@ -35,12 +37,14 @@ final class CategoryMerchandisingRepositoryTest extends TestCase
         $this->resource = $this->createMock(CategoryMerchandisingResource::class);
         $this->collectionFactory = $this->createMock(CollectionFactory::class);
         $this->searchResultsFactory = $this->createMock(SearchResultsInterfaceFactory::class);
+        $this->collectionProcessor = $this->createMock(CollectionProcessorInterface::class);
 
         $this->sut = new CategoryMerchandisingRepository(
             $this->factory,
             $this->resource,
             $this->collectionFactory,
             $this->searchResultsFactory,
+            $this->collectionProcessor,
         );
     }
 
@@ -133,6 +137,10 @@ final class CategoryMerchandisingRepositoryTest extends TestCase
         $collection->method('getItems')->willReturn($items);
         $collection->method('getSize')->willReturn(1);
         $this->searchResultsFactory->method('create')->willReturn($searchResults);
+
+        $this->collectionProcessor->expects(self::once())
+            ->method('process')
+            ->with($searchCriteria, $collection);
 
         $searchResults->expects(self::once())->method('setSearchCriteria')->with($searchCriteria);
         $searchResults->expects(self::once())->method('setItems')->with($items);

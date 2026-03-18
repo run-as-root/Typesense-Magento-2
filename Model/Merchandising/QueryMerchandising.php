@@ -54,7 +54,16 @@ class QueryMerchandising extends AbstractModel implements QueryMerchandisingInte
     public function getIncludes(): array
     {
         $value = $this->getData('includes');
-        return $value ? json_decode($value, true) : [];
+
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (!is_string($value) || $value === '') {
+            return [];
+        }
+
+        return json_decode($value, true) ?? [];
     }
 
     public function setIncludes(array $includes): self
@@ -65,7 +74,16 @@ class QueryMerchandising extends AbstractModel implements QueryMerchandisingInte
     public function getExcludes(): array
     {
         $value = $this->getData('excludes');
-        return $value ? json_decode($value, true) : [];
+
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (!is_string($value) || $value === '') {
+            return [];
+        }
+
+        return json_decode($value, true) ?? [];
     }
 
     public function setExcludes(array $excludes): self
@@ -76,7 +94,16 @@ class QueryMerchandising extends AbstractModel implements QueryMerchandisingInte
     public function getBannerConfig(): array
     {
         $value = $this->getData('banner_config');
-        return $value ? json_decode($value, true) : [];
+
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (!is_string($value) || $value === '') {
+            return [];
+        }
+
+        return json_decode($value, true) ?? [];
     }
 
     public function setBannerConfig(array $bannerConfig): self
