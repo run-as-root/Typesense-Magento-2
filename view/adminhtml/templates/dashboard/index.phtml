@@ -1,0 +1,162 @@
+<?php
+/** @var \Magento\Framework\View\Element\Template $block */
+/** @var \RunAsRoot\TypeSense\ViewModel\Adminhtml\DashboardViewModel $viewModel */
+
+declare(strict_types=1);
+
+$viewModel      = $block->getData('view_model');
+$isConnected    = $viewModel->isConnected();
+$connectionInfo = $viewModel->getConnectionInfo();
+$collections    = $viewModel->getCollections();
+$aliasesResult  = $viewModel->getAliases();
+
+// Build a map from collection name => alias name for quick lookup
+$aliasMap = [];
+foreach ($aliasesResult['aliases'] ?? [] as $alias) {
+    $collectionName = $alias['collection_name'] ?? '';
+    $aliasName      = $alias['name'] ?? '';
+    if ($collectionName !== '' && $aliasName !== '') {
+        $aliasMap[$collectionName] = $aliasName;
+    }
+}
+?>
+<div class="admin__page-section">
+    <div class="admin__page-section-title">
+        <span class="title"><?= $block->escapeHtml(__('TypeSense Dashboard')) ?></span>
+    </div>
+
+    <!-- Connection Status -->
+    <div class="admin__page-section-content">
+        <div class="admin__fieldset">
+            <div class="admin__fieldset-wrapper">
+                <div class="admin__fieldset-wrapper-title">
+                    <span><?= $block->escapeHtml(__('Connection Status')) ?></span>
+                </div>
+                <div class="admin__fieldset-wrapper-content">
+                    <div class="admin__field">
+                        <div class="admin__field-label">
+                            <span><?= $block->escapeHtml(__('Status')) ?></span>
+                        </div>
+                        <div class="admin__field-control">
+                            <?php if ($isConnected): ?>
+                                <span class="grid-severity-notice">
+                                    <span><?= $block->escapeHtml(__('Connected')) ?></span>
+                                </span>
+                            <?php else: ?>
+                                <span class="grid-severity-critical">
+                                    <span><?= $block->escapeHtml(__('Disconnected')) ?></span>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="admin__field">
+                        <div class="admin__field-label">
+                            <span><?= $block->escapeHtml(__('Host')) ?></span>
+                        </div>
+                        <div class="admin__field-control">
+                            <span><?= $block->escapeHtml((string) $connectionInfo['host']) ?></span>
+                        </div>
+                    </div>
+                    <div class="admin__field">
+                        <div class="admin__field-label">
+                            <span><?= $block->escapeHtml(__('Port')) ?></span>
+                        </div>
+                        <div class="admin__field-control">
+                            <span><?= $block->escapeHtml((string) $connectionInfo['port']) ?></span>
+                        </div>
+                    </div>
+                    <div class="admin__field">
+                        <div class="admin__field-label">
+                            <span><?= $block->escapeHtml(__('Protocol')) ?></span>
+                        </div>
+                        <div class="admin__field-control">
+                            <span><?= $block->escapeHtml((string) $connectionInfo['protocol']) ?></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="admin__page-section-content">
+        <div class="admin__fieldset">
+            <div class="admin__fieldset-wrapper">
+                <div class="admin__fieldset-wrapper-title">
+                    <span><?= $block->escapeHtml(__('Quick Actions')) ?></span>
+                </div>
+                <div class="admin__fieldset-wrapper-content">
+                    <div class="admin__field">
+                        <div class="admin__field-control">
+                            <button type="button"
+                                    class="action-default scalable"
+                                    title="<?= $block->escapeHtmlAttr(__('Reindex via CLI: bin/magento typesense:reindex')) ?>">
+                                <span><?= $block->escapeHtml(__('Reindex All (CLI)')) ?></span>
+                            </button>
+                            <span class="admin__field-note">
+                                <?= $block->escapeHtml(__('Run: bin/magento typesense:reindex')) ?>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="admin__field">
+                        <div class="admin__field-control">
+                            <a href="<?= $block->escapeUrl($block->getUrl('typesense/collection/index')) ?>"
+                               class="action-default scalable">
+                                <span><?= $block->escapeHtml(__('Manage Collections')) ?></span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Collections Table -->
+    <div class="admin__page-section-content">
+        <div class="admin__fieldset">
+            <div class="admin__fieldset-wrapper">
+                <div class="admin__fieldset-wrapper-title">
+                    <span>
+                        <?= $block->escapeHtml(__('Collections (%1)', count($collections))) ?>
+                    </span>
+                </div>
+                <div class="admin__fieldset-wrapper-content">
+                    <?php if (empty($collections)): ?>
+                        <p class="message message-notice">
+                            <?= $block->escapeHtml(__('No collections found. Check your connection settings or run a reindex.')) ?>
+                        </p>
+                    <?php else: ?>
+                        <table class="data-grid">
+                            <thead>
+                                <tr>
+                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Name')) ?></th>
+                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Document Count')) ?></th>
+                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Created At')) ?></th>
+                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Alias')) ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($collections as $collection): ?>
+                                    <?php
+                                    $name         = (string) ($collection['name'] ?? '');
+                                    $numDocuments = (int) ($collection['num_documents'] ?? 0);
+                                    $createdAt    = isset($collection['created_at'])
+                                        ? date('Y-m-d H:i:s', (int) $collection['created_at'])
+                                        : '';
+                                    $alias        = $aliasMap[$name] ?? '';
+                                    ?>
+                                    <tr>
+                                        <td><?= $block->escapeHtml($name) ?></td>
+                                        <td><?= $block->escapeHtml((string) $numDocuments) ?></td>
+                                        <td><?= $block->escapeHtml($createdAt) ?></td>
+                                        <td><?= $block->escapeHtml($alias) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
