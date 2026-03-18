@@ -172,9 +172,9 @@ require(['jquery', 'jquery/ui'], function ($) {
             ? '<img src="' + escapeHtml(p.image_url) + '" alt="" class="merchandiser-thumb"/>'
             : '<div class="merchandiser-thumb-placeholder"></div>';
 
-        var dragHandle = p.action === 'pin'
-            ? '<span class="drag-handle" title="Drag to reorder">&#9776;</span>'
-            : '<span class="drag-handle drag-handle-disabled"></span>';
+        var dragHandle = p.action === 'hide'
+            ? ''
+            : '<span class="drag-handle" title="Drag to reorder or pin">&#9776;</span>';
 
         var pinLabel   = p.action === 'pin'  ? 'Unpin' : 'Pin';
         var hideLabel  = p.action === 'hide' ? 'Unhide' : 'Hide';
@@ -227,15 +227,25 @@ require(['jquery', 'jquery/ui'], function ($) {
             $('#merchandiser-grid').show();
         }
 
-        // Sortable only on pinned rows
+        // Sortable on all non-hidden rows — dragging auto-pins
         $tbody.sortable({
-            items: 'tr.merchandiser-pinned',
+            items: 'tr:not(.merchandiser-hidden)',
             handle: '.drag-handle',
             axis: 'y',
             placeholder: 'ui-sortable-placeholder',
             forcePlaceholderSize: true,
             update: function () {
-                recalcPinnedPositions();
+                // Auto-pin any dragged normal rows and recalc all positions
+                var pos = 1;
+                $tbody.find('tr:not(.merchandiser-hidden)').each(function () {
+                    var id = $(this).data('product-id');
+                    if (products[id]) {
+                        products[id].action = 'pin';
+                        products[id].position = pos;
+                        pos++;
+                    }
+                });
+                renderTable();
             }
         });
     }
