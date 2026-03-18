@@ -66,8 +66,14 @@ class Load extends Action implements HttpGetActionInterface
      */
     private function fetchProductsFromTypesense(int $categoryId, int $storeId): array
     {
-        $store          = $this->storeManager->getStore($storeId ?: null);
-        $storeCode      = $store->getCode();
+        $store = $this->storeManager->getStore($storeId ?: null);
+
+        // Admin scope (store_id=0) has no Typesense collection — fall back to default store
+        if ($store->getCode() === 'admin') {
+            $store = $this->storeManager->getDefaultStoreView();
+        }
+
+        $storeCode       = $store->getCode();
         $resolvedStoreId = (int) $store->getId();
         $collectionName = $this->collectionNameResolver->resolve('product', $storeCode, $resolvedStoreId);
         $client         = $this->clientFactory->create($storeId ?: null);
@@ -98,12 +104,14 @@ class Load extends Action implements HttpGetActionInterface
             }
 
             $products[] = [
-                'id'        => (string) ($doc['id'] ?? ''),
-                'name'      => (string) ($doc['name'] ?? ''),
-                'sku'       => (string) ($doc['sku'] ?? ''),
-                'image_url' => (string) ($doc['image_url'] ?? $doc['thumbnail_url'] ?? ''),
-                'action'    => null,
-                'position'  => null,
+                'id'         => (string) ($doc['id'] ?? ''),
+                'product_id' => (int) ($doc['product_id'] ?? $doc['id'] ?? 0),
+                'name'       => (string) ($doc['name'] ?? ''),
+                'sku'        => (string) ($doc['sku'] ?? ''),
+                'price'      => (float) ($doc['price'] ?? 0),
+                'image_url'  => (string) ($doc['image_url'] ?? ''),
+                'action'     => null,
+                'position'   => null,
             ];
         }
 
@@ -115,6 +123,11 @@ class Load extends Action implements HttpGetActionInterface
      */
     private function loadMerchandisingRules(int $categoryId, int $storeId): array
     {
+        // Admin scope (0) → use default store for rules
+        if ($storeId === 0) {
+            $storeId = (int) $this->storeManager->getDefaultStoreView()->getId();
+        }
+
         $searchCriteria = $this->searchCriteriaBuilder
             ->addFilter('category_id', $categoryId)
             ->addFilter('store_id', $storeId)
