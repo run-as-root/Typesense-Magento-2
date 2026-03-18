@@ -8,7 +8,7 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Model\ScopeInterface;
 
-readonly class TypeSenseConfig
+readonly class TypeSenseConfig implements TypeSenseConfigInterface
 {
     private const string CONFIG_PREFIX = 'run_as_root_typesense';
 
