@@ -1,0 +1,12 @@
+parameters:
+    level: 6
+    paths:
+        - .
+    excludePaths:
+        - Test/*
+        - vendor/*
+        - view/*
+    ignoreErrors:
+        - '#Class Magento\\#'
+        - '#Class Typesense\\#'
+        - '#Class Psr\\#'
