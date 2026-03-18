@@ -8,65 +8,98 @@ if (!$block->isEnabled()) {
     return;
 }
 ?>
-<?php $block->getLayout()->getBlock('head') && $block->getLayout()->getBlock('head')->addCss('RunAsRoot_TypeSense::css/merchandiser.css'); ?>
 <link rel="stylesheet" type="text/css" href="<?= $block->escapeUrl($block->getViewFileUrl('RunAsRoot_TypeSense::css/merchandiser.css')) ?>"/>
+<style>
+    .ts-merch { font-size: 13px; }
+    .ts-merch-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .ts-merch-search { position: relative; flex: 0 0 300px; }
+    .ts-merch-search input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+    .ts-merch-search input:focus { border-color: #1979c3; outline: none; box-shadow: 0 0 0 2px rgba(25,121,195,0.1); }
+    .ts-merch-save { padding: 8px 20px; border-radius: 4px; font-size: 13px; font-weight: 600; border: 1px solid #1979c3; background: #1979c3; color: #fff; cursor: pointer; }
+    .ts-merch-save:hover { background: #1565c0; }
+    .ts-merch-save:disabled { opacity: 0.6; cursor: wait; }
+    .ts-merch-status { font-size: 12px; font-weight: 600; }
+    .ts-merch-hint {
+        font-size: 12px; color: #888; line-height: 1.5; margin-bottom: 16px;
+        padding: 10px 14px; background: #f8f9fa; border-left: 3px solid #1979c3; border-radius: 0 4px 4px 0;
+    }
+    .ts-merch-loading { text-align: center; padding: 30px; color: #999; font-size: 13px; }
+    .ts-merch-empty {
+        text-align: center; padding: 32px 20px; background: #fafafa; border: 1px dashed #ddd; border-radius: 6px;
+    }
+    .ts-merch-empty-icon { font-size: 28px; margin-bottom: 6px; color: #ccc; }
+    .ts-merch-empty-text { font-size: 13px; color: #999; }
+    .ts-merch-empty-hint { font-size: 12px; color: #ccc; margin-top: 4px; }
+    #merchandiser-search-results {
+        position: absolute; z-index: 100; background: #fff; border: 1px solid #ddd; width: 100%;
+        max-height: 300px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 0 0 4px 4px;
+    }
+    #merchandiser-search-results .search-result-item {
+        padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 12px;
+    }
+    #merchandiser-search-results .search-result-item:hover { background: #f0f7ff; }
+</style>
+
 <?php if (!$block->getCategoryId()): ?>
-<div class="message message-notice">
-    <span><?= $block->escapeHtml(__('Please save the category first before configuring merchandising.')) ?></span>
+<div style="text-align:center; padding:24px; color:#999; font-size:13px;">
+    <?= $block->escapeHtml(__('Save the category first to configure merchandising.')) ?>
 </div>
 <?php return; ?>
 <?php endif; ?>
 
-<div id="typesense-category-merchandiser"
+<div id="typesense-category-merchandiser" class="ts-merch"
      data-category-id="<?= (int) $block->getCategoryId() ?>"
      data-store-id="<?= (int) $block->getStoreId() ?>"
      data-load-url="<?= $block->escapeUrl($block->getLoadUrl()) ?>"
      data-save-url="<?= $block->escapeUrl($block->getSaveUrl()) ?>"
      data-search-url="<?= $block->escapeUrl($block->getProductSearchUrl()) ?>">
 
-    <div class="merchandiser-toolbar">
-        <div class="merchandiser-search">
+    <div class="ts-merch-toolbar">
+        <div class="ts-merch-search">
             <input type="text"
                    id="merchandiser-product-search"
-                   placeholder="<?= $block->escapeHtmlAttr(__('Search products to pin...')) ?>"
-                   class="admin__control-text"
+                   placeholder="<?= $block->escapeHtmlAttr(__('Search products to pin…')) ?>"
                    autocomplete="off"/>
-            <div id="merchandiser-search-results" class="merchandiser-search-dropdown" style="display:none;"></div>
+            <div id="merchandiser-search-results" style="display:none;"></div>
         </div>
-        <button type="button" class="action-default scalable save" id="merchandiser-save-btn">
-            <span><?= $block->escapeHtml(__('Save Merchandising')) ?></span>
+        <button type="button" class="ts-merch-save" id="merchandiser-save-btn">
+            <?= $block->escapeHtml(__('Save Merchandising')) ?>
         </button>
-        <span id="merchandiser-status" class="merchandiser-status-msg" style="display:none;"></span>
+        <span id="merchandiser-status" class="ts-merch-status"></span>
     </div>
 
-    <div class="merchandiser-info">
-        <p><?= $block->escapeHtml(__('Pin products to lock them at specific positions in search results. Hidden products are excluded entirely. Unpinned products appear in Typesense\'s default relevance order below pinned items. Changes are synced to Typesense when you click Save Merchandising.')) ?></p>
+    <div class="ts-merch-hint">
+        <?= $block->escapeHtml(__('Pin products to lock them at specific positions. Hidden products are excluded. Unpinned products follow Typesense relevance. Changes sync on save.')) ?>
     </div>
 
-    <div id="merchandiser-loading" class="loading-message">
-        <?= $block->escapeHtml(__('Loading products...')) ?>
+    <div id="merchandiser-loading" class="ts-merch-loading">
+        <?= $block->escapeHtml(__('Loading products from Typesense…')) ?>
     </div>
 
     <table id="merchandiser-grid" class="data-grid merchandiser-data-grid" style="display:none;">
         <thead>
             <tr>
-                <th class="col-drag"></th>
-                <th class="col-position"><?= $block->escapeHtml(__('Position')) ?></th>
-                <th class="col-image"><?= $block->escapeHtml(__('Image')) ?></th>
-                <th class="col-id"><?= $block->escapeHtml(__('ID')) ?></th>
-                <th class="col-sku"><?= $block->escapeHtml(__('SKU')) ?></th>
+                <th class="col-drag" style="width:30px;"></th>
+                <th class="col-position" style="width:50px;"><?= $block->escapeHtml(__('Pos')) ?></th>
+                <th class="col-image" style="width:50px;"><?= $block->escapeHtml(__('Image')) ?></th>
+                <th class="col-id" style="width:50px;"><?= $block->escapeHtml(__('ID')) ?></th>
+                <th class="col-sku" style="width:100px;"><?= $block->escapeHtml(__('SKU')) ?></th>
                 <th class="col-name"><?= $block->escapeHtml(__('Name')) ?></th>
-                <th class="col-price"><?= $block->escapeHtml(__('Price')) ?></th>
-                <th class="col-status"><?= $block->escapeHtml(__('Status')) ?></th>
-                <th class="col-actions"><?= $block->escapeHtml(__('Actions')) ?></th>
+                <th class="col-price" style="width:70px;"><?= $block->escapeHtml(__('Price')) ?></th>
+                <th class="col-status" style="width:70px;"><?= $block->escapeHtml(__('Status')) ?></th>
+                <th class="col-actions" style="width:140px;"><?= $block->escapeHtml(__('Actions')) ?></th>
             </tr>
         </thead>
         <tbody id="merchandiser-tbody">
         </tbody>
     </table>
 
-    <div id="merchandiser-empty" class="message message-notice" style="display:none;">
-        <span><?= $block->escapeHtml(__('No products loaded. Search for products above to pin or hide them.')) ?></span>
+    <div id="merchandiser-empty" style="display:none;">
+        <div class="ts-merch-empty">
+            <div class="ts-merch-empty-icon">📦</div>
+            <div class="ts-merch-empty-text"><?= $block->escapeHtml(__('No products found in this category')) ?></div>
+            <div class="ts-merch-empty-hint"><?= $block->escapeHtml(__('Use the search above to find and pin products, or ensure products are indexed in Typesense.')) ?></div>
+        </div>
     </div>
 
 </div>
