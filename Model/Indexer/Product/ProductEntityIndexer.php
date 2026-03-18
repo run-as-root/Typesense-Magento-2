@@ -11,7 +11,7 @@ readonly class ProductEntityIndexer implements EntityIndexerInterface
 {
     public function __construct(
         private ProductDataBuilder $dataBuilder,
-        private ProductSchemaProvider $schemaProvider,
+        private ProductSchemaProviderInterface $schemaProvider,
     ) {
     }
 

@@ -33,6 +33,9 @@
     <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\UrlResolverInterface"
                 type="RunAsRoot\TypeSense\Model\Indexer\Product\UrlResolver"/>
 
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProvider"/>
+
     <!-- Entity indexer pool: register product indexer -->
     <type name="RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool">
         <arguments>

@@ -17,7 +17,7 @@ readonly class ProductDataBuilder
         private StockResolverInterface $stockResolver,
         private CategoryResolverInterface $categoryResolver,
         private UrlResolverInterface $urlResolver,
-        private ?ProductCollectionFactory $collectionFactory = null,
+        private ProductCollectionFactory $collectionFactory,
     ) {
     }
 

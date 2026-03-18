@@ -8,10 +8,13 @@ use Magento\Catalog\Api\CategoryRepositoryInterface;
 use Magento\Catalog\Api\Data\CategoryInterface;
 use Magento\Catalog\Model\Product;
 
-readonly class CategoryResolver implements CategoryResolverInterface
+class CategoryResolver implements CategoryResolverInterface
 {
+    /** @var array<int, CategoryInterface> */
+    private array $categoryCache = [];
+
     public function __construct(
-        private CategoryRepositoryInterface $categoryRepository,
+        private readonly CategoryRepositoryInterface $categoryRepository,
     ) {
     }
 
@@ -34,9 +37,8 @@ readonly class CategoryResolver implements CategoryResolverInterface
         $lvl2 = [];
 
         foreach ($categoryIds as $categoryId) {
-            try {
-                $category = $this->categoryRepository->get((int) $categoryId);
-            } catch (\Exception) {
+            $category = $this->loadCategory((int) $categoryId);
+            if ($category === null) {
                 continue;
             }
 
@@ -65,6 +67,22 @@ readonly class CategoryResolver implements CategoryResolverInterface
         ];
     }
 
+    private function loadCategory(int $categoryId): ?CategoryInterface
+    {
+        if (isset($this->categoryCache[$categoryId])) {
+            return $this->categoryCache[$categoryId];
+        }
+
+        try {
+            $category = $this->categoryRepository->get($categoryId);
+            $this->categoryCache[$categoryId] = $category;
+
+            return $category;
+        } catch (\Exception) {
+            return null;
+        }
+    }
+
     private function buildCategoryPath(CategoryInterface $category): string
     {
         $names = [];
@@ -78,11 +96,7 @@ readonly class CategoryResolver implements CategoryResolverInterface
                 break;
             }
 
-            try {
-                $current = $this->categoryRepository->get($parentId);
-            } catch (\Exception) {
-                break;
-            }
+            $current = $this->loadCategory($parentId);
         }
 
         return implode(' > ', $names);

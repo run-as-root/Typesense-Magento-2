@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 
 use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\ResourceModel\Product\Attribute\Collection as AttributeCollection;
 use Magento\Catalog\Model\ResourceModel\Product\Attribute\CollectionFactory as AttributeCollectionFactory;
 
-readonly class AttributeResolver implements AttributeResolverInterface
+class AttributeResolver implements AttributeResolverInterface
 {
+    private ?AttributeCollection $cachedCollection = null;
+
     public function __construct(
-        private AttributeCollectionFactory $attributeCollectionFactory,
+        private readonly AttributeCollectionFactory $attributeCollectionFactory,
     ) {
     }
 
@@ -19,9 +22,7 @@ readonly class AttributeResolver implements AttributeResolverInterface
      */
     public function getExtraAttributes(Product $product): array
     {
-        $collection = $this->attributeCollectionFactory->create();
-        $collection->addIsSearchableFilter();
-        $collection->addFieldToFilter('is_filterable', ['gt' => 0]);
+        $collection = $this->getAttributeCollection();
 
         $coreFields = [
             'entity_id', 'attribute_set_id', 'type_id', 'sku', 'name',
@@ -46,5 +47,17 @@ readonly class AttributeResolver implements AttributeResolverInterface
         }
 
         return $extra;
+    }
+
+    private function getAttributeCollection(): AttributeCollection
+    {
+        if ($this->cachedCollection === null) {
+            $collection = $this->attributeCollectionFactory->create();
+            $collection->addIsSearchableFilter();
+            $collection->addFieldToFilter('is_filterable', ['gt' => 0]);
+            $this->cachedCollection = $collection;
+        }
+
+        return $this->cachedCollection;
     }
 }

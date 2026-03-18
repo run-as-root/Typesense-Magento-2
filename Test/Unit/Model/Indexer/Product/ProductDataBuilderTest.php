@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Test\Unit\Model\Indexer\Product;
 
 use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
+use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Model\Indexer\Product\AttributeResolverInterface;
@@ -23,6 +25,7 @@ final class ProductDataBuilderTest extends TestCase
     private StockResolverInterface&MockObject $stockResolver;
     private CategoryResolverInterface&MockObject $categoryResolver;
     private UrlResolverInterface&MockObject $urlResolver;
+    private ProductCollectionFactory&MockObject $collectionFactory;
     private ProductDataBuilder $sut;
 
     protected function setUp(): void
@@ -33,6 +36,7 @@ final class ProductDataBuilderTest extends TestCase
         $this->stockResolver = $this->createMock(StockResolverInterface::class);
         $this->categoryResolver = $this->createMock(CategoryResolverInterface::class);
         $this->urlResolver = $this->createMock(UrlResolverInterface::class);
+        $this->collectionFactory = $this->createMock(ProductCollectionFactory::class);
 
         $this->sut = new ProductDataBuilder(
             $this->attributeResolver,
@@ -41,6 +45,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->stockResolver,
             $this->categoryResolver,
             $this->urlResolver,
+            $this->collectionFactory,
         );
     }
 
@@ -197,6 +202,77 @@ final class ProductDataBuilderTest extends TestCase
         self::assertIsInt($document['updated_at']);
         self::assertGreaterThan(0, $document['created_at']);
         self::assertGreaterThan(0, $document['updated_at']);
+    }
+
+    public function test_get_product_collection_sets_store_id(): void
+    {
+        $collection = $this->createMock(ProductCollection::class);
+        $this->collectionFactory->method('create')->willReturn($collection);
+
+        $collection->expects(self::once())
+            ->method('setStoreId')
+            ->with(5);
+
+        $collection->method('addAttributeToSelect');
+        $collection->method('addUrlRewrite');
+
+        $this->sut->getProductCollection([], 5);
+    }
+
+    public function test_get_product_collection_adds_all_attributes(): void
+    {
+        $collection = $this->createMock(ProductCollection::class);
+        $this->collectionFactory->method('create')->willReturn($collection);
+
+        $collection->method('setStoreId');
+        $collection->expects(self::once())
+            ->method('addAttributeToSelect')
+            ->with('*');
+        $collection->method('addUrlRewrite');
+
+        $this->sut->getProductCollection([], 1);
+    }
+
+    public function test_get_product_collection_adds_url_rewrite(): void
+    {
+        $collection = $this->createMock(ProductCollection::class);
+        $this->collectionFactory->method('create')->willReturn($collection);
+
+        $collection->method('setStoreId');
+        $collection->method('addAttributeToSelect');
+        $collection->expects(self::once())
+            ->method('addUrlRewrite');
+
+        $this->sut->getProductCollection([], 1);
+    }
+
+    public function test_get_product_collection_filters_by_entity_ids_when_provided(): void
+    {
+        $collection = $this->createMock(ProductCollection::class);
+        $this->collectionFactory->method('create')->willReturn($collection);
+
+        $collection->method('setStoreId');
+        $collection->method('addAttributeToSelect');
+        $collection->method('addUrlRewrite');
+        $collection->expects(self::once())
+            ->method('addFieldToFilter')
+            ->with('entity_id', ['in' => [1, 2, 3]]);
+
+        $this->sut->getProductCollection([1, 2, 3], 1);
+    }
+
+    public function test_get_product_collection_does_not_filter_when_entity_ids_empty(): void
+    {
+        $collection = $this->createMock(ProductCollection::class);
+        $this->collectionFactory->method('create')->willReturn($collection);
+
+        $collection->method('setStoreId');
+        $collection->method('addAttributeToSelect');
+        $collection->method('addUrlRewrite');
+        $collection->expects(self::never())
+            ->method('addFieldToFilter');
+
+        $this->sut->getProductCollection([], 1);
     }
 
     /**
