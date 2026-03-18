@@ -10,7 +10,6 @@ $connectionInfo = $viewModel->getConnectionInfo();
 $collections    = $viewModel->getCollections();
 $aliasesResult  = $viewModel->getAliases();
 
-// Build a map from collection name => alias name for quick lookup
 $aliasMap = [];
 foreach ($aliasesResult['aliases'] ?? [] as $alias) {
     $collectionName = $alias['collection_name'] ?? '';
@@ -22,269 +21,292 @@ foreach ($aliasesResult['aliases'] ?? [] as $alias) {
 
 $configUrl = $block->getUrl('adminhtml/system_config/edit', ['section' => 'run_as_root_typesense']);
 
-// Checklist checks
 $checks = [
-    [
-        'pass'  => $viewModel->isEnabled(),
-        'label' => __('Module enabled'),
-        'fix'   => sprintf('<a href="%s">%s</a>', $block->escapeUrl($configUrl), $block->escapeHtml(__('Go to Configuration'))),
-    ],
-    [
-        'pass'  => $viewModel->hasApiKey(),
-        'label' => __('Admin API key set'),
-        'fix'   => sprintf('<a href="%s">%s</a>', $block->escapeUrl($configUrl), $block->escapeHtml(__('Go to Configuration'))),
-    ],
-    [
-        'pass'  => $viewModel->hasSearchOnlyApiKey(),
-        'label' => __('Search-only API key set'),
-        'fix'   => sprintf('<a href="%s">%s</a>', $block->escapeUrl($configUrl), $block->escapeHtml(__('Go to Configuration'))),
-    ],
-    [
-        'pass'  => $isConnected,
-        'label' => __('Connection healthy'),
-        'fix'   => $block->escapeHtml(__('Check host/port settings')),
-    ],
-    [
-        'pass'  => $viewModel->getTotalDocuments() > 0,
-        'label' => __('Products indexed'),
-        'fix'   => '<code>' . $block->escapeHtml(__('Run: bin/magento typesense:reindex')) . '</code>',
-    ],
-    [
-        'pass'  => $viewModel->isAutocompleteEnabled(),
-        'label' => __('Autocomplete enabled'),
-        'fix'   => sprintf('<a href="%s">%s</a>', $block->escapeUrl($configUrl), $block->escapeHtml(__('Go to Configuration'))),
-    ],
+    ['pass' => $viewModel->isEnabled(), 'label' => __('Module enabled')],
+    ['pass' => $viewModel->hasApiKey(), 'label' => __('Admin API key configured')],
+    ['pass' => $viewModel->hasSearchOnlyApiKey(), 'label' => __('Search-only API key configured')],
+    ['pass' => $isConnected, 'label' => __('Typesense connection healthy')],
+    ['pass' => $viewModel->getTotalDocuments() > 0, 'label' => __('Products indexed')],
+    ['pass' => $viewModel->isAutocompleteEnabled(), 'label' => __('Autocomplete enabled')],
 ];
-
-$allPass = array_reduce($checks, fn(bool $carry, array $check) => $carry && $check['pass'], true);
+$allPass = array_reduce($checks, fn(bool $carry, array $c) => $carry && $c['pass'], true);
+$passCount = count(array_filter($checks, fn(array $c) => $c['pass']));
+$totalDocs = $viewModel->getTotalDocuments();
 ?>
-<div class="admin__page-section">
-    <div class="admin__page-section-title">
-        <span class="title"><?= $block->escapeHtml(__('TypeSense Dashboard')) ?></span>
-    </div>
 
-    <!-- Smart Checklist -->
-    <div class="admin__page-section-content">
-        <?php if ($allPass): ?>
-            <div class="message message-success">
-                <strong>&#10003; <?= $block->escapeHtml(__('All systems operational')) ?></strong>
+<style>
+    .ts-dashboard { max-width: 1200px; }
+    .ts-status-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 20px;
+        border-radius: 6px;
+        margin-bottom: 24px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .ts-status-bar.ts-ok { background: #e8f5e9; color: #1b5e20; border: 1px solid #c8e6c9; }
+    .ts-status-bar.ts-warn { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; }
+    .ts-status-bar .ts-status-icon { font-size: 18px; }
+    .ts-status-bar .ts-status-detail { font-weight: 400; color: #666; margin-left: auto; font-size: 12px; }
+
+    .ts-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+    .ts-card {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .ts-card-header {
+        padding: 14px 20px;
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #555;
+        background: #fafafa;
+        border-bottom: 1px solid #e8e8e8;
+    }
+    .ts-card-body { padding: 20px; }
+
+    .ts-kv { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+    .ts-kv:last-child { border-bottom: none; }
+    .ts-kv-label { color: #888; }
+    .ts-kv-value { font-weight: 600; color: #333; font-family: monospace; }
+
+    .ts-checklist { list-style: none; padding: 0; margin: 0; }
+    .ts-checklist li { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+    .ts-checklist li:last-child { border-bottom: none; }
+    .ts-check-icon { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .ts-check-pass { background: #4caf50; }
+    .ts-check-fail { background: #ef5350; }
+
+    .ts-actions { display: flex; gap: 10px; margin-top: 12px; }
+    .ts-actions a, .ts-actions button {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 500;
+        text-decoration: none; cursor: pointer; border: 1px solid #ddd; background: #fff; color: #333;
+    }
+    .ts-actions a:hover, .ts-actions button:hover { background: #f5f5f5; border-color: #ccc; }
+    .ts-actions .ts-primary { background: #1979c3; color: #fff; border-color: #1979c3; }
+    .ts-actions .ts-primary:hover { background: #1565c0; }
+
+    .ts-test-result { font-size: 13px; font-weight: 600; margin-left: 8px; }
+
+    .ts-collections-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .ts-collections-table th {
+        text-align: left; padding: 10px 16px; font-size: 11px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.5px; color: #888; background: #fafafa;
+        border-bottom: 2px solid #e8e8e8;
+    }
+    .ts-collections-table td { padding: 12px 16px; border-bottom: 1px solid #f0f0f0; }
+    .ts-collections-table tr:hover td { background: #fafafa; }
+    .ts-collections-table .ts-mono { font-family: monospace; font-size: 12px; }
+    .ts-collections-table .ts-num { text-align: right; font-weight: 600; font-family: monospace; }
+    .ts-collections-table .ts-date { color: #999; font-size: 12px; }
+    .ts-badge-live {
+        display: inline-block; padding: 1px 6px; border-radius: 3px;
+        font-size: 10px; font-weight: 700; background: #e8f5e9; color: #2e7d32;
+        margin-left: 6px; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .ts-zero-docs { color: #e65100; }
+    .ts-zero-row td { background: #fffde7; }
+
+    .ts-hint { margin-top: 16px; padding: 12px 16px; background: #fff8e1; border: 1px solid #ffe082; border-radius: 6px; font-size: 12px; color: #795548; }
+    .ts-hint strong { color: #e65100; }
+    .ts-hint ul { margin: 6px 0 0 16px; padding: 0; }
+    .ts-hint li { margin-bottom: 4px; }
+</style>
+
+<div class="ts-dashboard">
+
+    <!-- Status Bar -->
+    <?php if ($allPass): ?>
+        <div class="ts-status-bar ts-ok">
+            <span class="ts-status-icon">✓</span>
+            <?= $block->escapeHtml(__('All systems operational')) ?>
+            <span class="ts-status-detail">
+                <?= $block->escapeHtml(__('%1 documents across %2 collections', number_format($totalDocs), count($collections))) ?>
+            </span>
+        </div>
+    <?php else: ?>
+        <div class="ts-status-bar ts-warn">
+            <span class="ts-status-icon">⚠</span>
+            <?= $block->escapeHtml(__('%1 of %2 checks passing — review items below', $passCount, count($checks))) ?>
+            <span class="ts-status-detail">
+                <a href="<?= $block->escapeUrl($configUrl) ?>" style="color:#e65100; text-decoration:underline;">
+                    <?= $block->escapeHtml(__('Open Configuration')) ?>
+                </a>
+            </span>
+        </div>
+    <?php endif; ?>
+
+    <!-- Two-Column Cards -->
+    <div class="ts-cards">
+
+        <!-- Connection Card -->
+        <div class="ts-card">
+            <div class="ts-card-header"><?= $block->escapeHtml(__('Connection')) ?></div>
+            <div class="ts-card-body">
+                <div class="ts-kv">
+                    <span class="ts-kv-label"><?= $block->escapeHtml(__('Status')) ?></span>
+                    <span>
+                        <?php if ($isConnected): ?>
+                            <span style="color:#2e7d32; font-weight:600;">● <?= $block->escapeHtml(__('Connected')) ?></span>
+                        <?php else: ?>
+                            <span style="color:#c62828; font-weight:600;">● <?= $block->escapeHtml(__('Disconnected')) ?></span>
+                        <?php endif; ?>
+                    </span>
+                </div>
+                <div class="ts-kv">
+                    <span class="ts-kv-label"><?= $block->escapeHtml(__('Server')) ?></span>
+                    <span class="ts-kv-value"><?= $block->escapeHtml($connectionInfo['protocol'] . '://' . $connectionInfo['host'] . ':' . $connectionInfo['port']) ?></span>
+                </div>
+                <div class="ts-actions">
+                    <button type="button" id="typesense-test-connection">
+                        <?= $block->escapeHtml(__('Test Connection')) ?>
+                    </button>
+                    <span id="typesense-test-connection-result" class="ts-test-result"></span>
+                </div>
+
+                <?php if (!$isConnected): ?>
+                    <div class="ts-hint">
+                        <strong><?= $block->escapeHtml(__('Troubleshooting:')) ?></strong>
+                        <ul>
+                            <li><?= $block->escapeHtml(__('Verify host and port in Configuration')) ?></li>
+                            <li><?= $block->escapeHtml(__('Check Admin API Key matches the --api-key server flag')) ?></li>
+                            <li><?= $block->escapeHtml(__("Docker/Warden: use container name 'typesense', not 'localhost'")) ?></li>
+                        </ul>
+                    </div>
+                <?php endif; ?>
             </div>
-        <?php else: ?>
-            <div class="message message-error">
-                <strong><?= $block->escapeHtml(__('Setup checklist — fix the items below:')) ?></strong>
-                <ul style="margin:0.75rem 0 0 1.25rem; padding:0;">
+        </div>
+
+        <!-- Setup Checklist Card -->
+        <div class="ts-card">
+            <div class="ts-card-header"><?= $block->escapeHtml(__('Setup Checklist')) ?></div>
+            <div class="ts-card-body">
+                <ul class="ts-checklist">
                     <?php foreach ($checks as $check): ?>
-                        <li style="margin-bottom:0.35rem;">
-                            <?php if ($check['pass']): ?>
-                                <span style="color:#185b00; font-weight:bold;">&#10003;</span>
+                        <li>
+                            <span class="ts-check-icon <?= $check['pass'] ? 'ts-check-pass' : 'ts-check-fail' ?>">
+                                <?= $check['pass'] ? '✓' : '✗' ?>
+                            </span>
+                            <span style="<?= $check['pass'] ? 'color:#333;' : 'color:#c62828; font-weight:500;' ?>">
                                 <?= $block->escapeHtml((string) $check['label']) ?>
-                            <?php else: ?>
-                                <span style="color:#b40000; font-weight:bold;">&#10007;</span>
-                                <?= $block->escapeHtml((string) $check['label']) ?>
-                                &mdash; <?= $check['fix'] /* already escaped/safe */ ?>
-                            <?php endif; ?>
+                            </span>
                         </li>
                     <?php endforeach; ?>
                 </ul>
-            </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- Connection Status -->
-    <div class="admin__page-section-content">
-        <div class="admin__fieldset">
-            <div class="admin__fieldset-wrapper">
-                <div class="admin__fieldset-wrapper-title">
-                    <span><?= $block->escapeHtml(__('Connection Status')) ?></span>
-                </div>
-                <div class="admin__fieldset-wrapper-content">
-                    <div class="admin__field">
-                        <div class="admin__field-label">
-                            <span><?= $block->escapeHtml(__('Status')) ?></span>
-                        </div>
-                        <div class="admin__field-control" style="display:flex; align-items:center; gap:1rem;">
-                            <?php if ($isConnected): ?>
-                                <span class="grid-severity-notice">
-                                    <span><?= $block->escapeHtml(__('Connected')) ?></span>
-                                </span>
-                            <?php else: ?>
-                                <span class="grid-severity-critical">
-                                    <span><?= $block->escapeHtml(__('Disconnected')) ?></span>
-                                </span>
-                            <?php endif; ?>
-                            <button type="button"
-                                    id="typesense-test-connection"
-                                    class="action-default scalable">
-                                <span><?= $block->escapeHtml(__('Test Connection')) ?></span>
-                            </button>
-                            <span id="typesense-test-connection-result" style="font-weight:bold;"></span>
-                        </div>
+                <?php if (!$allPass): ?>
+                    <div class="ts-actions" style="margin-top:16px;">
+                        <a href="<?= $block->escapeUrl($configUrl) ?>" class="ts-primary">
+                            <?= $block->escapeHtml(__('Open Configuration')) ?>
+                        </a>
                     </div>
-                    <div class="admin__field">
-                        <div class="admin__field-label">
-                            <span><?= $block->escapeHtml(__('Host')) ?></span>
-                        </div>
-                        <div class="admin__field-control">
-                            <span><?= $block->escapeHtml((string) $connectionInfo['host']) ?></span>
-                        </div>
-                    </div>
-                    <div class="admin__field">
-                        <div class="admin__field-label">
-                            <span><?= $block->escapeHtml(__('Port')) ?></span>
-                        </div>
-                        <div class="admin__field-control">
-                            <span><?= $block->escapeHtml((string) $connectionInfo['port']) ?></span>
-                        </div>
-                    </div>
-                    <div class="admin__field">
-                        <div class="admin__field-label">
-                            <span><?= $block->escapeHtml(__('Protocol')) ?></span>
-                        </div>
-                        <div class="admin__field-control">
-                            <span><?= $block->escapeHtml((string) $connectionInfo['protocol']) ?></span>
-                        </div>
-                    </div>
-
-                    <?php if (!$isConnected): ?>
-                        <div class="admin__field">
-                            <div class="admin__field-control">
-                                <div class="message message-warning">
-                                    <strong><?= $block->escapeHtml(__('Troubleshooting hints:')) ?></strong>
-                                    <ul style="margin:0.5rem 0 0 1.25rem; padding:0;">
-                                        <li><?= $block->escapeHtml(__('Check your Typesense host and port in Configuration')) ?></li>
-                                        <li><?= $block->escapeHtml(__('Verify your Admin API Key matches the --api-key flag used to start Typesense')) ?></li>
-                                        <li><?= $block->escapeHtml(__("If using Docker/Warden, the host should be the container name (e.g., 'typesense'), not 'localhost'")) ?></li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="admin__page-section-content">
-        <div class="admin__fieldset">
-            <div class="admin__fieldset-wrapper">
-                <div class="admin__fieldset-wrapper-title">
-                    <span><?= $block->escapeHtml(__('Quick Actions')) ?></span>
-                </div>
-                <div class="admin__fieldset-wrapper-content">
-                    <div class="admin__field">
-                        <div class="admin__field-control">
-                            <button type="button"
-                                    class="action-default scalable"
-                                    title="<?= $block->escapeHtmlAttr(__('Reindex via CLI: bin/magento typesense:reindex')) ?>">
-                                <span><?= $block->escapeHtml(__('Reindex All (CLI)')) ?></span>
-                            </button>
-                            <span class="admin__field-note">
-                                <?= $block->escapeHtml(__('Run: bin/magento typesense:reindex')) ?>
-                            </span>
-                        </div>
-                    </div>
-                    <div class="admin__field">
-                        <div class="admin__field-control">
-                            <a href="<?= $block->escapeUrl($block->getUrl('typesense/collection/index')) ?>"
-                               class="action-default scalable">
-                                <span><?= $block->escapeHtml(__('Manage Collections')) ?></span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 
     <!-- Collections Table -->
-    <div class="admin__page-section-content">
-        <div class="admin__fieldset">
-            <div class="admin__fieldset-wrapper">
-                <div class="admin__fieldset-wrapper-title">
-                    <span>
-                        <?= $block->escapeHtml(__('Collections (%1)', count($collections))) ?>
+    <div class="ts-card" style="margin-bottom:24px;">
+        <div class="ts-card-header">
+            <?= $block->escapeHtml(__('Collections')) ?>
+            <span style="font-weight:400; color:#aaa; margin-left:6px;">(<?= count($collections) ?>)</span>
+        </div>
+        <?php if (empty($collections)): ?>
+            <div class="ts-card-body">
+                <p style="color:#999; font-size:13px; margin:0;">
+                    <?= $block->escapeHtml(__('No collections found. Run a reindex to create them.')) ?>
+                </p>
+                <div class="ts-actions" style="margin-top:12px;">
+                    <span style="font-family:monospace; font-size:12px; color:#666; padding:8px 0;">
+                        bin/magento typesense:reindex
                     </span>
                 </div>
-                <div class="admin__fieldset-wrapper-content">
-                    <?php if (empty($collections)): ?>
-                        <p class="message message-notice">
-                            <?= $block->escapeHtml(__('No collections found. Check your connection settings or run a reindex.')) ?>
-                        </p>
-                    <?php else: ?>
-                        <table class="data-grid">
-                            <thead>
-                                <tr>
-                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Name')) ?></th>
-                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Document Count')) ?></th>
-                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Created At')) ?></th>
-                                    <th class="data-grid-th"
-                                        title="<?= $block->escapeHtmlAttr(__('An alias points to the active collection. During zero-downtime reindex, the alias switches to the new collection automatically.')) ?>">
-                                        <?= $block->escapeHtml(__('Alias')) ?>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($collections as $collection): ?>
-                                    <?php
-                                    $name         = (string) ($collection['name'] ?? '');
-                                    $numDocuments = (int) ($collection['num_documents'] ?? 0);
-                                    $createdAt    = isset($collection['created_at'])
-                                        ? date('Y-m-d H:i:s', (int) $collection['created_at'])
-                                        : '';
-                                    $alias        = $aliasMap[$name] ?? '';
-                                    $rowStyle     = $numDocuments === 0 ? ' style="background:#fff8e1;"' : '';
-                                    ?>
-                                    <tr<?= $rowStyle ?>>
-                                        <td><?= $block->escapeHtml($name) ?></td>
-                                        <td><?= $block->escapeHtml((string) $numDocuments) ?></td>
-                                        <td><?= $block->escapeHtml($createdAt) ?></td>
-                                        <td>
-                                            <?php if ($alias !== ''): ?>
-                                                <?= $block->escapeHtml($alias) ?>
-                                                <span style="color:#185b00; font-weight:bold;"><?= $block->escapeHtml(__(' (live)')) ?></span>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    <?php endif; ?>
-                </div>
             </div>
-        </div>
+        <?php else: ?>
+            <table class="ts-collections-table">
+                <thead>
+                    <tr>
+                        <th><?= $block->escapeHtml(__('Collection')) ?></th>
+                        <th style="text-align:right; width:120px;"><?= $block->escapeHtml(__('Documents')) ?></th>
+                        <th style="width:160px;"><?= $block->escapeHtml(__('Created')) ?></th>
+                        <th style="width:220px;"
+                            title="<?= $block->escapeHtmlAttr(__('An alias points to the active collection. During reindex, the alias switches to the new collection automatically.')) ?>">
+                            <?= $block->escapeHtml(__('Alias')) ?>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($collections as $collection): ?>
+                        <?php
+                        $name         = (string) ($collection['name'] ?? '');
+                        $numDocuments = (int) ($collection['num_documents'] ?? 0);
+                        $createdAt    = isset($collection['created_at'])
+                            ? date('Y-m-d H:i:s', (int) $collection['created_at'])
+                            : '';
+                        $alias        = $aliasMap[$name] ?? '';
+                        ?>
+                        <tr class="<?= $numDocuments === 0 ? 'ts-zero-row' : '' ?>">
+                            <td class="ts-mono"><?= $block->escapeHtml($name) ?></td>
+                            <td class="ts-num <?= $numDocuments === 0 ? 'ts-zero-docs' : '' ?>">
+                                <?= $block->escapeHtml(number_format($numDocuments)) ?>
+                            </td>
+                            <td class="ts-date"><?= $block->escapeHtml($createdAt) ?></td>
+                            <td>
+                                <?php if ($alias !== ''): ?>
+                                    <span class="ts-mono"><?= $block->escapeHtml($alias) ?></span>
+                                    <span class="ts-badge-live">live</span>
+                                <?php else: ?>
+                                    <span style="color:#ddd;">—</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="ts-actions">
+        <a href="<?= $block->escapeUrl($block->getUrl('typesense/collection/index')) ?>">
+            <?= $block->escapeHtml(__('Manage Collections')) ?>
+        </a>
+        <a href="<?= $block->escapeUrl($configUrl) ?>">
+            <?= $block->escapeHtml(__('Configuration')) ?>
+        </a>
+        <span style="font-family:monospace; font-size:12px; color:#999; display:flex; align-items:center; gap:6px; margin-left:auto;">
+            <?= $block->escapeHtml(__('CLI:')) ?> bin/magento typesense:reindex
+        </span>
     </div>
 </div>
 
 <script>
 require(['jquery'], function ($) {
     'use strict';
-
     $('#typesense-test-connection').on('click', function () {
-        var $btn    = $(this);
-        var $result = $('#typesense-test-connection-result');
-
+        var $btn = $(this), $result = $('#typesense-test-connection-result');
         $btn.prop('disabled', true);
-        $result.css('color', '').text('<?= $block->escapeJs(__('Testing...')) ?>');
-
+        $result.css('color', '#888').text('Testing...');
         $.ajax({
-            url:      '<?= $block->escapeJs($block->getUrl('typesense/dashboard/testconnection')) ?>',
-            method:   'GET',
+            url: '<?= $block->escapeJs($block->getUrl('typesense/dashboard/testconnection')) ?>',
+            method: 'GET',
             dataType: 'json',
             success: function (data) {
                 if (data && data.success) {
-                    $result.css('color', '#185b00').text('<?= $block->escapeJs(__('Connected successfully!')) ?>');
+                    $result.css('color', '#2e7d32').text('✓ ' + (data.message || 'Connected'));
                 } else {
-                    var msg = (data && data.message) ? data.message : '<?= $block->escapeJs(__('Connection failed')) ?>';
-                    $result.css('color', '#b40000').text(msg);
+                    $result.css('color', '#c62828').text('✗ ' + (data.message || 'Failed'));
                 }
             },
             error: function () {
-                $result.css('color', '#b40000').text('<?= $block->escapeJs(__('Request failed. Check browser console.')) ?>');
+                $result.css('color', '#c62828').text('✗ Request failed');
             },
-            complete: function () {
-                $btn.prop('disabled', false);
-            }
+            complete: function () { $btn.prop('disabled', false); }
         });
     });
 });
