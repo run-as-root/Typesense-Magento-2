@@ -1,0 +1,69 @@
+<?php
+/** @var \Magento\Framework\View\Element\Template $block */
+/** @var \RunAsRoot\TypeSense\ViewModel\Adminhtml\CollectionViewModel $viewModel */
+
+declare(strict_types=1);
+
+$viewModel   = $block->getData('view_model');
+$collections = $viewModel->getCollections();
+$aliasMap    = $viewModel->getAliasMap();
+?>
+<div class="admin__page-section">
+    <div class="admin__page-section-title">
+        <span class="title"><?= $block->escapeHtml(__('TypeSense Collections')) ?></span>
+    </div>
+
+    <div class="admin__page-section-content">
+        <?php if (empty($collections)): ?>
+            <p class="message message-notice">
+                <?= $block->escapeHtml(__('No collections found. Check your connection settings or run a reindex.')) ?>
+            </p>
+        <?php else: ?>
+            <table class="data-grid">
+                <thead>
+                    <tr>
+                        <th class="data-grid-th"><?= $block->escapeHtml(__('Name')) ?></th>
+                        <th class="data-grid-th"><?= $block->escapeHtml(__('Document Count')) ?></th>
+                        <th class="data-grid-th"><?= $block->escapeHtml(__('Created At')) ?></th>
+                        <th class="data-grid-th"><?= $block->escapeHtml(__('Alias')) ?></th>
+                        <th class="data-grid-th"><?= $block->escapeHtml(__('Actions')) ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($collections as $collection): ?>
+                        <?php
+                        $name         = (string) ($collection['name'] ?? '');
+                        $numDocuments = (int) ($collection['num_documents'] ?? 0);
+                        $createdAt    = isset($collection['created_at'])
+                            ? date('Y-m-d H:i:s', (int) $collection['created_at'])
+                            : '';
+                        $alias        = $aliasMap[$name] ?? '';
+                        ?>
+                        <tr>
+                            <td><?= $block->escapeHtml($name) ?></td>
+                            <td><?= $block->escapeHtml((string) $numDocuments) ?></td>
+                            <td><?= $block->escapeHtml($createdAt) ?></td>
+                            <td><?= $block->escapeHtml($alias) ?></td>
+                            <td>
+                                <a href="<?= $block->escapeUrl($block->getUrl('*/*/view', ['name' => $name])) ?>"
+                                   class="action-menu-item">
+                                    <?= $block->escapeHtml(__('View')) ?>
+                                </a>
+                                <form method="post"
+                                      action="<?= $block->escapeUrl($block->getUrl('*/*/delete')) ?>"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('<?= $block->escapeHtmlAttr(__('Are you sure you want to delete collection "%1"?', $name)) ?>');">
+                                    <?= $block->getBlockHtml('formkey') ?>
+                                    <input type="hidden" name="name" value="<?= $block->escapeHtmlAttr($name) ?>"/>
+                                    <button type="submit" class="action-menu-item" style="background:none;border:none;color:#eb5202;cursor:pointer;padding:0;">
+                                        <?= $block->escapeHtml(__('Delete')) ?>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </div>
+</div>

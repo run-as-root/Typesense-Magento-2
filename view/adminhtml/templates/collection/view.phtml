@@ -1,0 +1,140 @@
+<?php
+/** @var \Magento\Framework\View\Element\Template $block */
+/** @var \RunAsRoot\TypeSense\ViewModel\Adminhtml\CollectionViewModel $viewModel */
+
+declare(strict_types=1);
+
+$viewModel  = $block->getData('view_model');
+$name       = (string) $block->getRequest()->getParam('name', '');
+$collection = $viewModel->getCollectionDetails($name);
+$documents  = $viewModel->getDocuments($name, 10);
+$fields     = $collection['fields'] ?? [];
+$hits       = $documents['hits'] ?? [];
+$found      = (int) ($documents['found'] ?? 0);
+?>
+<div class="admin__page-section">
+    <div class="admin__page-section-title">
+        <span class="title">
+            <?= $block->escapeHtml(__('Collection: %1', $name)) ?>
+        </span>
+        <div class="admin__page-section-title-actions">
+            <a href="<?= $block->escapeUrl($block->getUrl('*/*/index')) ?>"
+               class="action-default scalable">
+                <?= $block->escapeHtml(__('Back to Collections')) ?>
+            </a>
+        </div>
+    </div>
+
+    <!-- Schema Fields -->
+    <div class="admin__page-section-content">
+        <div class="admin__fieldset">
+            <div class="admin__fieldset-wrapper">
+                <div class="admin__fieldset-wrapper-title">
+                    <span><?= $block->escapeHtml(__('Schema Fields (%1)', count($fields))) ?></span>
+                </div>
+                <div class="admin__fieldset-wrapper-content">
+                    <?php if (empty($fields)): ?>
+                        <p class="message message-notice">
+                            <?= $block->escapeHtml(__('No schema fields found.')) ?>
+                        </p>
+                    <?php else: ?>
+                        <table class="data-grid">
+                            <thead>
+                                <tr>
+                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Field Name')) ?></th>
+                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Type')) ?></th>
+                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Facet')) ?></th>
+                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Optional')) ?></th>
+                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Index')) ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($fields as $field): ?>
+                                    <tr>
+                                        <td><?= $block->escapeHtml((string) ($field['name'] ?? '')) ?></td>
+                                        <td><?= $block->escapeHtml((string) ($field['type'] ?? '')) ?></td>
+                                        <td>
+                                            <?php if ($field['facet'] ?? false): ?>
+                                                <span class="grid-severity-notice"><span><?= $block->escapeHtml(__('Yes')) ?></span></span>
+                                            <?php else: ?>
+                                                <?= $block->escapeHtml(__('No')) ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if ($field['optional'] ?? false): ?>
+                                                <span><?= $block->escapeHtml(__('Yes')) ?></span>
+                                            <?php else: ?>
+                                                <?= $block->escapeHtml(__('No')) ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if (($field['index'] ?? true) !== false): ?>
+                                                <span><?= $block->escapeHtml(__('Yes')) ?></span>
+                                            <?php else: ?>
+                                                <?= $block->escapeHtml(__('No')) ?>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents -->
+    <div class="admin__page-section-content">
+        <div class="admin__fieldset">
+            <div class="admin__fieldset-wrapper">
+                <div class="admin__fieldset-wrapper-title">
+                    <span>
+                        <?= $block->escapeHtml(__('Documents (showing first 10 of %1)', $found)) ?>
+                    </span>
+                </div>
+                <div class="admin__fieldset-wrapper-content">
+                    <?php if (empty($hits)): ?>
+                        <p class="message message-notice">
+                            <?= $block->escapeHtml(__('No documents found in this collection.')) ?>
+                        </p>
+                    <?php else: ?>
+                        <?php
+                        $firstDoc = $hits[0]['document'] ?? [];
+                        $docKeys = array_keys($firstDoc);
+                        ?>
+                        <div style="overflow-x: auto;">
+                            <table class="data-grid">
+                                <thead>
+                                    <tr>
+                                        <?php foreach ($docKeys as $key): ?>
+                                            <th class="data-grid-th"><?= $block->escapeHtml((string) $key) ?></th>
+                                        <?php endforeach; ?>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($hits as $hit): ?>
+                                        <?php $doc = $hit['document'] ?? []; ?>
+                                        <tr>
+                                            <?php foreach ($docKeys as $key): ?>
+                                                <td>
+                                                    <?php
+                                                    $value = $doc[$key] ?? '';
+                                                    if (is_array($value)) {
+                                                        $value = implode(', ', $value);
+                                                    }
+                                                    ?>
+                                                    <?= $block->escapeHtml((string) $value) ?>
+                                                </td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
