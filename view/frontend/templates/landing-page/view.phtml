@@ -1,11 +1,30 @@
 <?php
-/** @var \Magento\Framework\View\Element\Template $block */
-/** @var \RunAsRoot\TypeSense\ViewModel\Frontend\LandingPageViewModel $viewModel */
+/**
+ * Typesense Landing Page — Hyva CSP-compatible Alpine.js component
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+use RunAsRoot\TypeSense\ViewModel\Frontend\LandingPageViewModel;
+
+/** @var Escaper $escaper */
+/** @var Template $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var LandingPageViewModel $viewModel */
 $viewModel = $block->getData('view_model');
 $landingPage = $viewModel->getLandingPage();
 if (!$landingPage) {
     return;
 }
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+
 $config = $viewModel->getJsonSearchConfig();
 $cmsContent = $viewModel->getCmsContent();
 $bannerConfig = $viewModel->getBannerConfig();
@@ -13,30 +32,23 @@ $bannerConfig = $viewModel->getBannerConfig();
 
 <script src="https://cdn.jsdelivr.net/npm/typesense@1.8.2/dist/typesense.min.js"></script>
 
-<?php if ($viewModel->hasBanner()): ?>
+<?php if ($viewModel->hasBanner() && !empty($bannerConfig['image'])): ?>
 <div class="landing-page-banner mb-6">
-    <?php if (!empty($bannerConfig['image'])): ?>
     <div class="relative overflow-hidden rounded-lg">
-        <img src="<?= $block->escapeHtmlAttr($bannerConfig['image']) ?>"
-             alt="<?= $block->escapeHtmlAttr($bannerConfig['title'] ?? $landingPage->getTitle()) ?>"
-             class="w-full object-cover"
-             loading="eager"/>
+        <img src="<?= $escaper->escapeUrl($bannerConfig['image']) ?>"
+             alt="<?= $escaper->escapeHtmlAttr($bannerConfig['title'] ?? $landingPage->getTitle()) ?>"
+             class="w-full object-cover" loading="eager"/>
         <?php if (!empty($bannerConfig['title']) || !empty($bannerConfig['subtitle'])): ?>
         <div class="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white text-center px-6">
             <?php if (!empty($bannerConfig['title'])): ?>
-            <h1 class="text-3xl md:text-4xl font-bold mb-2">
-                <?= $block->escapeHtml($bannerConfig['title']) ?>
-            </h1>
+            <h1 class="text-3xl md:text-4xl font-bold mb-2"><?= $escaper->escapeHtml($bannerConfig['title']) ?></h1>
             <?php endif; ?>
             <?php if (!empty($bannerConfig['subtitle'])): ?>
-            <p class="text-lg md:text-xl">
-                <?= $block->escapeHtml($bannerConfig['subtitle']) ?>
-            </p>
+            <p class="text-lg md:text-xl"><?= $escaper->escapeHtml($bannerConfig['subtitle']) ?></p>
             <?php endif; ?>
         </div>
         <?php endif; ?>
     </div>
-    <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -46,44 +58,108 @@ $bannerConfig = $viewModel->getBannerConfig();
 </div>
 <?php endif; ?>
 
-<div x-data="typesenseLandingPageSearch(<?= $block->escapeHtmlAttr($config) ?>)"
-     x-init="init()"
-     x-cloak
+<script>
+    function initTypesenseLandingPageSearch() {
+        const config = <?= /* @noEscape */ $config ?>;
+
+        return {
+            query: config.query || '*',
+            hits: [],
+            facets: [],
+            stats: '',
+            page: 1,
+            totalPages: 1,
+            sortBy: config.sortBy || '',
+            filters: {},
+            client: null,
+
+            init() {
+                this.client = new Typesense.Client({
+                    nodes: [{ host: config.typesenseHost, port: String(config.typesensePort), protocol: config.typesenseProtocol }],
+                    apiKey: config.typesenseSearchOnlyApiKey,
+                    connectionTimeoutSeconds: 2,
+                });
+                this.search();
+            },
+
+            async search() {
+                const perPage = config.productsPerPage || 24;
+                const searchParams = {
+                    q: this.query,
+                    query_by: 'name,sku,description',
+                    per_page: perPage,
+                    page: this.page,
+                    facet_by: config.facetAttributes.join(','),
+                    max_facet_values: 20,
+                };
+
+                const filterParts = [];
+                if (config.filterBy) filterParts.push(config.filterBy);
+                for (const [field, values] of Object.entries(this.filters)) {
+                    if (values.length > 0) filterParts.push(field + ':[' + values.join(',') + ']');
+                }
+                if (filterParts.length > 0) searchParams.filter_by = filterParts.join(' && ');
+                if (this.sortBy) searchParams.sort_by = this.sortBy;
+
+                try {
+                    const result = await this.client.collections[config.productCollection].documents.search(searchParams);
+                    this.hits = result.hits || [];
+                    this.facets = result.facet_counts || [];
+                    this.totalPages = Math.ceil((result.found || 0) / perPage);
+                    this.stats = (result.found || 0) + ' products';
+                } catch (error) {
+                    console.error('Typesense landing page search error:', error);
+                }
+            },
+
+            toggleFilter(field, value) {
+                if (!this.filters[field]) this.filters[field] = [];
+                const idx = this.filters[field].indexOf(value);
+                if (idx === -1) { this.filters[field] = [...this.filters[field], value]; }
+                else { this.filters[field] = this.filters[field].filter(v => v !== value); }
+                this.page = 1;
+                this.search();
+            },
+            isFilterActive(field, value) {
+                return this.filters[field] ? this.filters[field].includes(value) : false;
+            },
+            nextPage() { if (this.page < this.totalPages) { this.page++; this.search(); } },
+            prevPage() { if (this.page > 1) { this.page--; this.search(); } },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => {
+        Alpine.data('initTypesenseLandingPageSearch', initTypesenseLandingPageSearch);
+    }, { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>
+
+<div x-data="initTypesenseLandingPageSearch"
      class="typesense-landing-page-search container mx-auto px-4 py-6">
 
-    <!-- Stats and sort bar -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
         <p class="text-sm text-gray-600" x-text="stats"></p>
-
         <div class="flex items-center gap-2">
-            <label for="typesense-landing-sort" class="text-sm text-gray-600 shrink-0">
-                <?= $block->escapeHtml(__('Sort by:')) ?>
-            </label>
-            <select id="typesense-landing-sort"
-                    x-model="sortBy"
-                    x-on:change="page = 1; search()"
+            <label for="typesense-landing-sort" class="text-sm text-gray-600 shrink-0"><?= $escaper->escapeHtml(__('Sort by:')) ?></label>
+            <select id="typesense-landing-sort" x-model="sortBy" @change="page = 1; search()"
                     class="text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value=""><?= $block->escapeHtml(__('Relevance')) ?></option>
-                <option value="price:asc"><?= $block->escapeHtml(__('Price: Low to High')) ?></option>
-                <option value="price:desc"><?= $block->escapeHtml(__('Price: High to Low')) ?></option>
-                <option value="created_at:desc"><?= $block->escapeHtml(__('Newest')) ?></option>
+                <option value=""><?= $escaper->escapeHtml(__('Relevance')) ?></option>
+                <option value="price:asc"><?= $escaper->escapeHtml(__('Price: Low to High')) ?></option>
+                <option value="price:desc"><?= $escaper->escapeHtml(__('Price: High to Low')) ?></option>
+                <option value="created_at:desc"><?= $escaper->escapeHtml(__('Newest')) ?></option>
             </select>
         </div>
     </div>
 
     <div class="flex gap-6">
-
-        <!-- Sidebar facets -->
-        <aside class="typesense-facet-sidebar w-64 shrink-0 hidden lg:block">
+        <aside class="w-64 shrink-0 hidden lg:block">
             <template x-for="facet in facets" :key="facet.field_name">
-                <div class="mb-6 border-b pb-4 last:border-b-0">
-                    <h3 class="font-semibold text-gray-800 mb-3 capitalize"
-                        x-text="facet.field_name.replace(/_/g, ' ')"></h3>
+                <div class="mb-6 border-b pb-4">
+                    <h3 class="font-semibold text-gray-800 mb-3 capitalize" x-text="facet.field_name.replace(/_/g, ' ')"></h3>
                     <template x-for="count in facet.counts" :key="count.value">
                         <label class="flex items-center gap-2 text-sm text-gray-700 mb-1.5 cursor-pointer hover:text-gray-900">
-                            <input type="checkbox"
-                                   :checked="isFilterActive(facet.field_name, count.value)"
-                                   x-on:change="toggleFilter(facet.field_name, count.value)"
+                            <input type="checkbox" :checked="isFilterActive(facet.field_name, count.value)"
+                                   @change="toggleFilter(facet.field_name, count.value)"
                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
                             <span x-text="count.value" class="flex-1"></span>
                             <span class="text-gray-400 text-xs" x-text="'(' + count.count + ')'"></span>
@@ -91,94 +167,52 @@ $bannerConfig = $viewModel->getBannerConfig();
                     </template>
                 </div>
             </template>
-
-            <template x-if="facets.length === 0">
-                <p class="text-sm text-gray-400"><?= $block->escapeHtml(__('No filters available')) ?></p>
-            </template>
         </aside>
 
-        <!-- Main content -->
         <div class="flex-1 min-w-0">
-
-            <!-- No results -->
             <template x-if="hits.length === 0 && stats !== ''">
                 <div class="text-center py-16">
-                    <p class="text-gray-500 text-lg"><?= $block->escapeHtml(__('No products found')) ?></p>
-                    <p class="text-gray-400 text-sm mt-2"><?= $block->escapeHtml(__('Try adjusting your filters')) ?></p>
+                    <p class="text-gray-500 text-lg"><?= $escaper->escapeHtml(__('No products found')) ?></p>
                 </div>
             </template>
 
-            <!-- Product grid -->
-            <div class="typesense-product-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <template x-for="hit in hits" :key="hit.document.id">
-                    <div class="typesense-product-card border border-gray-200 rounded-lg p-3 flex flex-col hover:shadow-md transition-shadow">
+                    <div class="border border-gray-200 rounded-lg p-3 flex flex-col hover:shadow-md transition-shadow">
                         <a :href="'/' + hit.document.url" class="flex flex-col flex-1">
                             <div class="aspect-square mb-3 overflow-hidden rounded">
-                                <img :src="hit.document.image_url"
-                                     :alt="hit.document.name"
-                                     class="w-full h-full object-contain"
-                                     loading="lazy"
-                                     x-show="hit.document.image_url"/>
-                                <div class="w-full h-full bg-gray-100 flex items-center justify-center"
-                                     x-show="!hit.document.image_url">
-                                    <span class="text-gray-300 text-xs"><?= $block->escapeHtml(__('No image')) ?></span>
-                                </div>
+                                <img :src="hit.document.image_url" :alt="hit.document.name"
+                                     class="w-full h-full object-contain" loading="lazy"/>
                             </div>
-
-                            <h3 class="text-sm font-medium text-gray-800 mb-1 line-clamp-2"
-                                x-text="hit.document.name"></h3>
-
+                            <h3 class="text-sm font-medium text-gray-800 mb-1 line-clamp-2" x-text="hit.document.name"></h3>
                             <div class="mt-auto pt-2">
-                                <template x-if="hit.document.special_price && hit.document.special_price < hit.document.price">
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-sm font-bold text-red-600"
-                                              x-text="'$' + Number(hit.document.special_price).toFixed(2)"></span>
-                                        <span class="text-xs text-gray-400 line-through"
-                                              x-text="'$' + Number(hit.document.price).toFixed(2)"></span>
-                                    </div>
-                                </template>
-                                <template x-if="!hit.document.special_price || hit.document.special_price >= hit.document.price">
-                                    <span class="text-sm font-bold text-gray-800"
-                                          x-text="hit.document.price ? '$' + Number(hit.document.price).toFixed(2) : ''"></span>
-                                </template>
+                                <span class="text-sm font-bold text-gray-800"
+                                      x-text="hit.document.price ? '$' + Number(hit.document.price).toFixed(2) : ''"></span>
                             </div>
                         </a>
-
                         <a :href="'/' + hit.document.url"
                            class="mt-3 w-full text-center text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-2 transition-colors">
-                            <?= $block->escapeHtml(__('View Product')) ?>
+                            <?= $escaper->escapeHtml(__('View Product')) ?>
                         </a>
                     </div>
                 </template>
             </div>
 
-            <!-- Pagination -->
             <template x-if="totalPages > 1">
                 <div class="flex justify-center items-center gap-3 mt-8">
-                    <button x-on:click="prevPage()"
-                            :disabled="page <= 1"
+                    <button @click="prevPage()" :disabled="page <= 1"
                             :class="page <= 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100'"
                             class="px-4 py-2 text-sm border border-gray-300 rounded transition-colors">
-                        <?= $block->escapeHtml(__('Previous')) ?>
+                        <?= $escaper->escapeHtml(__('Previous')) ?>
                     </button>
-
-                    <span class="text-sm text-gray-600">
-                        <span x-text="page"></span>
-                        <?= $block->escapeHtml(__('/')) ?>
-                        <span x-text="totalPages"></span>
-                    </span>
-
-                    <button x-on:click="nextPage()"
-                            :disabled="page >= totalPages"
+                    <span class="text-sm text-gray-600"><span x-text="page"></span> / <span x-text="totalPages"></span></span>
+                    <button @click="nextPage()" :disabled="page >= totalPages"
                             :class="page >= totalPages ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100'"
                             class="px-4 py-2 text-sm border border-gray-300 rounded transition-colors">
-                        <?= $block->escapeHtml(__('Next')) ?>
+                        <?= $escaper->escapeHtml(__('Next')) ?>
                     </button>
                 </div>
             </template>
-
         </div>
     </div>
 </div>
-
-<script src="<?= $block->getViewFileUrl('RunAsRoot_TypeSense::js/landing-page-search.js') ?>"></script>

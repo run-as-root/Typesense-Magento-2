@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Test\Unit\Console\Command;
 
+use Magento\Framework\App\State;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface;
@@ -15,13 +16,15 @@ final class ReindexCommandTest extends TestCase
 {
     private IndexerOrchestratorInterface&MockObject $orchestrator;
     private EntityIndexerPool&MockObject $indexerPool;
+    private State&MockObject $appState;
     private ReindexCommand $command;
 
     protected function setUp(): void
     {
         $this->orchestrator = $this->createMock(IndexerOrchestratorInterface::class);
         $this->indexerPool = $this->createMock(EntityIndexerPool::class);
-        $this->command = new ReindexCommand($this->orchestrator, $this->indexerPool);
+        $this->appState = $this->createMock(State::class);
+        $this->command = new ReindexCommand($this->orchestrator, $this->indexerPool, $this->appState);
     }
 
     public function test_reindex_all_is_called_when_no_entity_option(): void

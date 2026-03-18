@@ -1,91 +1,220 @@
 <?php
-/** @var \Magento\Framework\View\Element\Template $block */
-/** @var \RunAsRoot\TypeSense\ViewModel\Frontend\AutocompleteConfigViewModel $viewModel */
+/**
+ * Typesense Autocomplete — Hyva CSP-compatible Alpine.js component
+ *
+ * Uses Alpine.data() registration pattern required by Hyva's alpine3-csp.min.js.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+use RunAsRoot\TypeSense\ViewModel\Frontend\AutocompleteConfigViewModel;
+
+/** @var Escaper $escaper */
+/** @var Template $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var AutocompleteConfigViewModel $viewModel */
 $viewModel = $block->getData('view_model');
 if (!$viewModel->isEnabled()) {
     return;
 }
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+
 $config = $viewModel->getJsonConfig();
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/typesense@1.8.2/dist/typesense.min.js"></script>
-<link rel="stylesheet" href="<?= $block->getViewFileUrl('RunAsRoot_TypeSense::css/autocomplete.css') ?>"/>
+<script>
+    function initTypesenseAutocomplete() {
+        const config = <?= /* @noEscape */ $config ?>;
 
-<div x-data="typesenseAutocomplete(<?= $block->escapeHtmlAttr($config) ?>)"
-     x-on:click.away="isOpen = false"
-     class="typesense-autocomplete-wrapper relative">
+        return {
+            query: '',
+            results: { products: [], categories: [], suggestions: [] },
+            isOpen: false,
+            hasSearched: false,
+            selectedIndex: -1,
+            client: null,
 
+            init() {
+                this.client = new Typesense.Client({
+                    nodes: [{
+                        host: config.typesenseHost,
+                        port: String(config.typesensePort),
+                        protocol: config.typesenseProtocol,
+                    }],
+                    apiKey: config.typesenseSearchOnlyApiKey,
+                    connectionTimeoutSeconds: 2,
+                });
+            },
+
+            async search() {
+                if (this.query.length < 2) {
+                    this.isOpen = false;
+                    this.hasSearched = false;
+                    return;
+                }
+
+                try {
+                    const response = await this.client.multiSearch.perform({
+                        searches: [
+                            {
+                                collection: config.productCollection,
+                                q: this.query,
+                                query_by: 'name,sku,description',
+                                per_page: config.productCount || 6,
+                            },
+                            {
+                                collection: config.categoryCollection,
+                                q: this.query,
+                                query_by: 'name',
+                                per_page: 4,
+                            },
+                            {
+                                collection: config.suggestionCollection,
+                                q: this.query,
+                                query_by: 'q',
+                                per_page: 5,
+                            },
+                        ],
+                    }, {});
+
+                    this.results.products = response.results[0]?.hits || [];
+                    this.results.categories = response.results[1]?.hits || [];
+                    this.results.suggestions = response.results[2]?.hits || [];
+                    this.isOpen = true;
+                    this.hasSearched = true;
+                    this.selectedIndex = -1;
+                } catch (error) {
+                    console.error('Typesense search error:', error);
+                }
+            },
+
+            get totalItems() {
+                return this.results.suggestions.length
+                     + this.results.products.length
+                     + this.results.categories.length;
+            },
+
+            moveDown() {
+                if (this.totalItems === 0) return;
+                this.selectedIndex = (this.selectedIndex + 1) % this.totalItems;
+            },
+
+            moveUp() {
+                if (this.totalItems === 0) return;
+                this.selectedIndex = this.selectedIndex <= 0
+                    ? this.totalItems - 1
+                    : this.selectedIndex - 1;
+            },
+
+            selectCurrent() {
+                if (this.selectedIndex < 0) return;
+
+                const sugLen = this.results.suggestions.length;
+                const prodLen = this.results.products.length;
+
+                if (this.selectedIndex < sugLen) {
+                    const hit = this.results.suggestions[this.selectedIndex];
+                    this.query = hit.document.q;
+                    this.isOpen = false;
+                    this.search();
+                    return;
+                }
+
+                const prodIdx = this.selectedIndex - sugLen;
+                if (prodIdx < prodLen) {
+                    window.location.href = '/' + this.results.products[prodIdx].document.url;
+                    return;
+                }
+
+                const catIdx = this.selectedIndex - sugLen - prodLen;
+                const hit = this.results.categories[catIdx];
+                if (hit) {
+                    window.location.href = '/' + hit.document.url;
+                }
+            },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => {
+        Alpine.data('initTypesenseAutocomplete', initTypesenseAutocomplete);
+    }, { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>
+
+<div class="relative" x-data="initTypesenseAutocomplete" @click.outside="isOpen = false">
     <input type="text"
            x-model="query"
-           x-on:input.debounce.300ms="search()"
-           x-on:keydown.escape="isOpen = false"
-           x-on:keydown.arrow-down.prevent="moveDown()"
-           x-on:keydown.arrow-up.prevent="moveUp()"
-           x-on:keydown.enter.prevent="selectCurrent()"
-           x-on:focus="query.length >= 2 && (isOpen = true)"
-           placeholder="<?= $block->escapeHtmlAttr(__('Search...')) ?>"
+           @input.debounce.300ms="search"
+           @keydown.escape="isOpen = false"
+           @keydown.arrow-down.prevent="moveDown"
+           @keydown.arrow-up.prevent="moveUp"
+           @keydown.enter.prevent="selectCurrent"
+           @focus="query.length >= 2 && (isOpen = true)"
+           placeholder="<?= $escaper->escapeHtmlAttr(__('Search entire store here...')) ?>"
            class="form-input w-full"
            autocomplete="off"/>
 
-    <div x-show="isOpen"
-         x-cloak
-         class="typesense-autocomplete-dropdown absolute z-50 w-full bg-white border border-gray-200 rounded-b shadow-lg mt-1 max-h-96 overflow-y-auto">
+    <template x-if="isOpen">
+        <div class="absolute z-50 w-full bg-white border border-gray-200 rounded-b shadow-lg mt-1 max-h-96 overflow-y-auto">
 
-        <!-- Suggestions -->
-        <template x-if="results.suggestions.length > 0">
-            <div class="p-2 border-b">
-                <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $block->escapeHtml(__('Suggestions')) ?></h4>
-                <template x-for="(hit, i) in results.suggestions" :key="hit.document.id">
-                    <a x-on:click="query = hit.document.q; isOpen = false; search()"
-                       class="block px-2 py-1 text-sm hover:bg-gray-100 cursor-pointer"
-                       :class="selectedIndex === i ? 'bg-gray-100' : ''"
-                       x-text="hit.document.q"></a>
-                </template>
-            </div>
-        </template>
+            <template x-if="results.suggestions.length > 0">
+                <div class="p-2 border-b">
+                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $escaper->escapeHtml(__('Suggestions')) ?></h4>
+                    <template x-for="(hit, i) in results.suggestions" :key="hit.document.id">
+                        <button type="button"
+                                @click="query = hit.document.q; isOpen = false; search()"
+                                class="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 cursor-pointer"
+                                :class="selectedIndex === i ? 'bg-gray-100' : ''"
+                                x-text="hit.document.q"></button>
+                    </template>
+                </div>
+            </template>
 
-        <!-- Products -->
-        <template x-if="results.products.length > 0">
-            <div class="p-2 border-b">
-                <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $block->escapeHtml(__('Products')) ?></h4>
-                <template x-for="(hit, i) in results.products" :key="hit.document.id">
-                    <a :href="'/' + hit.document.url"
-                       class="flex items-center gap-3 px-2 py-2 hover:bg-gray-100 rounded"
-                       :class="selectedIndex === (results.suggestions.length + i) ? 'bg-gray-100' : ''">
-                        <img :src="hit.document.image_url"
-                             :alt="hit.document.name"
-                             class="w-10 h-10 object-contain"
-                             loading="lazy"
-                             x-show="hit.document.image_url"/>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium truncate" x-text="hit.document.name"></p>
-                            <p class="text-sm text-gray-600" x-text="hit.document.price ? '$' + hit.document.price : ''"></p>
-                        </div>
-                    </a>
-                </template>
-            </div>
-        </template>
+            <template x-if="results.products.length > 0">
+                <div class="p-2 border-b">
+                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $escaper->escapeHtml(__('Products')) ?></h4>
+                    <template x-for="(hit, i) in results.products" :key="hit.document.id">
+                        <a :href="'/' + hit.document.url"
+                           class="flex items-center gap-3 px-2 py-2 hover:bg-gray-100 rounded"
+                           :class="selectedIndex === (results.suggestions.length + i) ? 'bg-gray-100' : ''">
+                            <template x-if="hit.document.image_url">
+                                <img :src="hit.document.image_url" :alt="hit.document.name"
+                                     class="w-10 h-10 object-contain" loading="lazy"/>
+                            </template>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium truncate" x-text="hit.document.name"></p>
+                                <p class="text-sm text-gray-600" x-text="hit.document.price ? '$' + hit.document.price : ''"></p>
+                            </div>
+                        </a>
+                    </template>
+                </div>
+            </template>
 
-        <!-- Categories -->
-        <template x-if="results.categories.length > 0">
-            <div class="p-2">
-                <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $block->escapeHtml(__('Categories')) ?></h4>
-                <template x-for="(hit, i) in results.categories" :key="hit.document.id">
-                    <a :href="'/' + hit.document.url"
-                       class="block px-2 py-1 text-sm hover:bg-gray-100"
-                       :class="selectedIndex === (results.suggestions.length + results.products.length + i) ? 'bg-gray-100' : ''"
-                       x-text="hit.document.name"></a>
-                </template>
-            </div>
-        </template>
+            <template x-if="results.categories.length > 0">
+                <div class="p-2">
+                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $escaper->escapeHtml(__('Categories')) ?></h4>
+                    <template x-for="(hit, i) in results.categories" :key="hit.document.id">
+                        <a :href="'/' + hit.document.url"
+                           class="block px-2 py-1 text-sm hover:bg-gray-100"
+                           :class="selectedIndex === (results.suggestions.length + results.products.length + i) ? 'bg-gray-100' : ''"
+                           x-text="hit.document.name"></a>
+                    </template>
+                </div>
+            </template>
 
-        <!-- No results -->
-        <template x-if="hasSearched && results.products.length === 0 && results.categories.length === 0 && results.suggestions.length === 0">
-            <div class="p-4 text-center text-sm text-gray-500">
-                <?= $block->escapeHtml(__('No results found')) ?>
-            </div>
-        </template>
-    </div>
+            <template x-if="hasSearched && results.products.length === 0 && results.categories.length === 0 && results.suggestions.length === 0">
+                <div class="p-4 text-center text-sm text-gray-500">
+                    <?= $escaper->escapeHtml(__('No results found')) ?>
+                </div>
+            </template>
+        </div>
+    </template>
 </div>
-
-<script src="<?= $block->getViewFileUrl('RunAsRoot_TypeSense::js/autocomplete.js') ?>"></script>
