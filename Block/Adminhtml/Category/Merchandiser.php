@@ -6,35 +6,26 @@ namespace RunAsRoot\TypeSense\Block\Adminhtml\Category;
 
 use Magento\Backend\Block\Template;
 use Magento\Backend\Block\Template\Context;
-use Magento\Backend\Block\Widget\Tab\TabInterface;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
-class Merchandiser extends Template implements TabInterface
+class Merchandiser extends Template
 {
     public function __construct(
         Context $context,
+        private readonly TypeSenseConfigInterface $config,
         array $data = [],
     ) {
         parent::__construct($context, $data);
     }
 
-    public function getTabLabel(): string
+    public function isEnabled(): bool
     {
-        return (string) __('TypeSense Merchandising');
+        return $this->config->isEnabled() && $this->config->isCategoryMerchandiserEnabled();
     }
 
-    public function getTabTitle(): string
+    public function getStoreId(): int
     {
-        return (string) __('TypeSense Merchandising');
-    }
-
-    public function canShowTab(): bool
-    {
-        return true;
-    }
-
-    public function isHidden(): bool
-    {
-        return false;
+        return (int) $this->getRequest()->getParam('store', 0);
     }
 
     public function getCategoryId(): ?int
@@ -42,6 +33,11 @@ class Merchandiser extends Template implements TabInterface
         $id = $this->getRequest()->getParam('id');
 
         return $id !== null ? (int) $id : null;
+    }
+
+    public function getLoadUrl(): string
+    {
+        return $this->getUrl('typesense/categorymerchandiser/load');
     }
 
     public function getSaveUrl(): string

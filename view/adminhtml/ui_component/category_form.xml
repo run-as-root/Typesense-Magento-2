@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<form xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <fieldset name="typesense_merchandising" sortOrder="50">
+        <settings>
+            <collapsible>true</collapsible>
+            <opened>false</opened>
+            <label translate="true">TypeSense Merchandising</label>
+        </settings>
+        <htmlContent name="typesense_category_merchandiser">
+            <argument name="block" xsi:type="object">RunAsRoot\TypeSense\Block\Adminhtml\Category\Merchandiser</argument>
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="component" xsi:type="string">Magento_Ui/js/form/components/html</item>
+                </item>
+                <item name="template" xsi:type="string">RunAsRoot_TypeSense::category/merchandiser.phtml</item>
+            </argument>
+        </htmlContent>
+    </fieldset>
+</form>
