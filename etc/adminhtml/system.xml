@@ -21,53 +21,55 @@
                     <label>Enable TypeSense Search</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
-                <field id="protocol" translate="label" type="select"
+                <field id="protocol" translate="label comment" type="select"
                        sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Protocol</label>
                     <source_model>RunAsRoot\TypeSense\Model\Config\Source\Protocol</source_model>
+                    <comment>Protocol for server-side indexing. Use 'http' for local/Docker setups, 'https' for production.</comment>
                 </field>
                 <field id="host" translate="label comment" type="text"
                        sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Host</label>
-                    <comment>Typesense server hostname (e.g., localhost or typesense.example.com)</comment>
+                    <comment>Internal hostname for indexing (e.g., 'typesense' in Docker, 'search.example.com' in production). Used by PHP for indexing, not by the browser.</comment>
                 </field>
-                <field id="port" translate="label" type="text"
+                <field id="port" translate="label comment" type="text"
                        sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Port</label>
                     <validate>validate-digits</validate>
+                    <comment>Default Typesense port is 8108.</comment>
                 </field>
                 <field id="api_key" translate="label comment" type="obscure"
                        sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Admin API Key</label>
                     <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
-                    <comment>Server-side admin key. Never exposed to frontend.</comment>
+                    <comment>Full-access key for indexing and collection management. Found in your Typesense server startup flags (--api-key). Never exposed to the frontend.</comment>
                 </field>
                 <field id="search_only_api_key" translate="label comment" type="text"
                        sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Search-Only API Key</label>
-                    <comment>Used on the frontend for search requests.</comment>
+                    <comment>Read-only key for browser search requests. Generate one via the Typesense API, or use the admin key for development (not recommended in production).</comment>
                 </field>
                 <field id="index_prefix" translate="label comment" type="text"
                        sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Index Prefix</label>
-                    <comment>Prefix for all collection names (e.g., rar → rar_products_default)</comment>
+                    <comment>Short prefix for all collection names (e.g., 'rar' creates 'rar_product_default'). Useful when multiple environments share one Typesense server. Changing this after indexing requires a full reindex.</comment>
                 </field>
                 <field id="search_protocol" translate="label comment" type="select"
                        sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Frontend Search Protocol</label>
                     <source_model>RunAsRoot\TypeSense\Model\Config\Source\Protocol</source_model>
-                    <comment>Protocol for browser-side search requests. Usually https in production.</comment>
+                    <comment>Frontend Search Node — Protocol for browser-side search requests. In Docker/Warden setups, this is usually 'https' via Traefik. Leave empty to use the server protocol above.</comment>
                 </field>
                 <field id="search_host" translate="label comment" type="text"
                        sortOrder="90" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Frontend Search Host</label>
-                    <comment>Public hostname the browser uses to reach Typesense (e.g., typesense.example.com). Leave empty to use the server host.</comment>
+                    <comment>Frontend Search Node — Public hostname the browser uses to reach Typesense (e.g., 'typesense.mystore.test'). In Docker/Warden, this differs from the server host. Leave empty to use the server host above.</comment>
                 </field>
                 <field id="search_port" translate="label comment" type="text"
                        sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Frontend Search Port</label>
                     <validate>validate-digits</validate>
-                    <comment>Port for browser-side search requests. Leave empty to use the server port.</comment>
+                    <comment>Frontend Search Node — Port for browser-side requests (e.g., 443 for HTTPS). Leave empty to use the server port above.</comment>
                 </field>
                 <field id="log_enabled" translate="label" type="select"
                        sortOrder="110" showInDefault="1" showInWebsite="0" showInStore="0">
@@ -83,7 +85,7 @@
                 <field id="batch_size" translate="label comment" type="text"
                        sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Batch Size</label>
-                    <comment>Number of documents per import batch. Default: 200</comment>
+                    <comment>Documents per import batch. Lower values use less memory but are slower. Default: 200. Increase to 500–1000 for large catalogs with sufficient memory.</comment>
                     <validate>validate-digits</validate>
                 </field>
                 <field id="product_enabled" translate="label" type="select"
@@ -110,7 +112,7 @@
                        sortOrder="60" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Zero-Downtime Reindexing</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Creates new collection, imports, then swaps alias atomically.</comment>
+                    <comment>When enabled, indexing writes to a new collection, then swaps it live instantly. Your customers never see partial or empty results during reindex. Recommended for production.</comment>
                 </field>
                 <field id="cron_enabled" translate="label" type="select"
                        sortOrder="70" showInDefault="1" showInWebsite="0" showInStore="0">
@@ -120,7 +122,7 @@
                 <field id="cron_schedule" translate="label comment" type="text"
                        sortOrder="80" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Cron Schedule</label>
-                    <comment>Cron expression. Default: 0 2 * * * (daily at 2 AM)</comment>
+                    <comment>Standard cron expression. Examples: '0 2 * * *' (daily at 2 AM), '0 */6 * * *' (every 6 hours), '*/30 * * * *' (every 30 minutes).</comment>
                     <depends>
                         <field id="cron_enabled">1</field>
                     </depends>
@@ -129,7 +131,7 @@
                        sortOrder="90" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Use Message Queue</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Process full reindex asynchronously via RabbitMQ/MySQL queue.</comment>
+                    <comment>When enabled, full reindex jobs are dispatched to the message queue (RabbitMQ or MySQL) and processed asynchronously in the background.</comment>
                 </field>
             </group>
 
