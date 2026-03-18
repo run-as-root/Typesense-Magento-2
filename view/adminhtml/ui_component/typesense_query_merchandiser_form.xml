@@ -79,6 +79,7 @@
                 <validation>
                     <rule name="required-entry" xsi:type="boolean">true</rule>
                 </validation>
+                <notice translate="true">Exact: matches the query 'running shoes' only. Contains: matches any query containing 'running shoes', like 'best running shoes 2024'.</notice>
             </settings>
             <formElements>
                 <select>
@@ -141,7 +142,7 @@
             <settings>
                 <dataType>text</dataType>
                 <label translate="true">Banner Config (JSON)</label>
-                <notice translate="true">JSON configuration for the banner displayed with this query override.</notice>
+                <notice translate="true">JSON format: {"image": "/media/banner.jpg", "title": "Sale!", "subtitle": "Up to 50% off"}</notice>
             </settings>
         </field>
     </fieldset>

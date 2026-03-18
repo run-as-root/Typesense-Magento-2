@@ -70,7 +70,7 @@
                 <validation>
                     <rule name="required-entry" xsi:type="boolean">true</rule>
                 </validation>
-                <notice translate="true">The URL path for this landing page (e.g. "sale/summer").</notice>
+                <notice translate="true">URL path for this page (e.g., 'summer-sale' becomes yourstore.com/summer-sale). Use lowercase letters, numbers, and hyphens only.</notice>
             </settings>
         </field>
         <field name="title" formElement="input">
@@ -133,14 +133,14 @@
             <settings>
                 <dataType>text</dataType>
                 <label translate="true">Filter By</label>
-                <notice translate="true">Typesense filter expression (e.g. "brand:=Nike &amp;&amp; price:&gt;100").</notice>
+                <notice translate="true">Typesense filter syntax. Examples: brand:=Nike, price:&gt;50, in_stock:true. Combine with: brand:=Nike &amp;&amp; price:&gt;50</notice>
             </settings>
         </field>
         <field name="sort_by" formElement="input">
             <settings>
                 <dataType>text</dataType>
                 <label translate="true">Sort By</label>
-                <notice translate="true">Field name to sort results by (e.g. "price:asc").</notice>
+                <notice translate="true">Field and direction. Examples: price:asc, created_at:desc, _text_match:desc (relevance)</notice>
             </settings>
         </field>
     </fieldset>

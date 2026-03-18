@@ -40,7 +40,7 @@ if (!$block->isEnabled()) {
     </div>
 
     <div class="merchandiser-info">
-        <p><?= $block->escapeHtml(__('Drag pinned products to reorder their position. Use Pin to lock a product at a specific position, Hide to exclude it from results.')) ?></p>
+        <p><?= $block->escapeHtml(__('Pin products to lock them at specific positions in search results. Hidden products are excluded entirely. Unpinned products appear in Typesense\'s default relevance order below pinned items. Changes are synced to Typesense when you click Save Merchandising.')) ?></p>
     </div>
 
     <div id="merchandiser-loading" class="loading-message">
