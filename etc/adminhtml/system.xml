@@ -52,8 +52,25 @@
                     <label>Index Prefix</label>
                     <comment>Prefix for all collection names (e.g., rar → rar_products_default)</comment>
                 </field>
+                <field id="search_protocol" translate="label comment" type="select"
+                       sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Frontend Search Protocol</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\Protocol</source_model>
+                    <comment>Protocol for browser-side search requests. Usually https in production.</comment>
+                </field>
+                <field id="search_host" translate="label comment" type="text"
+                       sortOrder="90" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Frontend Search Host</label>
+                    <comment>Public hostname the browser uses to reach Typesense (e.g., typesense.example.com). Leave empty to use the server host.</comment>
+                </field>
+                <field id="search_port" translate="label comment" type="text"
+                       sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Frontend Search Port</label>
+                    <validate>validate-digits</validate>
+                    <comment>Port for browser-side search requests. Leave empty to use the server port.</comment>
+                </field>
                 <field id="log_enabled" translate="label" type="select"
-                       sortOrder="80" showInDefault="1" showInWebsite="0" showInStore="0">
+                       sortOrder="110" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Enable Logging</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>

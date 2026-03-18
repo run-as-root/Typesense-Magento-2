@@ -54,6 +54,22 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return (string) $this->getValue('general/index_prefix', $storeId);
     }
 
+    public function getSearchProtocol(?int $storeId = null): string
+    {
+        return (string) ($this->getValue('general/search_protocol', $storeId) ?: $this->getProtocol($storeId));
+    }
+
+    public function getSearchHost(?int $storeId = null): string
+    {
+        return (string) ($this->getValue('general/search_host', $storeId) ?: $this->getHost($storeId));
+    }
+
+    public function getSearchPort(?int $storeId = null): int
+    {
+        $port = $this->getValue('general/search_port', $storeId);
+        return $port ? (int) $port : $this->getPort($storeId);
+    }
+
     public function isLogEnabled(?int $storeId = null): bool
     {
         return $this->getFlag('general/log_enabled', $storeId);

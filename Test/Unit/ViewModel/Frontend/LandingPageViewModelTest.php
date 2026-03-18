@@ -73,9 +73,9 @@ final class LandingPageViewModelTest extends TestCase
         $store->method('getId')->willReturn(1);
         $this->storeManager->method('getStore')->willReturn($store);
 
-        $this->config->method('getHost')->willReturn('localhost');
-        $this->config->method('getPort')->willReturn(8108);
-        $this->config->method('getProtocol')->willReturn('http');
+        $this->config->method('getSearchHost')->willReturn('localhost');
+        $this->config->method('getSearchPort')->willReturn(8108);
+        $this->config->method('getSearchProtocol')->willReturn('http');
         $this->config->method('getSearchOnlyApiKey')->willReturn('search-key');
         $this->config->method('getProductsPerPage')->willReturn(24);
 
@@ -101,9 +101,9 @@ final class LandingPageViewModelTest extends TestCase
         $store->method('getId')->willReturn(1);
         $this->storeManager->method('getStore')->willReturn($store);
 
-        $this->config->method('getHost')->willReturn('localhost');
-        $this->config->method('getPort')->willReturn(8108);
-        $this->config->method('getProtocol')->willReturn('http');
+        $this->config->method('getSearchHost')->willReturn('localhost');
+        $this->config->method('getSearchPort')->willReturn(8108);
+        $this->config->method('getSearchProtocol')->willReturn('http');
         $this->config->method('getSearchOnlyApiKey')->willReturn('search-key');
         $this->config->method('getProductsPerPage')->willReturn(24);
 
@@ -189,9 +189,9 @@ final class LandingPageViewModelTest extends TestCase
         $store->method('getId')->willReturn(1);
         $this->storeManager->method('getStore')->willReturn($store);
 
-        $this->config->method('getHost')->willReturn('localhost');
-        $this->config->method('getPort')->willReturn(8108);
-        $this->config->method('getProtocol')->willReturn('http');
+        $this->config->method('getSearchHost')->willReturn('localhost');
+        $this->config->method('getSearchPort')->willReturn(8108);
+        $this->config->method('getSearchProtocol')->willReturn('http');
         $this->config->method('getSearchOnlyApiKey')->willReturn('search-key');
         $this->config->method('getProductsPerPage')->willReturn(24);
 

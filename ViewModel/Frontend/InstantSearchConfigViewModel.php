@@ -33,9 +33,9 @@ class InstantSearchConfigViewModel implements ArgumentInterface
         $storeId = (int) $store->getId();
 
         return [
-            'typesenseHost'             => $this->config->getHost(),
-            'typesensePort'             => $this->config->getPort(),
-            'typesenseProtocol'         => $this->config->getProtocol(),
+            'typesenseHost'             => $this->config->getSearchHost(),
+            'typesensePort'             => $this->config->getSearchPort(),
+            'typesenseProtocol'         => $this->config->getSearchProtocol(),
             'typesenseSearchOnlyApiKey' => $this->config->getSearchOnlyApiKey(),
             'productCollection'         => $this->collectionNameResolver->resolve('product', $storeCode, $storeId),
             'productsPerPage'           => $this->config->getProductsPerPage(),

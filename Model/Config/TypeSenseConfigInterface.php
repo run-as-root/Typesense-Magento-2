@@ -20,6 +20,12 @@ interface TypeSenseConfigInterface
 
     public function getIndexPrefix(?int $storeId = null): string;
 
+    public function getSearchProtocol(?int $storeId = null): string;
+
+    public function getSearchHost(?int $storeId = null): string;
+
+    public function getSearchPort(?int $storeId = null): int;
+
     public function isLogEnabled(?int $storeId = null): bool;
 
     public function getCollectionName(string $entityType, string $storeCode, ?int $storeId = null): string;

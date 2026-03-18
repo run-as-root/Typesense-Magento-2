@@ -64,9 +64,9 @@ final class AutocompleteConfigViewModelTest extends TestCase
 
     public function test_get_config_returns_array_with_expected_keys(): void
     {
-        $this->config->method('getHost')->willReturn('search.example.com');
-        $this->config->method('getPort')->willReturn(8108);
-        $this->config->method('getProtocol')->willReturn('https');
+        $this->config->method('getSearchHost')->willReturn('search.example.com');
+        $this->config->method('getSearchPort')->willReturn(8108);
+        $this->config->method('getSearchProtocol')->willReturn('https');
         $this->config->method('getSearchOnlyApiKey')->willReturn('xyz-search-key');
         $this->config->method('getAutocompleteProductCount')->willReturn(6);
 
@@ -101,9 +101,9 @@ final class AutocompleteConfigViewModelTest extends TestCase
 
     public function test_get_json_config_returns_valid_json_string(): void
     {
-        $this->config->method('getHost')->willReturn('localhost');
-        $this->config->method('getPort')->willReturn(8108);
-        $this->config->method('getProtocol')->willReturn('http');
+        $this->config->method('getSearchHost')->willReturn('localhost');
+        $this->config->method('getSearchPort')->willReturn(8108);
+        $this->config->method('getSearchProtocol')->willReturn('http');
         $this->config->method('getSearchOnlyApiKey')->willReturn('key');
         $this->config->method('getAutocompleteProductCount')->willReturn(4);
 
