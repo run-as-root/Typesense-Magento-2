@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <css src="RunAsRoot_TypeSense::css/merchandiser.css"/>
+    </head>
+    <body>
+        <referenceBlock name="category_tabs">
+            <block class="RunAsRoot\TypeSense\Block\Adminhtml\Category\Merchandiser"
+                   name="category.typesense.merchandiser"
+                   template="RunAsRoot_TypeSense::category/merchandiser.phtml"
+                   group="typesense_merchandiser">
+                <arguments>
+                    <argument name="js_bundle" xsi:type="string">RunAsRoot_TypeSense/js/category-merchandiser</argument>
+                </arguments>
+            </block>
+        </referenceBlock>
+    </body>
+</page>

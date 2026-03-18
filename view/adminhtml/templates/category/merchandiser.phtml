@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+/** @var \RunAsRoot\TypeSense\Block\Adminhtml\Category\Merchandiser $block */
+$categoryId = $block->getCategoryId();
+$saveUrl = $block->getSaveUrl();
+$searchUrl = $block->getProductSearchUrl();
+?>
+<div id="typesense-category-merchandiser"
+     data-category-id="<?= (int) $categoryId ?>"
+     data-save-url="<?= $block->escapeUrl($saveUrl) ?>"
+     data-search-url="<?= $block->escapeUrl($searchUrl) ?>">
+
+    <div class="merchandiser-toolbar">
+        <div class="merchandiser-search">
+            <input type="text"
+                   id="merchandiser-product-search"
+                   placeholder="<?= $block->escapeHtmlAttr(__('Search products to add...')) ?>"
+                   class="admin__control-text"
+                   autocomplete="off"/>
+            <div id="merchandiser-search-results" style="display:none;"></div>
+        </div>
+        <button type="button" class="action-default scalable save" id="merchandiser-save-btn">
+            <span><?= $block->escapeHtml(__('Save Merchandising Rules')) ?></span>
+        </button>
+    </div>
+
+    <div class="merchandiser-info">
+        <p><?= $block->escapeHtml(__('Drag products to reorder. Use Pin to lock a product at a position, Hide to exclude it from results.')) ?></p>
+    </div>
+
+    <div id="merchandiser-product-list" class="merchandiser-products">
+        <p class="loading-message"><?= $block->escapeHtml(__('Loading products...')) ?></p>
+    </div>
+</div>
+
+<script>
+require(['RunAsRoot_TypeSense/js/category-merchandiser'], function (merchandiser) {
+    'use strict';
+    merchandiser.init('typesense-category-merchandiser');
+});
+</script>
