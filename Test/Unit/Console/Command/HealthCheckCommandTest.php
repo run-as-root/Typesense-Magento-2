@@ -69,6 +69,27 @@ final class HealthCheckCommandTest extends TestCase
         self::assertStringContainsString('Connection refused', $tester->getDisplay());
     }
 
+    public function test_unhealthy_status_when_ok_is_false(): void
+    {
+        $health = $this->createMock(Health::class);
+        $health->method('retrieve')->willReturn(['ok' => false]);
+
+        $client = $this->createMock(Client::class);
+        $client->health = $health;
+
+        $this->clientFactory->method('create')->willReturn($client);
+
+        $this->config->method('getHost')->willReturn('localhost');
+        $this->config->method('getPort')->willReturn(8108);
+        $this->config->method('getProtocol')->willReturn('http');
+
+        $tester = new CommandTester($this->command);
+        $exitCode = $tester->execute([]);
+
+        self::assertSame(1, $exitCode);
+        self::assertStringContainsString('Unhealthy', $tester->getDisplay());
+    }
+
     public function test_health_check_displays_connection_details(): void
     {
         $health = $this->createMock(Health::class);

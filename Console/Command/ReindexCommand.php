@@ -15,7 +15,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 class ReindexCommand extends Command
 {
     private const OPTION_ENTITY = 'entity';
-    private const OPTION_STORE = 'store';
 
     public function __construct(
         private readonly IndexerOrchestratorInterface $orchestrator,
@@ -34,12 +33,7 @@ class ReindexCommand extends Command
                 InputOption::VALUE_OPTIONAL,
                 'Entity type to reindex (product, category, cms_page, suggestion). If omitted, reindexes all.',
             )
-            ->addOption(
-                self::OPTION_STORE,
-                null,
-                InputOption::VALUE_OPTIONAL,
-                'Store code to reindex. If omitted, reindexes all stores.',
-            );
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
