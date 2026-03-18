@@ -166,6 +166,7 @@
             </settings>
         </field>
         <htmlContent name="query_merchandiser_widget">
+            <argument name="block" xsi:type="object">Magento\Framework\View\Element\Template</argument>
             <argument name="data" xsi:type="array">
                 <item name="config" xsi:type="array">
                     <item name="component" xsi:type="string">Magento_Ui/js/form/components/html</item>
