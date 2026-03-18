@@ -1,0 +1,184 @@
+<?php
+/** @var \Magento\Framework\View\Element\Template $block */
+/** @var \RunAsRoot\TypeSense\ViewModel\Frontend\LandingPageViewModel $viewModel */
+$viewModel = $block->getData('view_model');
+$landingPage = $viewModel->getLandingPage();
+if (!$landingPage) {
+    return;
+}
+$config = $viewModel->getJsonSearchConfig();
+$cmsContent = $viewModel->getCmsContent();
+$bannerConfig = $viewModel->getBannerConfig();
+?>
+
+<script src="https://cdn.jsdelivr.net/npm/typesense@1.8.2/dist/typesense.min.js"></script>
+
+<?php if ($viewModel->hasBanner()): ?>
+<div class="landing-page-banner mb-6">
+    <?php if (!empty($bannerConfig['image'])): ?>
+    <div class="relative overflow-hidden rounded-lg">
+        <img src="<?= $block->escapeHtmlAttr($bannerConfig['image']) ?>"
+             alt="<?= $block->escapeHtmlAttr($bannerConfig['title'] ?? $landingPage->getTitle()) ?>"
+             class="w-full object-cover"
+             loading="eager"/>
+        <?php if (!empty($bannerConfig['title']) || !empty($bannerConfig['subtitle'])): ?>
+        <div class="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white text-center px-6">
+            <?php if (!empty($bannerConfig['title'])): ?>
+            <h1 class="text-3xl md:text-4xl font-bold mb-2">
+                <?= $block->escapeHtml($bannerConfig['title']) ?>
+            </h1>
+            <?php endif; ?>
+            <?php if (!empty($bannerConfig['subtitle'])): ?>
+            <p class="text-lg md:text-xl">
+                <?= $block->escapeHtml($bannerConfig['subtitle']) ?>
+            </p>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($cmsContent): ?>
+<div class="landing-page-cms prose max-w-none mb-6 px-4">
+    <?= /* @noEscape */ $cmsContent ?>
+</div>
+<?php endif; ?>
+
+<div x-data="typesenseLandingPageSearch(<?= $block->escapeHtmlAttr($config) ?>)"
+     x-init="init()"
+     x-cloak
+     class="typesense-landing-page-search container mx-auto px-4 py-6">
+
+    <!-- Stats and sort bar -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
+        <p class="text-sm text-gray-600" x-text="stats"></p>
+
+        <div class="flex items-center gap-2">
+            <label for="typesense-landing-sort" class="text-sm text-gray-600 shrink-0">
+                <?= $block->escapeHtml(__('Sort by:')) ?>
+            </label>
+            <select id="typesense-landing-sort"
+                    x-model="sortBy"
+                    x-on:change="page = 1; search()"
+                    class="text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value=""><?= $block->escapeHtml(__('Relevance')) ?></option>
+                <option value="price:asc"><?= $block->escapeHtml(__('Price: Low to High')) ?></option>
+                <option value="price:desc"><?= $block->escapeHtml(__('Price: High to Low')) ?></option>
+                <option value="created_at:desc"><?= $block->escapeHtml(__('Newest')) ?></option>
+            </select>
+        </div>
+    </div>
+
+    <div class="flex gap-6">
+
+        <!-- Sidebar facets -->
+        <aside class="typesense-facet-sidebar w-64 shrink-0 hidden lg:block">
+            <template x-for="facet in facets" :key="facet.field_name">
+                <div class="mb-6 border-b pb-4 last:border-b-0">
+                    <h3 class="font-semibold text-gray-800 mb-3 capitalize"
+                        x-text="facet.field_name.replace(/_/g, ' ')"></h3>
+                    <template x-for="count in facet.counts" :key="count.value">
+                        <label class="flex items-center gap-2 text-sm text-gray-700 mb-1.5 cursor-pointer hover:text-gray-900">
+                            <input type="checkbox"
+                                   :checked="isFilterActive(facet.field_name, count.value)"
+                                   x-on:change="toggleFilter(facet.field_name, count.value)"
+                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+                            <span x-text="count.value" class="flex-1"></span>
+                            <span class="text-gray-400 text-xs" x-text="'(' + count.count + ')'"></span>
+                        </label>
+                    </template>
+                </div>
+            </template>
+
+            <template x-if="facets.length === 0">
+                <p class="text-sm text-gray-400"><?= $block->escapeHtml(__('No filters available')) ?></p>
+            </template>
+        </aside>
+
+        <!-- Main content -->
+        <div class="flex-1 min-w-0">
+
+            <!-- No results -->
+            <template x-if="hits.length === 0 && stats !== ''">
+                <div class="text-center py-16">
+                    <p class="text-gray-500 text-lg"><?= $block->escapeHtml(__('No products found')) ?></p>
+                    <p class="text-gray-400 text-sm mt-2"><?= $block->escapeHtml(__('Try adjusting your filters')) ?></p>
+                </div>
+            </template>
+
+            <!-- Product grid -->
+            <div class="typesense-product-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <template x-for="hit in hits" :key="hit.document.id">
+                    <div class="typesense-product-card border border-gray-200 rounded-lg p-3 flex flex-col hover:shadow-md transition-shadow">
+                        <a :href="'/' + hit.document.url" class="flex flex-col flex-1">
+                            <div class="aspect-square mb-3 overflow-hidden rounded">
+                                <img :src="hit.document.image_url"
+                                     :alt="hit.document.name"
+                                     class="w-full h-full object-contain"
+                                     loading="lazy"
+                                     x-show="hit.document.image_url"/>
+                                <div class="w-full h-full bg-gray-100 flex items-center justify-center"
+                                     x-show="!hit.document.image_url">
+                                    <span class="text-gray-300 text-xs"><?= $block->escapeHtml(__('No image')) ?></span>
+                                </div>
+                            </div>
+
+                            <h3 class="text-sm font-medium text-gray-800 mb-1 line-clamp-2"
+                                x-text="hit.document.name"></h3>
+
+                            <div class="mt-auto pt-2">
+                                <template x-if="hit.document.special_price && hit.document.special_price < hit.document.price">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm font-bold text-red-600"
+                                              x-text="'$' + Number(hit.document.special_price).toFixed(2)"></span>
+                                        <span class="text-xs text-gray-400 line-through"
+                                              x-text="'$' + Number(hit.document.price).toFixed(2)"></span>
+                                    </div>
+                                </template>
+                                <template x-if="!hit.document.special_price || hit.document.special_price >= hit.document.price">
+                                    <span class="text-sm font-bold text-gray-800"
+                                          x-text="hit.document.price ? '$' + Number(hit.document.price).toFixed(2) : ''"></span>
+                                </template>
+                            </div>
+                        </a>
+
+                        <a :href="'/' + hit.document.url"
+                           class="mt-3 w-full text-center text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-2 transition-colors">
+                            <?= $block->escapeHtml(__('View Product')) ?>
+                        </a>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Pagination -->
+            <template x-if="totalPages > 1">
+                <div class="flex justify-center items-center gap-3 mt-8">
+                    <button x-on:click="prevPage()"
+                            :disabled="page <= 1"
+                            :class="page <= 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100'"
+                            class="px-4 py-2 text-sm border border-gray-300 rounded transition-colors">
+                        <?= $block->escapeHtml(__('Previous')) ?>
+                    </button>
+
+                    <span class="text-sm text-gray-600">
+                        <span x-text="page"></span>
+                        <?= $block->escapeHtml(__('/')) ?>
+                        <span x-text="totalPages"></span>
+                    </span>
+
+                    <button x-on:click="nextPage()"
+                            :disabled="page >= totalPages"
+                            :class="page >= totalPages ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100'"
+                            class="px-4 py-2 text-sm border border-gray-300 rounded transition-colors">
+                        <?= $block->escapeHtml(__('Next')) ?>
+                    </button>
+                </div>
+            </template>
+
+        </div>
+    </div>
+</div>
+
+<script src="<?= $block->getViewFileUrl('RunAsRoot_TypeSense::js/landing-page-search.js') ?>"></script>
