@@ -19,10 +19,75 @@ foreach ($aliasesResult['aliases'] ?? [] as $alias) {
         $aliasMap[$collectionName] = $aliasName;
     }
 }
+
+$configUrl = $block->getUrl('adminhtml/system_config/edit', ['section' => 'run_as_root_typesense']);
+
+// Checklist checks
+$checks = [
+    [
+        'pass'  => $viewModel->isEnabled(),
+        'label' => __('Module enabled'),
+        'fix'   => sprintf('<a href="%s">%s</a>', $block->escapeUrl($configUrl), $block->escapeHtml(__('Go to Configuration'))),
+    ],
+    [
+        'pass'  => $viewModel->hasApiKey(),
+        'label' => __('Admin API key set'),
+        'fix'   => sprintf('<a href="%s">%s</a>', $block->escapeUrl($configUrl), $block->escapeHtml(__('Go to Configuration'))),
+    ],
+    [
+        'pass'  => $viewModel->hasSearchOnlyApiKey(),
+        'label' => __('Search-only API key set'),
+        'fix'   => sprintf('<a href="%s">%s</a>', $block->escapeUrl($configUrl), $block->escapeHtml(__('Go to Configuration'))),
+    ],
+    [
+        'pass'  => $isConnected,
+        'label' => __('Connection healthy'),
+        'fix'   => $block->escapeHtml(__('Check host/port settings')),
+    ],
+    [
+        'pass'  => $viewModel->getTotalDocuments() > 0,
+        'label' => __('Products indexed'),
+        'fix'   => '<code>' . $block->escapeHtml(__('Run: bin/magento typesense:reindex')) . '</code>',
+    ],
+    [
+        'pass'  => $viewModel->isAutocompleteEnabled(),
+        'label' => __('Autocomplete enabled'),
+        'fix'   => sprintf('<a href="%s">%s</a>', $block->escapeUrl($configUrl), $block->escapeHtml(__('Go to Configuration'))),
+    ],
+];
+
+$allPass = array_reduce($checks, fn(bool $carry, array $check) => $carry && $check['pass'], true);
 ?>
 <div class="admin__page-section">
     <div class="admin__page-section-title">
         <span class="title"><?= $block->escapeHtml(__('TypeSense Dashboard')) ?></span>
+    </div>
+
+    <!-- Smart Checklist -->
+    <div class="admin__page-section-content">
+        <?php if ($allPass): ?>
+            <div class="message message-success">
+                <strong>&#10003; <?= $block->escapeHtml(__('All systems operational')) ?></strong>
+            </div>
+        <?php else: ?>
+            <div class="message message-error">
+                <strong><?= $block->escapeHtml(__('Setup checklist — fix the items below:')) ?></strong>
+                <ul style="margin:0.75rem 0 0 1.25rem; padding:0;">
+                    <?php foreach ($checks as $check): ?>
+                        <li style="margin-bottom:0.35rem;">
+                            <?php if ($check['pass']): ?>
+                                <span style="color:#185b00; font-weight:bold;">&#10003;</span>
+                                <?= $block->escapeHtml((string) $check['label']) ?>
+                            <?php else: ?>
+                                <span style="color:#b40000; font-weight:bold;">&#10007;</span>
+                                <?= $block->escapeHtml((string) $check['label']) ?>
+                                &mdash; <?= $check['fix'] /* already escaped/safe */ ?>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
     </div>
 
     <!-- Connection Status -->
@@ -37,7 +102,7 @@ foreach ($aliasesResult['aliases'] ?? [] as $alias) {
                         <div class="admin__field-label">
                             <span><?= $block->escapeHtml(__('Status')) ?></span>
                         </div>
-                        <div class="admin__field-control">
+                        <div class="admin__field-control" style="display:flex; align-items:center; gap:1rem;">
                             <?php if ($isConnected): ?>
                                 <span class="grid-severity-notice">
                                     <span><?= $block->escapeHtml(__('Connected')) ?></span>
@@ -47,6 +112,12 @@ foreach ($aliasesResult['aliases'] ?? [] as $alias) {
                                     <span><?= $block->escapeHtml(__('Disconnected')) ?></span>
                                 </span>
                             <?php endif; ?>
+                            <button type="button"
+                                    id="typesense-test-connection"
+                                    class="action-default scalable">
+                                <span><?= $block->escapeHtml(__('Test Connection')) ?></span>
+                            </button>
+                            <span id="typesense-test-connection-result" style="font-weight:bold;"></span>
                         </div>
                     </div>
                     <div class="admin__field">
@@ -73,6 +144,21 @@ foreach ($aliasesResult['aliases'] ?? [] as $alias) {
                             <span><?= $block->escapeHtml((string) $connectionInfo['protocol']) ?></span>
                         </div>
                     </div>
+
+                    <?php if (!$isConnected): ?>
+                        <div class="admin__field">
+                            <div class="admin__field-control">
+                                <div class="message message-warning">
+                                    <strong><?= $block->escapeHtml(__('Troubleshooting hints:')) ?></strong>
+                                    <ul style="margin:0.5rem 0 0 1.25rem; padding:0;">
+                                        <li><?= $block->escapeHtml(__('Check your Typesense host and port in Configuration')) ?></li>
+                                        <li><?= $block->escapeHtml(__('Verify your Admin API Key matches the --api-key flag used to start Typesense')) ?></li>
+                                        <li><?= $block->escapeHtml(__("If using Docker/Warden, the host should be the container name (e.g., 'typesense'), not 'localhost'")) ?></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -132,7 +218,10 @@ foreach ($aliasesResult['aliases'] ?? [] as $alias) {
                                     <th class="data-grid-th"><?= $block->escapeHtml(__('Name')) ?></th>
                                     <th class="data-grid-th"><?= $block->escapeHtml(__('Document Count')) ?></th>
                                     <th class="data-grid-th"><?= $block->escapeHtml(__('Created At')) ?></th>
-                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Alias')) ?></th>
+                                    <th class="data-grid-th"
+                                        title="<?= $block->escapeHtmlAttr(__('An alias points to the active collection. During zero-downtime reindex, the alias switches to the new collection automatically.')) ?>">
+                                        <?= $block->escapeHtml(__('Alias')) ?>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -144,12 +233,18 @@ foreach ($aliasesResult['aliases'] ?? [] as $alias) {
                                         ? date('Y-m-d H:i:s', (int) $collection['created_at'])
                                         : '';
                                     $alias        = $aliasMap[$name] ?? '';
+                                    $rowStyle     = $numDocuments === 0 ? ' style="background:#fff8e1;"' : '';
                                     ?>
-                                    <tr>
+                                    <tr<?= $rowStyle ?>>
                                         <td><?= $block->escapeHtml($name) ?></td>
                                         <td><?= $block->escapeHtml((string) $numDocuments) ?></td>
                                         <td><?= $block->escapeHtml($createdAt) ?></td>
-                                        <td><?= $block->escapeHtml($alias) ?></td>
+                                        <td>
+                                            <?php if ($alias !== ''): ?>
+                                                <?= $block->escapeHtml($alias) ?>
+                                                <span style="color:#185b00; font-weight:bold;"><?= $block->escapeHtml(__(' (live)')) ?></span>
+                                            <?php endif; ?>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -160,3 +255,37 @@ foreach ($aliasesResult['aliases'] ?? [] as $alias) {
         </div>
     </div>
 </div>
+
+<script>
+require(['jquery'], function ($) {
+    'use strict';
+
+    $('#typesense-test-connection').on('click', function () {
+        var $btn    = $(this);
+        var $result = $('#typesense-test-connection-result');
+
+        $btn.prop('disabled', true);
+        $result.css('color', '').text('<?= $block->escapeJs(__('Testing...')) ?>');
+
+        $.ajax({
+            url:      '<?= $block->escapeJs($block->getUrl('typesense/dashboard/testconnection')) ?>',
+            method:   'GET',
+            dataType: 'json',
+            success: function (data) {
+                if (data && data.success) {
+                    $result.css('color', '#185b00').text('<?= $block->escapeJs(__('Connected successfully!')) ?>');
+                } else {
+                    var msg = (data && data.message) ? data.message : '<?= $block->escapeJs(__('Connection failed')) ?>';
+                    $result.css('color', '#b40000').text(msg);
+                }
+            },
+            error: function () {
+                $result.css('color', '#b40000').text('<?= $block->escapeJs(__('Request failed. Check browser console.')) ?>');
+            },
+            complete: function () {
+                $btn.prop('disabled', false);
+            }
+        });
+    });
+});
+</script>

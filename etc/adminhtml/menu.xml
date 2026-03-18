@@ -43,5 +43,12 @@
              action="typesense/landingpage/index"
              resource="RunAsRoot_TypeSense::landing_pages"
              sortOrder="70"/>
+        <add id="RunAsRoot_TypeSense::configuration"
+             title="Configuration"
+             module="RunAsRoot_TypeSense"
+             parent="RunAsRoot_TypeSense::typesense"
+             action="adminhtml/system_config/edit/section/run_as_root_typesense"
+             resource="RunAsRoot_TypeSense::configuration"
+             sortOrder="80"/>
     </menu>
 </config>
