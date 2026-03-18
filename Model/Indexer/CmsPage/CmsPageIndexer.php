@@ -11,7 +11,7 @@ use RunAsRoot\TypeSense\Model\Indexer\IndexerOrchestrator;
 readonly class CmsPageIndexer implements ActionInterface, MviewActionInterface
 {
     public function __construct(
-        private readonly IndexerOrchestrator $orchestrator,
+        private IndexerOrchestrator $orchestrator,
     ) {
     }
 

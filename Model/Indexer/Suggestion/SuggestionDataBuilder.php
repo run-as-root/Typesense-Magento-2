@@ -44,6 +44,7 @@ readonly class SuggestionDataBuilder
     public function getQueryCollection(array $entityIds, int $storeId): QueryCollection
     {
         $collection = $this->collectionFactory->create();
+        $collection->addFieldToFilter('store_id', $storeId);
         $collection->addFieldToFilter('num_results', ['gt' => 0]);
 
         if ($entityIds !== []) {
