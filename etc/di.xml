@@ -1,4 +1,45 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <!-- Interface preferences -->
+    <preference for="RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface"
+                type="RunAsRoot\TypeSense\Model\Config\TypeSenseConfig"/>
+
+    <preference for="RunAsRoot\TypeSense\Api\CollectionManagerInterface"
+                type="RunAsRoot\TypeSense\Model\Collection\CollectionManager"/>
+
+    <preference for="RunAsRoot\TypeSense\Api\AliasManagerInterface"
+                type="RunAsRoot\TypeSense\Model\Collection\AliasManager"/>
+
+    <preference for="RunAsRoot\TypeSense\Api\CollectionNameResolverInterface"
+                type="RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver"/>
+
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\AttributeResolverInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Product\AttributeResolver"/>
+
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\PriceCalculatorInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Product\PriceCalculator"/>
+
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\ImageResolverInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Product\ImageResolver"/>
+
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\StockResolverInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Product\StockResolver"/>
+
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\CategoryResolverInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Product\CategoryResolver"/>
+
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\UrlResolverInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Product\UrlResolver"/>
+
+    <!-- Entity indexer pool: register product indexer -->
+    <type name="RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool">
+        <arguments>
+            <argument name="indexers" xsi:type="array">
+                <item name="product" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Product\ProductEntityIndexer</item>
+            </argument>
+        </arguments>
+    </type>
+
 </config>

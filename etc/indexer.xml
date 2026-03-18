@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Indexer/etc/indexer.xsd">
+    <indexer id="typesense_product"
+             view_id="typesense_product"
+             class="RunAsRoot\TypeSense\Model\Indexer\Product\ProductIndexer">
+        <title translate="true">TypeSense Product Index</title>
+        <description translate="true">Rebuilds TypeSense product search index</description>
+    </indexer>
+</config>
