@@ -175,11 +175,6 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return $this->getFlag('merchandising/query_merchandiser_enabled', $storeId);
     }
 
-    public function isLandingPageEnabled(?int $storeId = null): bool
-    {
-        return $this->getFlag('merchandising/landing_page_enabled', $storeId);
-    }
-
     private function getValue(string $path, ?int $storeId = null): mixed
     {
         return $this->scopeConfig->getValue(

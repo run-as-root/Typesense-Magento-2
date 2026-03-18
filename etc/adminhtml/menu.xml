@@ -36,14 +36,7 @@
              action="typesense/querymerchandiser/index"
              resource="RunAsRoot_TypeSense::query_merchandiser"
              sortOrder="60"/>
-        <add id="RunAsRoot_TypeSense::landing_pages"
-             title="Landing Pages"
-             module="RunAsRoot_TypeSense"
-             parent="RunAsRoot_TypeSense::typesense"
-             action="typesense/landingpage/index"
-             resource="RunAsRoot_TypeSense::landing_pages"
-             sortOrder="70"/>
-        <add id="RunAsRoot_TypeSense::configuration"
+<add id="RunAsRoot_TypeSense::configuration"
              title="Configuration"
              module="RunAsRoot_TypeSense"
              parent="RunAsRoot_TypeSense::typesense"

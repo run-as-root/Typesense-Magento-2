@@ -243,11 +243,6 @@
                     <label>Enable Query Merchandiser</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
-                <field id="landing_page_enabled" translate="label" type="select"
-                       sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>Enable Landing Pages</label>
-                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                </field>
             </group>
         </section>
     </system>

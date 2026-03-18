@@ -48,7 +48,6 @@
             <merchandising>
                 <category_merchandiser_enabled>0</category_merchandiser_enabled>
                 <query_merchandiser_enabled>0</query_merchandiser_enabled>
-                <landing_page_enabled>0</landing_page_enabled>
             </merchandising>
         </run_as_root_typesense>
     </default>

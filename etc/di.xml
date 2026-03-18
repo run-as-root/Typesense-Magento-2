@@ -58,9 +58,6 @@
     <preference for="RunAsRoot\TypeSense\Api\Data\QueryMerchandisingInterface"
                 type="RunAsRoot\TypeSense\Model\Merchandising\QueryMerchandising"/>
 
-    <preference for="RunAsRoot\TypeSense\Api\Data\LandingPageInterface"
-                type="RunAsRoot\TypeSense\Model\Merchandising\LandingPage"/>
-
     <!-- Curation service preferences -->
     <preference for="RunAsRoot\TypeSense\Api\OverrideManagerInterface"
                 type="RunAsRoot\TypeSense\Model\Curation\OverrideManager"/>
@@ -71,9 +68,6 @@
 
     <preference for="RunAsRoot\TypeSense\Api\QueryMerchandisingRepositoryInterface"
                 type="RunAsRoot\TypeSense\Model\Merchandising\QueryMerchandisingRepository"/>
-
-    <preference for="RunAsRoot\TypeSense\Api\LandingPageRepositoryInterface"
-                type="RunAsRoot\TypeSense\Model\Merchandising\LandingPageRepository"/>
 
     <!-- Entity indexer pool: register all entity indexers -->
     <type name="RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool">

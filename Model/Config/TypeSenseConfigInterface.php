@@ -65,6 +65,4 @@ interface TypeSenseConfigInterface
     public function isCategoryMerchandiserEnabled(?int $storeId = null): bool;
 
     public function isQueryMerchandiserEnabled(?int $storeId = null): bool;
-
-    public function isLandingPageEnabled(?int $storeId = null): bool;
 }

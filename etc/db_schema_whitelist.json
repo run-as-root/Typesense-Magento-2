@@ -38,31 +38,5 @@
             "RUN_AS_ROOT_TYPESENSE_QUERY_MERCHANDISING_QUERY_STORE_ID": true,
             "RUN_AS_ROOT_TYPESENSE_QR_MERCHANDISING_STORE_ID_STORE_STORE_ID": true
         }
-    },
-    "run_as_root_typesense_landing_page": {
-        "column": {
-            "id": true,
-            "url_key": true,
-            "store_id": true,
-            "title": true,
-            "meta_description": true,
-            "query": true,
-            "filter_by": true,
-            "sort_by": true,
-            "includes": true,
-            "excludes": true,
-            "banner_config": true,
-            "cms_content": true,
-            "is_active": true,
-            "created_at": true,
-            "updated_at": true
-        },
-        "constraint": {
-            "PRIMARY": true,
-            "UNQ_TS_LANDING_URL_STORE": true,
-            "FK_TS_LANDING_STORE": true,
-            "RUN_AS_ROOT_TYPESENSE_LANDING_PAGE_URL_KEY_STORE_ID": true,
-            "RUN_AS_ROOT_TYPESENSE_LANDING_PAGE_STORE_ID_STORE_STORE_ID": true
-        }
     }
 }
