@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 
 use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\Product\Attribute\Source\Status;
+use Magento\Catalog\Model\Product\Visibility;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 
@@ -58,12 +60,12 @@ readonly class ProductDataBuilder
 
         $description = $product->getData('description');
         if ($description !== null && $description !== '') {
-            $document['description'] = (string) $description;
+            $document['description'] = strip_tags((string) $description);
         }
 
         $shortDescription = $product->getData('short_description');
         if ($shortDescription !== null && $shortDescription !== '') {
-            $document['short_description'] = (string) $shortDescription;
+            $document['short_description'] = strip_tags((string) $shortDescription);
         }
 
         $extra = $this->attributeResolver->getExtraAttributes($product);
@@ -85,6 +87,11 @@ readonly class ProductDataBuilder
         $collection->setStoreId($storeId);
         $collection->addAttributeToSelect('*');
         $collection->addUrlRewrite();
+        $collection->addAttributeToFilter('status', Status::STATUS_ENABLED);
+        $collection->setVisibility([
+            Visibility::VISIBILITY_IN_SEARCH,
+            Visibility::VISIBILITY_BOTH,
+        ]);
 
         if ($entityIds !== []) {
             $collection->addFieldToFilter('entity_id', ['in' => $entityIds]);

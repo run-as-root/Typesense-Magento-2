@@ -10,6 +10,13 @@ use Magento\Catalog\Model\ResourceModel\Product\Attribute\CollectionFactory as A
 
 class AttributeResolver implements AttributeResolverInterface
 {
+    private const array CORE_FIELDS = [
+        'entity_id', 'attribute_set_id', 'type_id', 'sku', 'name',
+        'description', 'short_description', 'price', 'special_price',
+        'visibility', 'status', 'created_at', 'updated_at', 'url_key',
+        'image', 'small_image', 'thumbnail',
+    ];
+
     private ?AttributeCollection $cachedCollection = null;
 
     public function __construct(
@@ -24,17 +31,10 @@ class AttributeResolver implements AttributeResolverInterface
     {
         $collection = $this->getAttributeCollection();
 
-        $coreFields = [
-            'entity_id', 'attribute_set_id', 'type_id', 'sku', 'name',
-            'description', 'short_description', 'price', 'special_price',
-            'visibility', 'status', 'created_at', 'updated_at', 'url_key',
-            'image', 'small_image', 'thumbnail',
-        ];
-
         $extra = [];
         foreach ($collection as $attribute) {
             $code = $attribute->getAttributeCode();
-            if (in_array($code, $coreFields, true)) {
+            if (in_array($code, self::CORE_FIELDS, true)) {
                 continue;
             }
 
@@ -53,8 +53,10 @@ class AttributeResolver implements AttributeResolverInterface
     {
         if ($this->cachedCollection === null) {
             $collection = $this->attributeCollectionFactory->create();
-            $collection->addIsSearchableFilter();
-            $collection->addFieldToFilter('is_filterable', ['gt' => 0]);
+            $collection->addFieldToFilter(
+                ['is_searchable', 'is_filterable'],
+                [['eq' => 1], ['gt' => 0]],
+            );
             $this->cachedCollection = $collection;
         }
 

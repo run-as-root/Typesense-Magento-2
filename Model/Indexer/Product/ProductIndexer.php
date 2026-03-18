@@ -8,7 +8,7 @@ use Magento\Framework\Indexer\ActionInterface;
 use Magento\Framework\Mview\ActionInterface as MviewActionInterface;
 use RunAsRoot\TypeSense\Model\Indexer\IndexerOrchestrator;
 
-class ProductIndexer implements ActionInterface, MviewActionInterface
+readonly class ProductIndexer implements ActionInterface, MviewActionInterface
 {
     public function __construct(
         private readonly IndexerOrchestrator $orchestrator,

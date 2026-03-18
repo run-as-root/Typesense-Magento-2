@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Test\Unit\Model\Indexer\Product;
 
 use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\Product\Attribute\Source\Status;
+use Magento\Catalog\Model\Product\Visibility;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -204,6 +206,60 @@ final class ProductDataBuilderTest extends TestCase
         self::assertGreaterThan(0, $document['updated_at']);
     }
 
+    public function test_build_strips_html_from_description(): void
+    {
+        $product = $this->createProductMock();
+
+        $this->priceCalculator->method('getFinalPrice')->willReturn(99.99);
+        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
+        $this->imageResolver->method('getImageUrl')->willReturn('');
+        $this->stockResolver->method('isInStock')->willReturn(true);
+        $this->urlResolver->method('getProductUrl')->willReturn('');
+        $this->categoryResolver->method('getCategoryData')->willReturn([
+            'categories' => [],
+            'category_ids' => [],
+            'categories.lvl0' => [],
+            'categories.lvl1' => [],
+            'categories.lvl2' => [],
+        ]);
+        $this->attributeResolver->method('getExtraAttributes')->willReturn([]);
+        $product->method('getData')->willReturnMap([
+            ['description', null, '<p>This is a <strong>great</strong> product.</p>'],
+            ['short_description', null, null],
+        ]);
+
+        $document = $this->sut->build($product, 1);
+
+        self::assertSame('This is a great product.', $document['description']);
+    }
+
+    public function test_build_strips_html_from_short_description(): void
+    {
+        $product = $this->createProductMock();
+
+        $this->priceCalculator->method('getFinalPrice')->willReturn(99.99);
+        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
+        $this->imageResolver->method('getImageUrl')->willReturn('');
+        $this->stockResolver->method('isInStock')->willReturn(true);
+        $this->urlResolver->method('getProductUrl')->willReturn('');
+        $this->categoryResolver->method('getCategoryData')->willReturn([
+            'categories' => [],
+            'category_ids' => [],
+            'categories.lvl0' => [],
+            'categories.lvl1' => [],
+            'categories.lvl2' => [],
+        ]);
+        $this->attributeResolver->method('getExtraAttributes')->willReturn([]);
+        $product->method('getData')->willReturnMap([
+            ['description', null, null],
+            ['short_description', null, '<em>Quick</em> summary <br/> here.'],
+        ]);
+
+        $document = $this->sut->build($product, 1);
+
+        self::assertSame('Quick summary  here.', $document['short_description']);
+    }
+
     public function test_get_product_collection_sets_store_id(): void
     {
         $collection = $this->createMock(ProductCollection::class);
@@ -215,6 +271,8 @@ final class ProductDataBuilderTest extends TestCase
 
         $collection->method('addAttributeToSelect');
         $collection->method('addUrlRewrite');
+        $collection->method('addAttributeToFilter');
+        $collection->method('setVisibility');
 
         $this->sut->getProductCollection([], 5);
     }
@@ -229,6 +287,8 @@ final class ProductDataBuilderTest extends TestCase
             ->method('addAttributeToSelect')
             ->with('*');
         $collection->method('addUrlRewrite');
+        $collection->method('addAttributeToFilter');
+        $collection->method('setVisibility');
 
         $this->sut->getProductCollection([], 1);
     }
@@ -242,6 +302,43 @@ final class ProductDataBuilderTest extends TestCase
         $collection->method('addAttributeToSelect');
         $collection->expects(self::once())
             ->method('addUrlRewrite');
+        $collection->method('addAttributeToFilter');
+        $collection->method('setVisibility');
+
+        $this->sut->getProductCollection([], 1);
+    }
+
+    public function test_get_product_collection_filters_enabled_status(): void
+    {
+        $collection = $this->createMock(ProductCollection::class);
+        $this->collectionFactory->method('create')->willReturn($collection);
+
+        $collection->method('setStoreId');
+        $collection->method('addAttributeToSelect');
+        $collection->method('addUrlRewrite');
+        $collection->expects(self::once())
+            ->method('addAttributeToFilter')
+            ->with('status', Status::STATUS_ENABLED);
+        $collection->method('setVisibility');
+
+        $this->sut->getProductCollection([], 1);
+    }
+
+    public function test_get_product_collection_filters_searchable_visibility(): void
+    {
+        $collection = $this->createMock(ProductCollection::class);
+        $this->collectionFactory->method('create')->willReturn($collection);
+
+        $collection->method('setStoreId');
+        $collection->method('addAttributeToSelect');
+        $collection->method('addUrlRewrite');
+        $collection->method('addAttributeToFilter');
+        $collection->expects(self::once())
+            ->method('setVisibility')
+            ->with([
+                Visibility::VISIBILITY_IN_SEARCH,
+                Visibility::VISIBILITY_BOTH,
+            ]);
 
         $this->sut->getProductCollection([], 1);
     }
@@ -254,6 +351,8 @@ final class ProductDataBuilderTest extends TestCase
         $collection->method('setStoreId');
         $collection->method('addAttributeToSelect');
         $collection->method('addUrlRewrite');
+        $collection->method('addAttributeToFilter');
+        $collection->method('setVisibility');
         $collection->expects(self::once())
             ->method('addFieldToFilter')
             ->with('entity_id', ['in' => [1, 2, 3]]);
@@ -261,7 +360,7 @@ final class ProductDataBuilderTest extends TestCase
         $this->sut->getProductCollection([1, 2, 3], 1);
     }
 
-    public function test_get_product_collection_does_not_filter_when_entity_ids_empty(): void
+    public function test_get_product_collection_does_not_filter_by_entity_ids_when_empty(): void
     {
         $collection = $this->createMock(ProductCollection::class);
         $this->collectionFactory->method('create')->willReturn($collection);
@@ -269,6 +368,8 @@ final class ProductDataBuilderTest extends TestCase
         $collection->method('setStoreId');
         $collection->method('addAttributeToSelect');
         $collection->method('addUrlRewrite');
+        $collection->method('addAttributeToFilter');
+        $collection->method('setVisibility');
         $collection->expects(self::never())
             ->method('addFieldToFilter');
 

@@ -30,7 +30,7 @@ readonly class ProductEntityIndexer implements EntityIndexerInterface
         return $this->schemaProvider->getFields();
     }
 
-    public function buildDocuments(array $entityIds, int $storeId): \Generator
+    public function buildDocuments(array $entityIds, int $storeId): iterable
     {
         $collection = $this->dataBuilder->getProductCollection($entityIds, $storeId);
 
