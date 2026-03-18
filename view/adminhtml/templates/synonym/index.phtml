@@ -9,186 +9,230 @@ $collection  = (string) $block->getRequest()->getParam('collection', '');
 $collections = $viewModel->getCollections();
 $synonyms    = $collection !== '' ? $viewModel->getSynonyms($collection) : [];
 ?>
-<div class="admin__page-section">
-    <div class="admin__page-section-title">
-        <span class="title"><?= $block->escapeHtml(__('TypeSense Synonyms')) ?></span>
-    </div>
 
-    <!-- Collection Selector -->
-    <div class="admin__page-section-content">
-        <div class="admin__fieldset">
-            <div class="admin__fieldset-wrapper">
-                <div class="admin__fieldset-wrapper-title">
-                    <span><?= $block->escapeHtml(__('Select Collection')) ?></span>
-                </div>
-                <div class="admin__fieldset-wrapper-content">
-                    <form method="get" action="<?= $block->escapeUrl($block->getUrl('*/*/index')) ?>">
-                        <div class="admin__field">
-                            <div class="admin__field-label">
-                                <label for="collection-select"><?= $block->escapeHtml(__('Collection')) ?></label>
-                            </div>
-                            <div class="admin__field-control">
-                                <select id="collection-select"
-                                        name="collection"
-                                        class="admin__control-select"
-                                        onchange="this.form.submit()">
-                                    <option value=""><?= $block->escapeHtml(__('-- Select a Collection --')) ?></option>
-                                    <?php foreach ($collections as $col): ?>
-                                        <?php $colName = (string) ($col['name'] ?? ''); ?>
-                                        <option value="<?= $block->escapeHtmlAttr($colName) ?>"
-                                            <?= $colName === $collection ? 'selected="selected"' : '' ?>>
-                                            <?= $block->escapeHtml($colName) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-                    </form>
+<style>
+    .ts-synonyms { max-width: 1000px; }
+
+    .ts-card {
+        background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; margin-bottom: 20px;
+    }
+    .ts-card-header {
+        padding: 14px 20px; font-size: 13px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.5px; color: #555; background: #fafafa; border-bottom: 1px solid #e8e8e8;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .ts-card-header .ts-count { font-weight: 400; color: #aaa; }
+    .ts-card-body { padding: 20px; }
+
+    /* Collection selector */
+    .ts-collection-bar {
+        display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
+        padding: 16px 20px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px;
+    }
+    .ts-collection-bar label { font-size: 13px; font-weight: 600; color: #555; white-space: nowrap; }
+    .ts-collection-bar select {
+        flex: 1; max-width: 400px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;
+        font-size: 13px; background: #fff;
+    }
+
+    /* Empty state */
+    .ts-empty {
+        text-align: center; padding: 40px 20px; color: #999;
+    }
+    .ts-empty-icon { font-size: 32px; margin-bottom: 8px; }
+    .ts-empty-text { font-size: 14px; }
+    .ts-empty-hint { font-size: 12px; color: #bbb; margin-top: 4px; }
+
+    /* Synonym list */
+    .ts-synonym-row {
+        display: flex; align-items: center; gap: 12px;
+        padding: 12px 20px; border-bottom: 1px solid #f0f0f0;
+    }
+    .ts-synonym-row:last-child { border-bottom: none; }
+    .ts-synonym-row:hover { background: #fafafa; }
+
+    .ts-synonym-type {
+        display: inline-block; padding: 2px 8px; border-radius: 3px;
+        font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+        flex-shrink: 0;
+    }
+    .ts-type-multi { background: #e3f2fd; color: #1565c0; }
+    .ts-type-oneway { background: #f3e5f5; color: #7b1fa2; }
+
+    .ts-synonym-words { flex: 1; font-size: 13px; }
+    .ts-synonym-word {
+        display: inline-block; padding: 2px 10px; margin: 2px 4px 2px 0;
+        background: #f5f5f5; border: 1px solid #e8e8e8; border-radius: 12px;
+        font-size: 12px; color: #333;
+    }
+    .ts-synonym-arrow { color: #999; margin: 0 4px; font-size: 12px; }
+    .ts-synonym-root {
+        display: inline-block; padding: 2px 10px; margin: 2px 4px 2px 0;
+        background: #f3e5f5; border: 1px solid #e1bee7; border-radius: 12px;
+        font-size: 12px; color: #7b1fa2; font-weight: 600;
+    }
+
+    .ts-synonym-id { font-size: 11px; color: #ccc; font-family: monospace; flex-shrink: 0; width: 100px; }
+
+    .ts-synonym-delete {
+        background: none; border: none; color: #e53935; cursor: pointer; font-size: 12px;
+        padding: 4px 8px; border-radius: 3px; flex-shrink: 0;
+    }
+    .ts-synonym-delete:hover { background: #ffebee; }
+
+    /* Add form */
+    .ts-form-row { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+    .ts-form-row label { font-size: 12px; font-weight: 600; color: #555; width: 80px; padding-top: 10px; flex-shrink: 0; }
+    .ts-form-row select, .ts-form-row input {
+        flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;
+    }
+    .ts-form-row input:focus, .ts-form-row select:focus { border-color: #1979c3; outline: none; box-shadow: 0 0 0 2px rgba(25,121,195,0.1); }
+    .ts-form-hint { font-size: 11px; color: #aaa; margin-top: 4px; }
+    .ts-form-actions { display: flex; gap: 10px; margin-top: 16px; padding-left: 92px; }
+    .ts-btn-primary {
+        padding: 8px 20px; border-radius: 4px; font-size: 13px; font-weight: 600;
+        border: none; cursor: pointer; background: #1979c3; color: #fff;
+    }
+    .ts-btn-primary:hover { background: #1565c0; }
+</style>
+
+<div class="ts-synonyms">
+
+    <!-- Collection selector bar -->
+    <form method="get" action="<?= $block->escapeUrl($block->getUrl('*/*/index')) ?>">
+        <div class="ts-collection-bar">
+            <label for="collection-select"><?= $block->escapeHtml(__('Collection:')) ?></label>
+            <select id="collection-select" name="collection" onchange="this.form.submit()">
+                <option value=""><?= $block->escapeHtml(__('Select a collection…')) ?></option>
+                <?php foreach ($collections as $col): ?>
+                    <?php $colName = (string) ($col['name'] ?? ''); ?>
+                    <option value="<?= $block->escapeHtmlAttr($colName) ?>"
+                        <?= $colName === $collection ? 'selected="selected"' : '' ?>>
+                        <?= $block->escapeHtml($colName) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </form>
+
+    <?php if ($collection === ''): ?>
+        <!-- No collection selected -->
+        <div class="ts-card">
+            <div class="ts-card-body">
+                <div class="ts-empty">
+                    <div class="ts-empty-icon">🔤</div>
+                    <div class="ts-empty-text"><?= $block->escapeHtml(__('Select a collection above to manage its synonyms')) ?></div>
+                    <div class="ts-empty-hint"><?= $block->escapeHtml(__('Synonyms help users find products using alternative terms (e.g., "phone" ↔ "mobile" ↔ "cell")')) ?></div>
                 </div>
             </div>
         </div>
-    </div>
+    <?php else: ?>
 
-    <?php if ($collection !== ''): ?>
-
-        <!-- Synonyms Table -->
-        <div class="admin__page-section-content">
-            <div class="admin__fieldset">
-                <div class="admin__fieldset-wrapper">
-                    <div class="admin__fieldset-wrapper-title">
-                        <span>
-                            <?= $block->escapeHtml(__('Synonyms for "%1" (%2)', $collection, count($synonyms))) ?>
-                        </span>
-                    </div>
-                    <div class="admin__fieldset-wrapper-content">
-                        <?php if (empty($synonyms)): ?>
-                            <p class="message message-notice">
-                                <?= $block->escapeHtml(__('No synonyms defined for this collection.')) ?>
-                            </p>
-                        <?php else: ?>
-                            <table class="data-grid">
-                                <thead>
-                                    <tr>
-                                        <th class="data-grid-th"><?= $block->escapeHtml(__('ID')) ?></th>
-                                        <th class="data-grid-th"><?= $block->escapeHtml(__('Synonyms')) ?></th>
-                                        <th class="data-grid-th"><?= $block->escapeHtml(__('Root (One-Way)')) ?></th>
-                                        <th class="data-grid-th"><?= $block->escapeHtml(__('Actions')) ?></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($synonyms as $synonym): ?>
-                                        <?php
-                                        $synonymId    = (string) ($synonym['id'] ?? '');
-                                        $synonymWords = $synonym['synonyms'] ?? [];
-                                        $rootWord     = (string) ($synonym['root'] ?? '');
-                                        ?>
-                                        <tr>
-                                            <td><?= $block->escapeHtml($synonymId) ?></td>
-                                            <td><?= $block->escapeHtml(implode(', ', $synonymWords)) ?></td>
-                                            <td><?= $block->escapeHtml($rootWord) ?></td>
-                                            <td>
-                                                <form method="post"
-                                                      action="<?= $block->escapeUrl($block->getUrl('*/*/delete')) ?>"
-                                                      style="display:inline;"
-                                                      onsubmit="return confirm('<?= $block->escapeHtmlAttr(__('Delete synonym "%1"?', $synonymId)) ?>');">
-                                                    <?= $block->getBlockHtml('formkey') ?>
-                                                    <input type="hidden" name="collection" value="<?= $block->escapeHtmlAttr($collection) ?>"/>
-                                                    <input type="hidden" name="synonym_id" value="<?= $block->escapeHtmlAttr($synonymId) ?>"/>
-                                                    <button type="submit" class="action-menu-item" style="background:none;border:none;color:#eb5202;cursor:pointer;padding:0;">
-                                                        <?= $block->escapeHtml(__('Delete')) ?>
-                                                    </button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        <?php endif; ?>
+        <!-- Existing Synonyms -->
+        <div class="ts-card">
+            <div class="ts-card-header">
+                <?= $block->escapeHtml(__('Synonyms')) ?>
+                <span class="ts-count">(<?= count($synonyms) ?>)</span>
+            </div>
+            <?php if (empty($synonyms)): ?>
+                <div class="ts-card-body">
+                    <div class="ts-empty">
+                        <div class="ts-empty-text"><?= $block->escapeHtml(__('No synonyms defined yet')) ?></div>
+                        <div class="ts-empty-hint"><?= $block->escapeHtml(__('Use the form below to add your first synonym rule')) ?></div>
                     </div>
                 </div>
-            </div>
+            <?php else: ?>
+                <?php foreach ($synonyms as $synonym): ?>
+                    <?php
+                    $synonymId    = (string) ($synonym['id'] ?? '');
+                    $synonymWords = $synonym['synonyms'] ?? [];
+                    $rootWord     = (string) ($synonym['root'] ?? '');
+                    $isOneWay     = $rootWord !== '';
+                    ?>
+                    <div class="ts-synonym-row">
+                        <span class="ts-synonym-type <?= $isOneWay ? 'ts-type-oneway' : 'ts-type-multi' ?>">
+                            <?= $isOneWay ? $block->escapeHtml(__('one-way')) : $block->escapeHtml(__('multi')) ?>
+                        </span>
+                        <div class="ts-synonym-words">
+                            <?php if ($isOneWay): ?>
+                                <span class="ts-synonym-root"><?= $block->escapeHtml($rootWord) ?></span>
+                                <span class="ts-synonym-arrow">→</span>
+                            <?php endif; ?>
+                            <?php foreach ($synonymWords as $word): ?>
+                                <span class="ts-synonym-word"><?= $block->escapeHtml((string) $word) ?></span>
+                            <?php endforeach; ?>
+                        </div>
+                        <span class="ts-synonym-id"><?= $block->escapeHtml($synonymId) ?></span>
+                        <form method="post"
+                              action="<?= $block->escapeUrl($block->getUrl('*/*/delete')) ?>"
+                              style="display:inline;"
+                              onsubmit="return confirm('<?= $block->escapeHtmlAttr(__('Delete this synonym?')) ?>');">
+                            <?= $block->getBlockHtml('formkey') ?>
+                            <input type="hidden" name="collection" value="<?= $block->escapeHtmlAttr($collection) ?>"/>
+                            <input type="hidden" name="synonym_id" value="<?= $block->escapeHtmlAttr($synonymId) ?>"/>
+                            <button type="submit" class="ts-synonym-delete">✕ <?= $block->escapeHtml(__('Delete')) ?></button>
+                        </form>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </div>
 
         <!-- Add Synonym Form -->
-        <div class="admin__page-section-content">
-            <div class="admin__fieldset">
-                <div class="admin__fieldset-wrapper">
-                    <div class="admin__fieldset-wrapper-title">
-                        <span><?= $block->escapeHtml(__('Add Synonym')) ?></span>
+        <div class="ts-card">
+            <div class="ts-card-header"><?= $block->escapeHtml(__('Add Synonym')) ?></div>
+            <div class="ts-card-body">
+                <form method="post" action="<?= $block->escapeUrl($block->getUrl('*/*/save')) ?>" id="add-synonym-form">
+                    <?= $block->getBlockHtml('formkey') ?>
+                    <input type="hidden" name="collection" value="<?= $block->escapeHtmlAttr($collection) ?>"/>
+
+                    <div class="ts-form-row">
+                        <label for="synonym-type"><?= $block->escapeHtml(__('Type')) ?></label>
+                        <div style="flex:1;">
+                            <select id="synonym-type" name="type" onchange="toggleRootField(this.value)">
+                                <option value="multi"><?= $block->escapeHtml(__('Multi-way')) ?></option>
+                                <option value="one-way"><?= $block->escapeHtml(__('One-way')) ?></option>
+                            </select>
+                            <div class="ts-form-hint" id="type-hint">
+                                <?= $block->escapeHtml(__('All words are interchangeable: searching any word finds results for all.')) ?>
+                            </div>
+                        </div>
                     </div>
-                    <div class="admin__fieldset-wrapper-content">
-                        <form method="post"
-                              action="<?= $block->escapeUrl($block->getUrl('*/*/save')) ?>"
-                              id="add-synonym-form">
-                            <?= $block->getBlockHtml('formkey') ?>
-                            <input type="hidden" name="collection" value="<?= $block->escapeHtmlAttr($collection) ?>"/>
 
-                            <div class="admin__field">
-                                <div class="admin__field-label">
-                                    <label for="synonym-type"><?= $block->escapeHtml(__('Type')) ?></label>
-                                </div>
-                                <div class="admin__field-control">
-                                    <select id="synonym-type"
-                                            name="type"
-                                            class="admin__control-select"
-                                            onchange="toggleRootField(this.value)">
-                                        <option value="multi"><?= $block->escapeHtml(__('Multi-Way (all words are synonyms of each other)')) ?></option>
-                                        <option value="one-way"><?= $block->escapeHtml(__('One-Way (root word maps to synonyms)')) ?></option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="admin__field" id="root-field" style="display:none;">
-                                <div class="admin__field-label">
-                                    <label for="synonym-root"><?= $block->escapeHtml(__('Root Word')) ?></label>
-                                </div>
-                                <div class="admin__field-control">
-                                    <input type="text"
-                                           id="synonym-root"
-                                           name="root"
-                                           class="admin__control-text"
-                                           placeholder="<?= $block->escapeHtmlAttr(__('e.g. smartphone')) ?>"/>
-                                    <p class="admin__field-note">
-                                        <?= $block->escapeHtml(__('The root word that maps to the synonym list.')) ?>
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div class="admin__field">
-                                <div class="admin__field-label">
-                                    <label for="synonym-words"><?= $block->escapeHtml(__('Synonyms')) ?></label>
-                                </div>
-                                <div class="admin__field-control">
-                                    <input type="text"
-                                           id="synonym-words"
-                                           name="synonyms"
-                                           class="admin__control-text"
-                                           placeholder="<?= $block->escapeHtmlAttr(__('e.g. phone, mobile, cell')) ?>"
-                                           required="required"/>
-                                    <p class="admin__field-note">
-                                        <?= $block->escapeHtml(__('Comma-separated list of synonym words.')) ?>
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div class="admin__field">
-                                <div class="admin__field-control">
-                                    <button type="submit" class="action-primary">
-                                        <span><?= $block->escapeHtml(__('Save Synonym')) ?></span>
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
+                    <div class="ts-form-row" id="root-field" style="display:none;">
+                        <label for="synonym-root"><?= $block->escapeHtml(__('Root')) ?></label>
+                        <div style="flex:1;">
+                            <input type="text" id="synonym-root" name="root" placeholder="<?= $block->escapeHtmlAttr(__('e.g., smartphone')) ?>"/>
+                            <div class="ts-form-hint"><?= $block->escapeHtml(__('The primary word. Searching synonyms will also match this root word.')) ?></div>
+                        </div>
                     </div>
-                </div>
+
+                    <div class="ts-form-row">
+                        <label for="synonym-words"><?= $block->escapeHtml(__('Synonyms')) ?></label>
+                        <div style="flex:1;">
+                            <input type="text" id="synonym-words" name="synonyms" required
+                                   placeholder="<?= $block->escapeHtmlAttr(__('e.g., phone, mobile, cell')) ?>"/>
+                            <div class="ts-form-hint"><?= $block->escapeHtml(__('Comma-separated list of synonym words.')) ?></div>
+                        </div>
+                    </div>
+
+                    <div class="ts-form-actions">
+                        <button type="submit" class="ts-btn-primary"><?= $block->escapeHtml(__('Add Synonym')) ?></button>
+                    </div>
+                </form>
             </div>
         </div>
 
         <script>
             function toggleRootField(type) {
                 var rootField = document.getElementById('root-field');
+                var hint = document.getElementById('type-hint');
                 if (rootField) {
-                    rootField.style.display = type === 'one-way' ? 'block' : 'none';
+                    rootField.style.display = type === 'one-way' ? 'flex' : 'none';
+                }
+                if (hint) {
+                    hint.textContent = type === 'one-way'
+                        ? '<?= $block->escapeJs(__('Searching any synonym will also return results for the root word, but not vice versa.')) ?>'
+                        : '<?= $block->escapeJs(__('All words are interchangeable: searching any word finds results for all.')) ?>';
                 }
             }
         </script>
