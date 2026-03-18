@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Console\Command;
 
+use Magento\Framework\App\State;
 use Magento\Framework\Console\Cli;
 use RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface;
 use RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool;
@@ -19,6 +20,7 @@ class ReindexCommand extends Command
     public function __construct(
         private readonly IndexerOrchestratorInterface $orchestrator,
         private readonly EntityIndexerPool $indexerPool,
+        private readonly State $appState,
     ) {
         parent::__construct();
     }
@@ -48,6 +50,12 @@ class ReindexCommand extends Command
             ));
 
             return Cli::RETURN_FAILURE;
+        }
+
+        try {
+            $this->appState->setAreaCode(\Magento\Framework\App\Area::AREA_FRONTEND);
+        } catch (\Magento\Framework\Exception\LocalizedException) {
+            // Area code already set
         }
 
         try {
