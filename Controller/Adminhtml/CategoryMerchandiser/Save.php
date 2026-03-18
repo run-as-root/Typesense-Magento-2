@@ -78,8 +78,8 @@ class Save extends Action implements HttpPostActionInterface, HttpGetActionInter
     private function handlePost(Json $resultJson): Json
     {
         try {
-            $body = $this->getRequest()->getContent();
-            $payload = json_decode((string) $body, true, 512, JSON_THROW_ON_ERROR);
+            $raw = $this->getRequest()->getParam('payload') ?: $this->getRequest()->getContent();
+            $payload = json_decode((string) $raw, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
             return $resultJson->setData(['success' => false, 'message' => 'Invalid JSON payload.']);
         }
@@ -87,6 +87,11 @@ class Save extends Action implements HttpPostActionInterface, HttpGetActionInter
         $categoryId = (int) ($payload['category_id'] ?? 0);
         $storeId    = (int) ($payload['store_id'] ?? 0);
         $rules      = $payload['rules'] ?? [];
+
+        // Admin scope (0) → use default store
+        if ($storeId === 0) {
+            $storeId = (int) $this->storeManager->getDefaultStoreView()->getId();
+        }
 
         if ($categoryId === 0) {
             return $resultJson->setData(['success' => false, 'message' => 'category_id is required.']);

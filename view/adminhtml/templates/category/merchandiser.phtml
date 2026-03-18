@@ -311,10 +311,9 @@ require(['jquery', 'jquery/ui'], function ($) {
         $btn.prop('disabled', true);
 
         $.ajax({
-            url: saveUrl + (saveUrl.indexOf('?') === -1 ? '?' : '&') + 'form_key=' + window.FORM_KEY,
+            url: saveUrl,
             type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(payload),
+            data: { form_key: window.FORM_KEY, payload: JSON.stringify(payload) },
             dataType: 'json',
             success: function (response) {
                 if (response && response.success) {
