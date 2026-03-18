@@ -164,7 +164,7 @@ require(['jquery', 'jquery/ui'], function ($) {
 
     function renderTable() {
         var $tbody = $('#merchandiser-tbody');
-        $tbody.sortable('destroy');
+        if ($tbody.data('ui-sortable')) { $tbody.sortable('destroy'); }
         $tbody.empty();
 
         var pinned  = [];
