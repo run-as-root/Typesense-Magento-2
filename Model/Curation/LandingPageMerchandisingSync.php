@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Curation;
 
+use Magento\Framework\Exception\NoSuchEntityException;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Api\LandingPageRepositoryInterface;
@@ -21,9 +22,20 @@ class LandingPageMerchandisingSync
 
     public function sync(int $landingPageId, int $storeId, string $storeCode): void
     {
-        $landingPage = $this->repository->getById($landingPageId);
         $collectionName = $this->collectionNameResolver->resolve('product', $storeCode, $storeId);
         $overrideId = sprintf('landing_%d', $landingPageId);
+
+        try {
+            $landingPage = $this->repository->getById($landingPageId);
+        } catch (NoSuchEntityException) {
+            $this->logger->info(sprintf(
+                'Landing page %d no longer exists — deleting override %s',
+                $landingPageId,
+                $overrideId,
+            ));
+            $this->overrideManager->deleteOverride($collectionName, $overrideId);
+            return;
+        }
 
         if (!$landingPage->isActive()) {
             $this->logger->info(sprintf(
@@ -35,12 +47,18 @@ class LandingPageMerchandisingSync
             return;
         }
 
+        $rule = [
+            'query' => $landingPage->getQuery(),
+            'match' => 'exact',
+        ];
+
+        $filterBy = $landingPage->getFilterBy();
+        if ($filterBy !== null && $filterBy !== '') {
+            $rule['filter_by'] = $filterBy;
+        }
+
         $payload = [
-            'rule' => [
-                'query' => $landingPage->getQuery(),
-                'match' => 'exact',
-                'filter_by' => $landingPage->getFilterBy() ?? '',
-            ],
+            'rule' => $rule,
             'includes' => $landingPage->getIncludes(),
             'excludes' => $landingPage->getExcludes(),
         ];

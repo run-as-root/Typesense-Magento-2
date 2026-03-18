@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Curation;
 
+use Magento\Framework\Exception\NoSuchEntityException;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Api\OverrideManagerInterface;
@@ -21,9 +22,20 @@ class QueryMerchandisingSync
 
     public function sync(int $queryMerchandisingId, int $storeId, string $storeCode): void
     {
-        $queryRule = $this->repository->getById($queryMerchandisingId);
         $collectionName = $this->collectionNameResolver->resolve('product', $storeCode, $storeId);
         $overrideId = sprintf('query_merch_%d', $queryMerchandisingId);
+
+        try {
+            $queryRule = $this->repository->getById($queryMerchandisingId);
+        } catch (NoSuchEntityException) {
+            $this->logger->info(sprintf(
+                'Query merchandising rule %d no longer exists — deleting override %s',
+                $queryMerchandisingId,
+                $overrideId,
+            ));
+            $this->overrideManager->deleteOverride($collectionName, $overrideId);
+            return;
+        }
 
         if (!$queryRule->isActive()) {
             $this->logger->info(sprintf(
