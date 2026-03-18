@@ -10,6 +10,8 @@ use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
 class Merchandiser extends Template
 {
+    protected $_template = 'RunAsRoot_TypeSense::category/merchandiser.phtml';
+
     public function __construct(
         Context $context,
         private readonly TypeSenseConfigInterface $config,

@@ -13,7 +13,6 @@
                 <item name="config" xsi:type="array">
                     <item name="component" xsi:type="string">Magento_Ui/js/form/components/html</item>
                 </item>
-                <item name="template" xsi:type="string">RunAsRoot_TypeSense::category/merchandiser.phtml</item>
             </argument>
         </htmlContent>
     </fieldset>
