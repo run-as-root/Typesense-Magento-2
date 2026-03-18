@@ -7,10 +7,10 @@ namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 use Magento\Catalog\Model\Product;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
 
-readonly class StockResolver implements StockResolverInterface
+class StockResolver implements StockResolverInterface
 {
     public function __construct(
-        private StockRegistryInterface $stockRegistry,
+        private readonly StockRegistryInterface $stockRegistry,
     ) {
     }
 

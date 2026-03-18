@@ -12,10 +12,10 @@ use Magento\Search\Model\ResourceModel\Query\CollectionFactory as QueryCollectio
  * Note: Suggestions are updated on-search, not on entity save, so no mview subscription is needed.
  * Use cron or manual reindex to keep suggestions in sync.
  */
-readonly class SuggestionDataBuilder
+class SuggestionDataBuilder
 {
     public function __construct(
-        private QueryCollectionFactory $collectionFactory,
+        private readonly QueryCollectionFactory $collectionFactory,
     ) {
     }
 

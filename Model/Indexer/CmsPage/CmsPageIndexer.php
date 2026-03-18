@@ -8,10 +8,10 @@ use Magento\Framework\Indexer\ActionInterface;
 use Magento\Framework\Mview\ActionInterface as MviewActionInterface;
 use RunAsRoot\TypeSense\Model\Indexer\IndexerOrchestrator;
 
-readonly class CmsPageIndexer implements ActionInterface, MviewActionInterface
+class CmsPageIndexer implements ActionInterface, MviewActionInterface
 {
     public function __construct(
-        private IndexerOrchestrator $orchestrator,
+        private readonly IndexerOrchestrator $orchestrator,
     ) {
     }
 

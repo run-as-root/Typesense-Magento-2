@@ -7,7 +7,7 @@ namespace RunAsRoot\TypeSense\Model\Collection;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
-readonly class CollectionNameResolver implements CollectionNameResolverInterface
+class CollectionNameResolver implements CollectionNameResolverInterface
 {
     public function __construct(private TypeSenseConfigInterface $config)
     {

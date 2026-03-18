@@ -8,12 +8,12 @@ use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Model\Client\TypeSenseClientFactory;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
-readonly class BatchImportService
+class BatchImportService
 {
     public function __construct(
-        private TypeSenseClientFactory $clientFactory,
-        private TypeSenseConfigInterface $config,
-        private LoggerInterface $logger,
+        private readonly TypeSenseClientFactory $clientFactory,
+        private readonly TypeSenseConfigInterface $config,
+        private readonly LoggerInterface $logger,
     ) {
     }
 

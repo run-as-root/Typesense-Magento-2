@@ -10,16 +10,16 @@ use Magento\Catalog\Model\Product\Visibility;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 
-readonly class ProductDataBuilder
+class ProductDataBuilder
 {
     public function __construct(
-        private AttributeResolverInterface $attributeResolver,
-        private PriceCalculatorInterface $priceCalculator,
-        private ImageResolverInterface $imageResolver,
-        private StockResolverInterface $stockResolver,
-        private CategoryResolverInterface $categoryResolver,
-        private UrlResolverInterface $urlResolver,
-        private ProductCollectionFactory $collectionFactory,
+        private readonly AttributeResolverInterface $attributeResolver,
+        private readonly PriceCalculatorInterface $priceCalculator,
+        private readonly ImageResolverInterface $imageResolver,
+        private readonly StockResolverInterface $stockResolver,
+        private readonly CategoryResolverInterface $categoryResolver,
+        private readonly UrlResolverInterface $urlResolver,
+        private readonly ProductCollectionFactory $collectionFactory,
     ) {
     }
 

@@ -9,11 +9,11 @@ use RunAsRoot\TypeSense\Api\TypeSenseClientFactoryInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use Typesense\Client;
 
-readonly class TypeSenseClientFactory implements TypeSenseClientFactoryInterface
+class TypeSenseClientFactory implements TypeSenseClientFactoryInterface
 {
     public function __construct(
-        private TypeSenseConfigInterface $config,
-        private LoggerInterface $logger,
+        private readonly TypeSenseConfigInterface $config,
+        private readonly LoggerInterface $logger,
     ) {
     }
 

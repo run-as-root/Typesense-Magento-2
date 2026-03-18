@@ -10,13 +10,13 @@ use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use Typesense\Exceptions\ObjectNotFound;
 
-readonly class ZeroDowntimeService
+class ZeroDowntimeService
 {
     public function __construct(
-        private CollectionManagerInterface $collectionManager,
-        private AliasManagerInterface $aliasManager,
-        private CollectionNameResolverInterface $nameResolver,
-        private LoggerInterface $logger,
+        private readonly CollectionManagerInterface $collectionManager,
+        private readonly AliasManagerInterface $aliasManager,
+        private readonly CollectionNameResolverInterface $nameResolver,
+        private readonly LoggerInterface $logger,
     ) {
     }
 

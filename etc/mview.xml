@@ -27,5 +27,7 @@
             <table name="cms_page_store" entity_column="page_id"/>
         </subscriptions>
     </view>
-    <!-- typesense_suggestion has no mview subscription: suggestions are updated on search, not on entity save -->
+    <!-- typesense_suggestion has no subscriptions: suggestions are updated on search, not on entity save -->
+    <view id="typesense_suggestion" class="RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionIndexer" group="indexer">
+    </view>
 </config>

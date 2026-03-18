@@ -7,11 +7,11 @@ namespace RunAsRoot\TypeSense\Model\Indexer\Category;
 use Magento\Catalog\Model\Category;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 
-readonly class CategoryEntityIndexer implements EntityIndexerInterface
+class CategoryEntityIndexer implements EntityIndexerInterface
 {
     public function __construct(
-        private CategoryDataBuilder $dataBuilder,
-        private CategorySchemaProviderInterface $schemaProvider,
+        private readonly CategoryDataBuilder $dataBuilder,
+        private readonly CategorySchemaProviderInterface $schemaProvider,
     ) {
     }
 

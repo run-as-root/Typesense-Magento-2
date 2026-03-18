@@ -20,6 +20,7 @@
         <description translate="true">Rebuilds TypeSense CMS page search index</description>
     </indexer>
     <indexer id="typesense_suggestion"
+             view_id="typesense_suggestion"
              class="RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionIndexer">
         <title translate="true">TypeSense Suggestion Index</title>
         <description translate="true">Rebuilds TypeSense search suggestion index</description>

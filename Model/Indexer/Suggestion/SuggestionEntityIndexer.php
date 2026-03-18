@@ -7,11 +7,11 @@ namespace RunAsRoot\TypeSense\Model\Indexer\Suggestion;
 use Magento\Search\Model\Query;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 
-readonly class SuggestionEntityIndexer implements EntityIndexerInterface
+class SuggestionEntityIndexer implements EntityIndexerInterface
 {
     public function __construct(
-        private SuggestionDataBuilder $dataBuilder,
-        private SuggestionSchemaProviderInterface $schemaProvider,
+        private readonly SuggestionDataBuilder $dataBuilder,
+        private readonly SuggestionSchemaProviderInterface $schemaProvider,
     ) {
     }
 

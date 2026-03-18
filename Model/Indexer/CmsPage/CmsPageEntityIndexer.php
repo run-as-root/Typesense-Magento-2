@@ -7,11 +7,11 @@ namespace RunAsRoot\TypeSense\Model\Indexer\CmsPage;
 use Magento\Cms\Model\Page;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 
-readonly class CmsPageEntityIndexer implements EntityIndexerInterface
+class CmsPageEntityIndexer implements EntityIndexerInterface
 {
     public function __construct(
-        private CmsPageDataBuilder $dataBuilder,
-        private CmsPageSchemaProviderInterface $schemaProvider,
+        private readonly CmsPageDataBuilder $dataBuilder,
+        private readonly CmsPageSchemaProviderInterface $schemaProvider,
     ) {
     }
 

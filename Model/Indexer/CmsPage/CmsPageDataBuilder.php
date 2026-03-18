@@ -8,10 +8,10 @@ use Magento\Cms\Model\Page;
 use Magento\Cms\Model\ResourceModel\Page\Collection as PageCollection;
 use Magento\Cms\Model\ResourceModel\Page\CollectionFactory as PageCollectionFactory;
 
-readonly class CmsPageDataBuilder
+class CmsPageDataBuilder
 {
     public function __construct(
-        private PageCollectionFactory $collectionFactory,
+        private readonly PageCollectionFactory $collectionFactory,
     ) {
     }
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Indexer\Category;
 
-readonly class CategorySchemaProvider implements CategorySchemaProviderInterface
+class CategorySchemaProvider implements CategorySchemaProviderInterface
 {
     /** @return array<int, array<string, mixed>> */
     public function getFields(): array

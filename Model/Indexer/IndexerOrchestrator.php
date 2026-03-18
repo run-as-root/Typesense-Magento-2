@@ -12,16 +12,16 @@ use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
 use RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
-readonly class IndexerOrchestrator implements IndexerOrchestratorInterface
+class IndexerOrchestrator implements IndexerOrchestratorInterface
 {
     public function __construct(
-        private EntityIndexerPool $indexerPool,
-        private ZeroDowntimeService $zeroDowntimeService,
-        private BatchImportService $batchImportService,
-        private CollectionNameResolver $nameResolver,
-        private TypeSenseConfigInterface $config,
-        private StoreRepositoryInterface $storeRepository,
-        private LoggerInterface $logger,
+        private readonly EntityIndexerPool $indexerPool,
+        private readonly ZeroDowntimeService $zeroDowntimeService,
+        private readonly BatchImportService $batchImportService,
+        private readonly CollectionNameResolver $nameResolver,
+        private readonly TypeSenseConfigInterface $config,
+        private readonly StoreRepositoryInterface $storeRepository,
+        private readonly LoggerInterface $logger,
     ) {
     }
 

@@ -11,10 +11,10 @@ use RunAsRoot\TypeSense\Model\Indexer\IndexerOrchestrator;
  * Note: Suggestions have no mview subscription since they are updated on search, not on entity save.
  * This indexer is triggered manually or via cron.
  */
-readonly class SuggestionIndexer implements ActionInterface
+class SuggestionIndexer implements ActionInterface
 {
     public function __construct(
-        private IndexerOrchestrator $orchestrator,
+        private readonly IndexerOrchestrator $orchestrator,
     ) {
     }
 

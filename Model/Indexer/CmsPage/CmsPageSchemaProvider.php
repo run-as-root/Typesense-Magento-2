@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Indexer\CmsPage;
 
-readonly class CmsPageSchemaProvider implements CmsPageSchemaProviderInterface
+class CmsPageSchemaProvider implements CmsPageSchemaProviderInterface
 {
     /** @return array<int, array<string, mixed>> */
     public function getFields(): array

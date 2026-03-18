@@ -7,10 +7,10 @@ namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Model\Product;
 
-readonly class ImageResolver implements ImageResolverInterface
+class ImageResolver implements ImageResolverInterface
 {
     public function __construct(
-        private ImageHelper $imageHelper,
+        private readonly ImageHelper $imageHelper,
     ) {
     }
 

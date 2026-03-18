@@ -1,0 +1,68 @@
+{
+    "run_as_root_typesense_category_merchandising": {
+        "column": {
+            "id": true,
+            "category_id": true,
+            "store_id": true,
+            "product_id": true,
+            "position": true,
+            "action": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "UNQ_TS_CAT_MERCH_CAT_STORE_PROD": true,
+            "FK_TS_CAT_MERCH_STORE": true,
+            "RUN_AS_ROOT_TYPESENSE_CTGR_MERCHANDISING_CTGR_ID_STORE_ID_PRD_ID": true,
+            "RUN_AS_ROOT_TYPESENSE_CTGR_MERCHANDISING_STORE_ID_STORE_STORE_ID": true
+        }
+    },
+    "run_as_root_typesense_query_merchandising": {
+        "column": {
+            "id": true,
+            "query": true,
+            "match_type": true,
+            "store_id": true,
+            "includes": true,
+            "excludes": true,
+            "banner_config": true,
+            "is_active": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "UNQ_TS_QUERY_MERCH_QUERY_STORE": true,
+            "FK_TS_QUERY_MERCH_STORE": true,
+            "RUN_AS_ROOT_TYPESENSE_QUERY_MERCHANDISING_QUERY_STORE_ID": true,
+            "RUN_AS_ROOT_TYPESENSE_QR_MERCHANDISING_STORE_ID_STORE_STORE_ID": true
+        }
+    },
+    "run_as_root_typesense_landing_page": {
+        "column": {
+            "id": true,
+            "url_key": true,
+            "store_id": true,
+            "title": true,
+            "meta_description": true,
+            "query": true,
+            "filter_by": true,
+            "sort_by": true,
+            "includes": true,
+            "excludes": true,
+            "banner_config": true,
+            "cms_content": true,
+            "is_active": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "UNQ_TS_LANDING_URL_STORE": true,
+            "FK_TS_LANDING_STORE": true,
+            "RUN_AS_ROOT_TYPESENSE_LANDING_PAGE_URL_KEY_STORE_ID": true,
+            "RUN_AS_ROOT_TYPESENSE_LANDING_PAGE_STORE_ID_STORE_STORE_ID": true
+        }
+    }
+}

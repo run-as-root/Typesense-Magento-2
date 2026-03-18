@@ -7,10 +7,10 @@ namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\Product\Url as ProductUrl;
 
-readonly class UrlResolver implements UrlResolverInterface
+class UrlResolver implements UrlResolverInterface
 {
     public function __construct(
-        private ProductUrl $productUrl,
+        private readonly ProductUrl $productUrl,
     ) {
     }
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 
-readonly class ProductSchemaProvider implements ProductSchemaProviderInterface
+class ProductSchemaProvider implements ProductSchemaProviderInterface
 {
     /** @return array<int, array<string, mixed>> */
     public function getFields(): array

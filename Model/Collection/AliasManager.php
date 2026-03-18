@@ -9,11 +9,11 @@ use RunAsRoot\TypeSense\Api\AliasManagerInterface;
 use RunAsRoot\TypeSense\Model\Client\TypeSenseClientFactory;
 use Typesense\Exceptions\ObjectNotFound;
 
-readonly class AliasManager implements AliasManagerInterface
+class AliasManager implements AliasManagerInterface
 {
     public function __construct(
-        private TypeSenseClientFactory $clientFactory,
-        private LoggerInterface $logger,
+        private readonly TypeSenseClientFactory $clientFactory,
+        private readonly LoggerInterface $logger,
     ) {
     }
 

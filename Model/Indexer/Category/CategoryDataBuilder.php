@@ -8,10 +8,10 @@ use Magento\Catalog\Model\Category;
 use Magento\Catalog\Model\ResourceModel\Category\Collection as CategoryCollection;
 use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory as CategoryCollectionFactory;
 
-readonly class CategoryDataBuilder
+class CategoryDataBuilder
 {
     public function __construct(
-        private CategoryCollectionFactory $collectionFactory,
+        private readonly CategoryCollectionFactory $collectionFactory,
     ) {
     }
 

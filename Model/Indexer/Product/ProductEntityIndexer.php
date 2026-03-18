@@ -7,11 +7,11 @@ namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 use Magento\Catalog\Model\Product;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 
-readonly class ProductEntityIndexer implements EntityIndexerInterface
+class ProductEntityIndexer implements EntityIndexerInterface
 {
     public function __construct(
-        private ProductDataBuilder $dataBuilder,
-        private ProductSchemaProviderInterface $schemaProvider,
+        private readonly ProductDataBuilder $dataBuilder,
+        private readonly ProductSchemaProviderInterface $schemaProvider,
     ) {
     }
 

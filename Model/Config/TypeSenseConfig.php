@@ -8,13 +8,13 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Model\ScopeInterface;
 
-readonly class TypeSenseConfig implements TypeSenseConfigInterface
+class TypeSenseConfig implements TypeSenseConfigInterface
 {
     private const string CONFIG_PREFIX = 'run_as_root_typesense';
 
     public function __construct(
-        private ScopeConfigInterface $scopeConfig,
-        private EncryptorInterface $encryptor,
+        private readonly ScopeConfigInterface $scopeConfig,
+        private readonly EncryptorInterface $encryptor,
     ) {
     }
 

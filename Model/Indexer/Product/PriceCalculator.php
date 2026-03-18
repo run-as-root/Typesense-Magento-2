@@ -6,7 +6,7 @@ namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 
 use Magento\Catalog\Model\Product;
 
-readonly class PriceCalculator implements PriceCalculatorInterface
+class PriceCalculator implements PriceCalculatorInterface
 {
     public function getFinalPrice(Product $product): float
     {

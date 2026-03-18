@@ -9,11 +9,11 @@ use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
 use RunAsRoot\TypeSense\Model\Client\TypeSenseClientFactory;
 use Typesense\Exceptions\ObjectNotFound;
 
-readonly class CollectionManager implements CollectionManagerInterface
+class CollectionManager implements CollectionManagerInterface
 {
     public function __construct(
-        private TypeSenseClientFactory $clientFactory,
-        private LoggerInterface $logger,
+        private readonly TypeSenseClientFactory $clientFactory,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
