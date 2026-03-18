@@ -73,7 +73,7 @@ $sortOptions = $viewModel->getSortOptions();
                 if (this.sortBy) searchParams.sort_by = this.sortBy;
 
                 try {
-                    const result = await this.client.collections[config.productCollection].documents.search(searchParams);
+                    const result = await this.client.collections(config.productCollection).documents().search(searchParams);
                     this.hits = result.hits || [];
                     this.facets = result.facet_counts || [];
                     this.totalPages = Math.ceil((result.found || 0) / perPage);
