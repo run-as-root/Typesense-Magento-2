@@ -11,7 +11,71 @@ $documents  = $viewModel->getDocuments($name, 10);
 $fields     = $collection['fields'] ?? [];
 $hits       = $documents['hits'] ?? [];
 $found      = (int) ($documents['found'] ?? 0);
+
+// Key fields to show in the documents preview (not all 20+)
+$previewFields = ['id', 'product_id', 'name', 'sku', 'price', 'in_stock', 'type_id', 'categories.lvl0'];
 ?>
+
+<style>
+    .ts-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .ts-badge-yes { background: #e8f5e9; color: #2e7d32; }
+    .ts-badge-no { background: #f5f5f5; color: #999; }
+    .ts-badge-type { background: #e3f2fd; color: #1565c0; font-family: monospace; }
+    .ts-field-name { font-family: monospace; font-size: 13px; }
+    .ts-doc-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 12px;
+        background: #fafafa;
+    }
+    .ts-doc-card:hover { background: #f5f5f5; border-color: #ccc; }
+    .ts-doc-header {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 8px;
+        color: #333;
+    }
+    .ts-doc-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 8px;
+    }
+    .ts-doc-field { font-size: 12px; }
+    .ts-doc-field-label { color: #888; font-size: 11px; text-transform: uppercase; }
+    .ts-doc-field-value { color: #333; word-break: break-word; }
+    .ts-doc-expand {
+        margin-top: 8px;
+        font-size: 11px;
+        color: #1979c3;
+        cursor: pointer;
+        border: none;
+        background: none;
+        padding: 0;
+    }
+    .ts-doc-expand:hover { text-decoration: underline; }
+    .ts-doc-raw {
+        display: none;
+        margin-top: 8px;
+        padding: 10px;
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 11px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+</style>
+
 <div class="admin__page-section">
     <div class="admin__page-section-title">
         <span class="title">
@@ -38,41 +102,49 @@ $found      = (int) ($documents['found'] ?? 0);
                             <?= $block->escapeHtml(__('No schema fields found.')) ?>
                         </p>
                     <?php else: ?>
-                        <table class="data-grid">
+                        <table class="data-grid" style="width:100%;">
                             <thead>
                                 <tr>
-                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Field Name')) ?></th>
-                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Type')) ?></th>
-                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Facet')) ?></th>
-                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Optional')) ?></th>
-                                    <th class="data-grid-th"><?= $block->escapeHtml(__('Index')) ?></th>
+                                    <th class="data-grid-th" style="width:30%;"><?= $block->escapeHtml(__('Field Name')) ?></th>
+                                    <th class="data-grid-th" style="width:15%;"><?= $block->escapeHtml(__('Type')) ?></th>
+                                    <th class="data-grid-th" style="width:10%; text-align:center;"
+                                        title="<?= $block->escapeHtmlAttr(__('Faceted fields can be used for filtering and aggregation in search results.')) ?>">
+                                        <?= $block->escapeHtml(__('Facet')) ?>
+                                    </th>
+                                    <th class="data-grid-th" style="width:10%; text-align:center;"
+                                        title="<?= $block->escapeHtmlAttr(__('Optional fields may be missing from some documents without causing an error.')) ?>">
+                                        <?= $block->escapeHtml(__('Optional')) ?>
+                                    </th>
+                                    <th class="data-grid-th" style="width:10%; text-align:center;"
+                                        title="<?= $block->escapeHtmlAttr(__('Indexed fields are searchable. Non-indexed fields are stored but not searchable.')) ?>">
+                                        <?= $block->escapeHtml(__('Indexed')) ?>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($fields as $field): ?>
+                                    <?php
+                                    $isFacet = (bool) ($field['facet'] ?? false);
+                                    $isOptional = (bool) ($field['optional'] ?? false);
+                                    $isIndex = ($field['index'] ?? true) !== false;
+                                    ?>
                                     <tr>
-                                        <td><?= $block->escapeHtml((string) ($field['name'] ?? '')) ?></td>
-                                        <td><?= $block->escapeHtml((string) ($field['type'] ?? '')) ?></td>
-                                        <td>
-                                            <?php if ($field['facet'] ?? false): ?>
-                                                <span class="grid-severity-notice"><span><?= $block->escapeHtml(__('Yes')) ?></span></span>
-                                            <?php else: ?>
-                                                <?= $block->escapeHtml(__('No')) ?>
-                                            <?php endif; ?>
+                                        <td><span class="ts-field-name"><?= $block->escapeHtml((string) ($field['name'] ?? '')) ?></span></td>
+                                        <td><span class="ts-badge ts-badge-type"><?= $block->escapeHtml((string) ($field['type'] ?? '')) ?></span></td>
+                                        <td style="text-align:center;">
+                                            <span class="ts-badge <?= $isFacet ? 'ts-badge-yes' : 'ts-badge-no' ?>">
+                                                <?= $block->escapeHtml($isFacet ? __('Yes') : __('No')) ?>
+                                            </span>
                                         </td>
-                                        <td>
-                                            <?php if ($field['optional'] ?? false): ?>
-                                                <span><?= $block->escapeHtml(__('Yes')) ?></span>
-                                            <?php else: ?>
-                                                <?= $block->escapeHtml(__('No')) ?>
-                                            <?php endif; ?>
+                                        <td style="text-align:center;">
+                                            <span class="ts-badge <?= $isOptional ? 'ts-badge-yes' : 'ts-badge-no' ?>">
+                                                <?= $block->escapeHtml($isOptional ? __('Yes') : __('No')) ?>
+                                            </span>
                                         </td>
-                                        <td>
-                                            <?php if (($field['index'] ?? true) !== false): ?>
-                                                <span><?= $block->escapeHtml(__('Yes')) ?></span>
-                                            <?php else: ?>
-                                                <?= $block->escapeHtml(__('No')) ?>
-                                            <?php endif; ?>
+                                        <td style="text-align:center;">
+                                            <span class="ts-badge <?= $isIndex ? 'ts-badge-yes' : 'ts-badge-no' ?>">
+                                                <?= $block->escapeHtml($isIndex ? __('Yes') : __('No')) ?>
+                                            </span>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -99,39 +171,45 @@ $found      = (int) ($documents['found'] ?? 0);
                             <?= $block->escapeHtml(__('No documents found in this collection.')) ?>
                         </p>
                     <?php else: ?>
-                        <?php
-                        $firstDoc = $hits[0]['document'] ?? [];
-                        $docKeys = array_keys($firstDoc);
-                        ?>
-                        <div style="overflow-x: auto;">
-                            <table class="data-grid">
-                                <thead>
-                                    <tr>
-                                        <?php foreach ($docKeys as $key): ?>
-                                            <th class="data-grid-th"><?= $block->escapeHtml((string) $key) ?></th>
-                                        <?php endforeach; ?>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($hits as $hit): ?>
-                                        <?php $doc = $hit['document'] ?? []; ?>
-                                        <tr>
-                                            <?php foreach ($docKeys as $key): ?>
-                                                <td>
-                                                    <?php
-                                                    $value = $doc[$key] ?? '';
-                                                    if (is_array($value)) {
-                                                        $value = implode(', ', $value);
-                                                    }
-                                                    ?>
-                                                    <?= $block->escapeHtml((string) $value) ?>
-                                                </td>
-                                            <?php endforeach; ?>
-                                        </tr>
+                        <?php foreach ($hits as $index => $hit): ?>
+                            <?php
+                            $doc = $hit['document'] ?? [];
+                            $docName = (string) ($doc['name'] ?? $doc['q'] ?? $doc['title'] ?? 'Document #' . ($index + 1));
+                            $docId = (string) ($doc['id'] ?? '');
+                            ?>
+                            <div class="ts-doc-card">
+                                <div class="ts-doc-header">
+                                    <?= $block->escapeHtml($docName) ?>
+                                    <?php if ($docId !== ''): ?>
+                                        <span style="color:#999; font-weight:normal; font-size:12px;">
+                                            (ID: <?= $block->escapeHtml($docId) ?>)
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="ts-doc-grid">
+                                    <?php foreach ($previewFields as $fieldName): ?>
+                                        <?php if (!isset($doc[$fieldName])) { continue; } ?>
+                                        <?php
+                                        $val = $doc[$fieldName];
+                                        if (is_array($val)) { $val = implode(', ', $val); }
+                                        if (is_bool($val)) { $val = $val ? 'true' : 'false'; }
+                                        $val = (string) $val;
+                                        if ($val === '') { continue; }
+                                        ?>
+                                        <div class="ts-doc-field">
+                                            <div class="ts-doc-field-label"><?= $block->escapeHtml($fieldName) ?></div>
+                                            <div class="ts-doc-field-value"><?= $block->escapeHtml(mb_substr($val, 0, 100)) ?><?= mb_strlen($val) > 100 ? '…' : '' ?></div>
+                                        </div>
                                     <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
+                                </div>
+                                <button type="button" class="ts-doc-expand" onclick="
+                                    var raw = this.nextElementSibling;
+                                    if (raw.style.display === 'none') { raw.style.display = 'block'; this.textContent = 'Hide raw JSON'; }
+                                    else { raw.style.display = 'none'; this.textContent = 'Show raw JSON'; }
+                                "><?= $block->escapeHtml(__('Show raw JSON')) ?></button>
+                                <div class="ts-doc-raw"><?= $block->escapeHtml(json_encode($doc, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) ?></div>
+                            </div>
+                        <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
             </div>

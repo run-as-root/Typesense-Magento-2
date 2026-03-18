@@ -19,14 +19,17 @@ $aliasMap    = $viewModel->getAliasMap();
                 <?= $block->escapeHtml(__('No collections found. Check your connection settings or run a reindex.')) ?>
             </p>
         <?php else: ?>
-            <table class="data-grid">
+            <table class="data-grid" style="width:100%;">
                 <thead>
                     <tr>
                         <th class="data-grid-th"><?= $block->escapeHtml(__('Name')) ?></th>
-                        <th class="data-grid-th"><?= $block->escapeHtml(__('Document Count')) ?></th>
-                        <th class="data-grid-th"><?= $block->escapeHtml(__('Created At')) ?></th>
-                        <th class="data-grid-th"><?= $block->escapeHtml(__('Alias')) ?></th>
-                        <th class="data-grid-th"><?= $block->escapeHtml(__('Actions')) ?></th>
+                        <th class="data-grid-th" style="width:120px; text-align:right;"><?= $block->escapeHtml(__('Documents')) ?></th>
+                        <th class="data-grid-th" style="width:160px;"><?= $block->escapeHtml(__('Created')) ?></th>
+                        <th class="data-grid-th" style="width:200px;"
+                            title="<?= $block->escapeHtmlAttr(__('An alias points to the active collection. During zero-downtime reindex, the alias switches to the new collection automatically.')) ?>">
+                            <?= $block->escapeHtml(__('Alias')) ?>
+                        </th>
+                        <th class="data-grid-th" style="width:140px;"><?= $block->escapeHtml(__('Actions')) ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -38,15 +41,27 @@ $aliasMap    = $viewModel->getAliasMap();
                             ? date('Y-m-d H:i:s', (int) $collection['created_at'])
                             : '';
                         $alias        = $aliasMap[$name] ?? '';
+                        $rowStyle     = $numDocuments === 0 ? 'background:#fff8e1;' : '';
                         ?>
-                        <tr>
-                            <td><?= $block->escapeHtml($name) ?></td>
-                            <td><?= $block->escapeHtml((string) $numDocuments) ?></td>
-                            <td><?= $block->escapeHtml($createdAt) ?></td>
-                            <td><?= $block->escapeHtml($alias) ?></td>
+                        <tr style="<?= $block->escapeHtmlAttr($rowStyle) ?>">
+                            <td style="font-family:monospace; font-size:13px;"><?= $block->escapeHtml($name) ?></td>
+                            <td style="text-align:right; font-weight:600; <?= $numDocuments === 0 ? 'color:#e65100;' : '' ?>">
+                                <?= $block->escapeHtml((string) number_format($numDocuments)) ?>
+                            </td>
+                            <td style="color:#666; font-size:12px;"><?= $block->escapeHtml($createdAt) ?></td>
+                            <td>
+                                <?php if ($alias !== ''): ?>
+                                    <span style="font-family:monospace; font-size:12px;"><?= $block->escapeHtml($alias) ?></span>
+                                    <span style="display:inline-block; padding:1px 6px; border-radius:3px; font-size:10px; font-weight:600; background:#e8f5e9; color:#2e7d32; margin-left:4px;">
+                                        <?= $block->escapeHtml(__('live')) ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span style="color:#ccc;">—</span>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <a href="<?= $block->escapeUrl($block->getUrl('*/*/view', ['name' => $name])) ?>"
-                                   class="action-menu-item">
+                                   style="margin-right:10px; color:#1979c3; text-decoration:none; font-size:13px;">
                                     <?= $block->escapeHtml(__('View')) ?>
                                 </a>
                                 <form method="post"
@@ -55,7 +70,7 @@ $aliasMap    = $viewModel->getAliasMap();
                                       onsubmit="return confirm('<?= $block->escapeHtmlAttr(__('Are you sure you want to delete collection "%1"?', $name)) ?>');">
                                     <?= $block->getBlockHtml('formkey') ?>
                                     <input type="hidden" name="name" value="<?= $block->escapeHtmlAttr($name) ?>"/>
-                                    <button type="submit" class="action-menu-item" style="background:none;border:none;color:#eb5202;cursor:pointer;padding:0;">
+                                    <button type="submit" style="background:none; border:none; color:#eb5202; cursor:pointer; padding:0; font-size:13px;">
                                         <?= $block->escapeHtml(__('Delete')) ?>
                                     </button>
                                 </form>
