@@ -1,0 +1,22 @@
+/**
+ * Typesense Autocomplete — minimal CSS
+ *
+ * Tailwind utility classes in the template handle the majority of styling.
+ * This file covers only what Tailwind cannot (e.g. [x-cloak] reset).
+ */
+
+.typesense-autocomplete-wrapper {
+    position: relative;
+}
+
+.typesense-autocomplete-dropdown {
+    /* Shadow and border-radius are applied via Tailwind classes in the template */
+}
+
+/**
+ * Hide Alpine.js components until the framework is initialised.
+ * Without this rule, dropdowns flash visible on page load.
+ */
+[x-cloak] {
+    display: none !important;
+}
