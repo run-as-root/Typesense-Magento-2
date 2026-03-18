@@ -12,4 +12,11 @@
             </argument>
         </arguments>
     </type>
+    <type name="Magento\Csp\Model\CompositePolicyCollector">
+        <arguments>
+            <argument name="collectors" xsi:type="array">
+                <item name="typesense_csp" xsi:type="object">RunAsRoot\TypeSense\Plugin\CspDynamicCollector</item>
+            </argument>
+        </arguments>
+    </type>
 </config>
