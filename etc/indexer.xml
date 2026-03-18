@@ -7,4 +7,21 @@
         <title translate="true">TypeSense Product Index</title>
         <description translate="true">Rebuilds TypeSense product search index</description>
     </indexer>
+    <indexer id="typesense_category"
+             view_id="typesense_category"
+             class="RunAsRoot\TypeSense\Model\Indexer\Category\CategoryIndexer">
+        <title translate="true">TypeSense Category Index</title>
+        <description translate="true">Rebuilds TypeSense category search index</description>
+    </indexer>
+    <indexer id="typesense_cms_page"
+             view_id="typesense_cms_page"
+             class="RunAsRoot\TypeSense\Model\Indexer\CmsPage\CmsPageIndexer">
+        <title translate="true">TypeSense CMS Page Index</title>
+        <description translate="true">Rebuilds TypeSense CMS page search index</description>
+    </indexer>
+    <indexer id="typesense_suggestion"
+             class="RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionIndexer">
+        <title translate="true">TypeSense Suggestion Index</title>
+        <description translate="true">Rebuilds TypeSense search suggestion index</description>
+    </indexer>
 </config>

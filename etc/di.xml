@@ -36,11 +36,23 @@
     <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface"
                 type="RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProvider"/>
 
-    <!-- Entity indexer pool: register product indexer -->
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Category\CategorySchemaProviderInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Category\CategorySchemaProvider"/>
+
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\CmsPage\CmsPageSchemaProviderInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\CmsPage\CmsPageSchemaProvider"/>
+
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionSchemaProviderInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionSchemaProvider"/>
+
+    <!-- Entity indexer pool: register all entity indexers -->
     <type name="RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool">
         <arguments>
             <argument name="indexers" xsi:type="array">
                 <item name="product" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Product\ProductEntityIndexer</item>
+                <item name="category" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Category\CategoryEntityIndexer</item>
+                <item name="cms_page" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\CmsPage\CmsPageEntityIndexer</item>
+                <item name="suggestion" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionEntityIndexer</item>
             </argument>
         </arguments>
     </type>

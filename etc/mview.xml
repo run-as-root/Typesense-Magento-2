@@ -13,4 +13,19 @@
             <table name="cataloginventory_stock_item" entity_column="product_id"/>
         </subscriptions>
     </view>
+    <view id="typesense_category" class="RunAsRoot\TypeSense\Model\Indexer\Category\CategoryIndexer" group="indexer">
+        <subscriptions>
+            <table name="catalog_category_entity" entity_column="entity_id"/>
+            <table name="catalog_category_entity_int" entity_column="entity_id"/>
+            <table name="catalog_category_entity_varchar" entity_column="entity_id"/>
+            <table name="catalog_category_entity_text" entity_column="entity_id"/>
+        </subscriptions>
+    </view>
+    <view id="typesense_cms_page" class="RunAsRoot\TypeSense\Model\Indexer\CmsPage\CmsPageIndexer" group="indexer">
+        <subscriptions>
+            <table name="cms_page" entity_column="page_id"/>
+            <table name="cms_page_store" entity_column="page_id"/>
+        </subscriptions>
+    </view>
+    <!-- typesense_suggestion has no mview subscription: suggestions are updated on search, not on entity save -->
 </config>
