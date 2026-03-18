@@ -3,41 +3,448 @@
 declare(strict_types=1);
 
 /** @var \RunAsRoot\TypeSense\Block\Adminhtml\Category\Merchandiser $block */
-$categoryId = $block->getCategoryId();
-$saveUrl = $block->getSaveUrl();
-$searchUrl = $block->getProductSearchUrl();
+
+if (!$block->isEnabled()) {
+    return;
+}
 ?>
+<?php $block->getLayout()->getBlock('head') && $block->getLayout()->getBlock('head')->addCss('RunAsRoot_TypeSense::css/merchandiser.css'); ?>
+<link rel="stylesheet" type="text/css" href="<?= $block->escapeUrl($block->getViewFileUrl('RunAsRoot_TypeSense::css/merchandiser.css')) ?>"/>
+<?php if (!$block->getCategoryId()): ?>
+<div class="message message-notice">
+    <span><?= $block->escapeHtml(__('Please save the category first before configuring merchandising.')) ?></span>
+</div>
+<?php return; ?>
+<?php endif; ?>
+
 <div id="typesense-category-merchandiser"
-     data-category-id="<?= (int) $categoryId ?>"
-     data-save-url="<?= $block->escapeUrl($saveUrl) ?>"
-     data-search-url="<?= $block->escapeUrl($searchUrl) ?>">
+     data-category-id="<?= (int) $block->getCategoryId() ?>"
+     data-store-id="<?= (int) $block->getStoreId() ?>"
+     data-load-url="<?= $block->escapeUrl($block->getLoadUrl()) ?>"
+     data-save-url="<?= $block->escapeUrl($block->getSaveUrl()) ?>"
+     data-search-url="<?= $block->escapeUrl($block->getProductSearchUrl()) ?>">
 
     <div class="merchandiser-toolbar">
         <div class="merchandiser-search">
             <input type="text"
                    id="merchandiser-product-search"
-                   placeholder="<?= $block->escapeHtmlAttr(__('Search products to add...')) ?>"
+                   placeholder="<?= $block->escapeHtmlAttr(__('Search products to pin...')) ?>"
                    class="admin__control-text"
                    autocomplete="off"/>
-            <div id="merchandiser-search-results" style="display:none;"></div>
+            <div id="merchandiser-search-results" class="merchandiser-search-dropdown" style="display:none;"></div>
         </div>
         <button type="button" class="action-default scalable save" id="merchandiser-save-btn">
-            <span><?= $block->escapeHtml(__('Save Merchandising Rules')) ?></span>
+            <span><?= $block->escapeHtml(__('Save Merchandising')) ?></span>
         </button>
+        <span id="merchandiser-status" class="merchandiser-status-msg" style="display:none;"></span>
     </div>
 
     <div class="merchandiser-info">
-        <p><?= $block->escapeHtml(__('Drag products to reorder. Use Pin to lock a product at a position, Hide to exclude it from results.')) ?></p>
+        <p><?= $block->escapeHtml(__('Drag pinned products to reorder their position. Use Pin to lock a product at a specific position, Hide to exclude it from results.')) ?></p>
     </div>
 
-    <div id="merchandiser-product-list" class="merchandiser-products">
-        <p class="loading-message"><?= $block->escapeHtml(__('Loading products...')) ?></p>
+    <div id="merchandiser-loading" class="loading-message">
+        <?= $block->escapeHtml(__('Loading products...')) ?>
     </div>
+
+    <table id="merchandiser-grid" class="data-grid merchandiser-data-grid" style="display:none;">
+        <thead>
+            <tr>
+                <th class="col-drag"></th>
+                <th class="col-position"><?= $block->escapeHtml(__('Position')) ?></th>
+                <th class="col-image"><?= $block->escapeHtml(__('Image')) ?></th>
+                <th class="col-id"><?= $block->escapeHtml(__('ID')) ?></th>
+                <th class="col-sku"><?= $block->escapeHtml(__('SKU')) ?></th>
+                <th class="col-name"><?= $block->escapeHtml(__('Name')) ?></th>
+                <th class="col-price"><?= $block->escapeHtml(__('Price')) ?></th>
+                <th class="col-status"><?= $block->escapeHtml(__('Status')) ?></th>
+                <th class="col-actions"><?= $block->escapeHtml(__('Actions')) ?></th>
+            </tr>
+        </thead>
+        <tbody id="merchandiser-tbody">
+        </tbody>
+    </table>
+
+    <div id="merchandiser-empty" class="message message-notice" style="display:none;">
+        <span><?= $block->escapeHtml(__('No products loaded. Search for products above to pin or hide them.')) ?></span>
+    </div>
+
 </div>
 
 <script>
-require(['RunAsRoot_TypeSense/js/category-merchandiser'], function (merchandiser) {
+require(['jquery', 'jquery/ui'], function ($) {
     'use strict';
-    merchandiser.init('typesense-category-merchandiser');
+
+    var $container = $('#typesense-category-merchandiser');
+    var categoryId = $container.data('category-id');
+    var storeId    = $container.data('store-id');
+    var loadUrl    = $container.data('load-url');
+    var saveUrl    = $container.data('save-url');
+    var searchUrl  = $container.data('search-url');
+
+    // products keyed by product_id
+    var products = {};
+    var searchTimeout = null;
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    function escapeHtml(str) {
+        return $('<div/>').text(String(str || '')).html();
+    }
+
+    function getNextPinPosition() {
+        var max = 0;
+        $.each(products, function (id, p) {
+            if (p.action === 'pin' && p.position > max) {
+                max = p.position;
+            }
+        });
+        return max + 1;
+    }
+
+    function recalcPinnedPositions() {
+        var $rows = $('#merchandiser-tbody tr.merchandiser-pinned');
+        $rows.each(function (idx) {
+            var pid = $(this).data('product-id');
+            if (products[pid]) {
+                products[pid].position = idx + 1;
+            }
+            $(this).find('.col-position').text(idx + 1);
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // Render
+    // -----------------------------------------------------------------------
+
+    function renderRow(p) {
+        var rowClass = 'merchandiser-row';
+        var badgeHtml = '';
+        var posText = '';
+
+        if (p.action === 'pin') {
+            rowClass += ' merchandiser-pinned';
+            badgeHtml = '<span class="status-badge status-badge-pin">Pinned</span>';
+            posText = p.position;
+        } else if (p.action === 'hide') {
+            rowClass += ' merchandiser-hidden';
+            badgeHtml = '<span class="status-badge status-badge-hide">Hidden</span>';
+        } else {
+            badgeHtml = '<span class="status-badge status-badge-none">Normal</span>';
+        }
+
+        var imgHtml = p.image_url
+            ? '<img src="' + escapeHtml(p.image_url) + '" alt="" class="merchandiser-thumb"/>'
+            : '<div class="merchandiser-thumb-placeholder"></div>';
+
+        var dragHandle = p.action === 'pin'
+            ? '<span class="drag-handle" title="Drag to reorder">&#9776;</span>'
+            : '<span class="drag-handle drag-handle-disabled"></span>';
+
+        var pinLabel   = p.action === 'pin'  ? 'Unpin' : 'Pin';
+        var hideLabel  = p.action === 'hide' ? 'Unhide' : 'Hide';
+
+        return '<tr class="' + rowClass + '" data-product-id="' + parseInt(p.product_id, 10) + '">' +
+            '<td class="col-drag">' + dragHandle + '</td>' +
+            '<td class="col-position">' + escapeHtml(posText) + '</td>' +
+            '<td class="col-image">' + imgHtml + '</td>' +
+            '<td class="col-id">' + escapeHtml(p.product_id) + '</td>' +
+            '<td class="col-sku">' + escapeHtml(p.sku) + '</td>' +
+            '<td class="col-name">' + escapeHtml(p.name) + '</td>' +
+            '<td class="col-price">' + (p.price !== undefined ? escapeHtml(p.price) : '') + '</td>' +
+            '<td class="col-status">' + badgeHtml + '</td>' +
+            '<td class="col-actions">' +
+                '<button type="button" class="action-btn btn-pin" data-product-id="' + parseInt(p.product_id, 10) + '">' + pinLabel + '</button> ' +
+                '<button type="button" class="action-btn btn-hide" data-product-id="' + parseInt(p.product_id, 10) + '">' + hideLabel + '</button>' +
+            '</td>' +
+        '</tr>';
+    }
+
+    function renderTable() {
+        var $tbody = $('#merchandiser-tbody');
+        $tbody.sortable('destroy');
+        $tbody.empty();
+
+        var pinned  = [];
+        var hidden  = [];
+        var normal  = [];
+
+        $.each(products, function (id, p) {
+            if (p.action === 'pin')  { pinned.push(p); }
+            else if (p.action === 'hide') { hidden.push(p); }
+            else { normal.push(p); }
+        });
+
+        // Sort pinned by position ascending
+        pinned.sort(function (a, b) { return a.position - b.position; });
+
+        var hasRows = pinned.length + hidden.length + normal.length > 0;
+
+        $.each(pinned,  function (i, p) { $tbody.append(renderRow(p)); });
+        $.each(normal,  function (i, p) { $tbody.append(renderRow(p)); });
+        $.each(hidden,  function (i, p) { $tbody.append(renderRow(p)); });
+
+        if (!hasRows) {
+            $('#merchandiser-grid').hide();
+            $('#merchandiser-empty').show();
+        } else {
+            $('#merchandiser-empty').hide();
+            $('#merchandiser-grid').show();
+        }
+
+        // Sortable only on pinned rows
+        $tbody.sortable({
+            items: 'tr.merchandiser-pinned',
+            handle: '.drag-handle',
+            axis: 'y',
+            placeholder: 'ui-sortable-placeholder',
+            forcePlaceholderSize: true,
+            update: function () {
+                recalcPinnedPositions();
+            }
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // Load
+    // -----------------------------------------------------------------------
+
+    function loadProducts() {
+        $('#merchandiser-loading').show();
+        $('#merchandiser-grid').hide();
+        $('#merchandiser-empty').hide();
+
+        $.ajax({
+            url: loadUrl,
+            type: 'GET',
+            data: { category_id: categoryId, store_id: storeId },
+            dataType: 'json',
+            success: function (response) {
+                products = {};
+                var list = (response && response.products) ? response.products : [];
+                $.each(list, function (i, p) {
+                    products[p.product_id] = $.extend({}, p, {
+                        action: p.action || 'none',
+                        position: p.position || 0
+                    });
+                });
+                $('#merchandiser-loading').hide();
+                renderTable();
+            },
+            error: function () {
+                $('#merchandiser-loading').hide();
+                showStatus('Failed to load products.', 'error');
+                $('#merchandiser-empty').show();
+            }
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // Save
+    // -----------------------------------------------------------------------
+
+    function saveRules() {
+        var rules = [];
+
+        $.each(products, function (id, p) {
+            if (p.action === 'pin' || p.action === 'hide') {
+                rules.push({
+                    product_id: parseInt(p.product_id, 10),
+                    position: p.action === 'pin' ? (p.position || 0) : 0,
+                    action: p.action
+                });
+            }
+        });
+
+        var payload = {
+            category_id: categoryId,
+            store_id: storeId,
+            rules: rules
+        };
+
+        var $btn = $('#merchandiser-save-btn');
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: saveUrl,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(payload),
+            dataType: 'json',
+            success: function (response) {
+                if (response && response.success) {
+                    showStatus('Merchandising saved successfully.', 'success');
+                } else {
+                    var msg = (response && response.message) ? response.message : 'An error occurred while saving.';
+                    showStatus(msg, 'error');
+                }
+            },
+            error: function () {
+                showStatus('Failed to save merchandising rules. Please try again.', 'error');
+            },
+            complete: function () {
+                $btn.prop('disabled', false);
+            }
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // Status message
+    // -----------------------------------------------------------------------
+
+    function showStatus(msg, type) {
+        var $status = $('#merchandiser-status');
+        $status.text(msg)
+               .removeClass('status-success status-error')
+               .addClass(type === 'success' ? 'status-success' : 'status-error')
+               .show();
+        setTimeout(function () { $status.fadeOut(); }, 4000);
+    }
+
+    // -----------------------------------------------------------------------
+    // Product Search
+    // -----------------------------------------------------------------------
+
+    function searchProducts(query) {
+        if (!query || query.length < 2) {
+            $('#merchandiser-search-results').hide().empty();
+            return;
+        }
+
+        $.ajax({
+            url: searchUrl,
+            type: 'GET',
+            data: { q: query, store_id: storeId },
+            dataType: 'json',
+            success: function (results) {
+                renderSearchDropdown(results || []);
+            },
+            error: function () {
+                $('#merchandiser-search-results').hide().empty();
+            }
+        });
+    }
+
+    function renderSearchDropdown(results) {
+        var $dropdown = $('#merchandiser-search-results');
+        $dropdown.empty();
+
+        if (results.length === 0) {
+            $dropdown.append('<div class="search-no-results">No products found.</div>');
+            $dropdown.show();
+            return;
+        }
+
+        $.each(results, function (i, product) {
+            var $item = $('<div class="search-result-item" role="button" tabindex="0"/>');
+            $item.html(
+                '<span class="search-result-name">' + escapeHtml(product.name) + '</span>' +
+                '<span class="search-result-sku">' + escapeHtml(product.sku) + '</span>'
+            );
+            $item.on('click keypress', function (e) {
+                if (e.type === 'click' || e.which === 13) {
+                    pinProductFromSearch(product);
+                    $dropdown.hide().empty();
+                    $('#merchandiser-product-search').val('');
+                }
+            });
+            $dropdown.append($item);
+        });
+
+        $dropdown.show();
+    }
+
+    function pinProductFromSearch(product) {
+        var pid = parseInt(product.id, 10);
+
+        if (products[pid]) {
+            // Already exists — just pin it if not already pinned
+            if (products[pid].action !== 'pin') {
+                products[pid].action = 'pin';
+                products[pid].position = getNextPinPosition();
+                renderTable();
+            }
+            return;
+        }
+
+        products[pid] = {
+            product_id: pid,
+            name: product.name,
+            sku: product.sku,
+            image_url: product.image_url || '',
+            price: '',
+            action: 'pin',
+            position: getNextPinPosition()
+        };
+
+        renderTable();
+    }
+
+    // -----------------------------------------------------------------------
+    // Event bindings
+    // -----------------------------------------------------------------------
+
+    // Pin / Unpin toggle
+    $container.on('click', '.btn-pin', function () {
+        var pid = parseInt($(this).data('product-id'), 10);
+        var p = products[pid];
+        if (!p) { return; }
+
+        if (p.action === 'pin') {
+            p.action = 'none';
+            p.position = 0;
+        } else {
+            p.action = 'pin';
+            p.position = getNextPinPosition();
+        }
+
+        renderTable();
+    });
+
+    // Hide / Unhide toggle
+    $container.on('click', '.btn-hide', function () {
+        var pid = parseInt($(this).data('product-id'), 10);
+        var p = products[pid];
+        if (!p) { return; }
+
+        if (p.action === 'hide') {
+            p.action = 'none';
+            p.position = 0;
+        } else {
+            p.action = 'hide';
+            if (p.action === 'pin') { p.position = 0; }
+        }
+
+        renderTable();
+    });
+
+    // Save button
+    $('#merchandiser-save-btn').on('click', function () {
+        saveRules();
+    });
+
+    // Search input with debounce
+    $('#merchandiser-product-search').on('input', function () {
+        var query = $(this).val().trim();
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function () {
+            searchProducts(query);
+        }, 300);
+    });
+
+    // Close search dropdown when clicking outside
+    $(document).on('click', function (e) {
+        if (!$(e.target).closest('#merchandiser-product-search, #merchandiser-search-results').length) {
+            $('#merchandiser-search-results').hide();
+        }
+    });
+
+    // -----------------------------------------------------------------------
+    // Boot
+    // -----------------------------------------------------------------------
+
+    loadProducts();
 });
 </script>
