@@ -52,7 +52,7 @@ class CategorySearchConfigViewModel implements ArgumentInterface
             'productCollection'         => $this->collectionNameResolver->resolve('product', $storeCode, $storeId),
             'categoryId'                => $this->getCurrentCategoryId(),
             'productsPerPage'           => $this->config->getProductsPerPage(),
-            'facetAttributes'           => ['brand', 'color', 'size', 'in_stock', 'price'],
+            'facetAttributes'           => ['categories.lvl0', 'in_stock', 'type_id'],
             'sortOptions'               => $this->getSortOptions(),
         ];
     }

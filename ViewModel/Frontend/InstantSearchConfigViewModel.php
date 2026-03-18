@@ -54,7 +54,7 @@ class InstantSearchConfigViewModel implements ArgumentInterface
      */
     public function getFacetAttributes(): array
     {
-        return ['category_ids', 'brand', 'color', 'size', 'in_stock'];
+        return ['categories.lvl0', 'in_stock', 'type_id'];
     }
 
     /**

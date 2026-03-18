@@ -46,7 +46,7 @@ class LandingPageViewModel implements ArgumentInterface
             'filterBy'                  => $landingPage?->getFilterBy() ?: '',
             'sortBy'                    => $landingPage?->getSortBy() ?: '',
             'productsPerPage'           => $this->config->getProductsPerPage(),
-            'facetAttributes'           => ['brand', 'color', 'size', 'in_stock', 'price'],
+            'facetAttributes'           => ['categories.lvl0', 'in_stock', 'type_id'],
         ];
     }
 
