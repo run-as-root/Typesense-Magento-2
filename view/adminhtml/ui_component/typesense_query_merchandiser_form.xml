@@ -1,0 +1,181 @@
+<?xml version="1.0"?>
+<form xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <argument name="data" xsi:type="array">
+        <item name="js_config" xsi:type="array">
+            <item name="provider" xsi:type="string">typesense_query_merchandiser_form.typesense_query_merchandiser_form_data_source</item>
+        </item>
+        <item name="label" xsi:type="string" translate="true">Query Merchandiser</item>
+        <item name="template" xsi:type="string">templates/form/collapsible</item>
+    </argument>
+    <settings>
+        <buttons>
+            <button name="back">
+                <url path="*/*/index"/>
+                <class>back</class>
+                <label translate="true">Back</label>
+            </button>
+            <button name="delete">
+                <class>delete</class>
+                <label translate="true">Delete</label>
+                <aclResource>RunAsRoot_TypeSense::query_merchandiser</aclResource>
+                <url path="*/*/delete">
+                    <param name="id">${ $.$data.id }</param>
+                </url>
+            </button>
+            <button name="save">
+                <class>save primary</class>
+                <label translate="true">Save</label>
+            </button>
+        </buttons>
+        <namespace>typesense_query_merchandiser_form</namespace>
+        <dataScope>data</dataScope>
+        <deps>
+            <dep>typesense_query_merchandiser_form.typesense_query_merchandiser_form_data_source</dep>
+        </deps>
+    </settings>
+    <dataSource name="typesense_query_merchandiser_form_data_source">
+        <argument name="data" xsi:type="array">
+            <item name="js_config" xsi:type="array">
+                <item name="component" xsi:type="string">Magento_Ui/js/form/provider</item>
+            </item>
+        </argument>
+        <settings>
+            <submitUrl path="typesense/querymerchandiser/save"/>
+        </settings>
+        <aclResource>RunAsRoot_TypeSense::query_merchandiser</aclResource>
+        <dataProvider class="RunAsRoot\TypeSense\Ui\Component\Form\DataProvider\QueryMerchandiserFormDataProvider"
+                      name="typesense_query_merchandiser_form_data_source">
+            <settings>
+                <requestFieldName>id</requestFieldName>
+                <primaryFieldName>id</primaryFieldName>
+            </settings>
+        </dataProvider>
+    </dataSource>
+    <fieldset name="general">
+        <settings>
+            <collapsible>false</collapsible>
+            <label translate="true">General</label>
+        </settings>
+        <field name="id" formElement="input">
+            <settings>
+                <dataType>text</dataType>
+                <visible>false</visible>
+            </settings>
+        </field>
+        <field name="query" formElement="input">
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Query</label>
+                <validation>
+                    <rule name="required-entry" xsi:type="boolean">true</rule>
+                </validation>
+            </settings>
+        </field>
+        <field name="match_type" formElement="select">
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Match Type</label>
+                <validation>
+                    <rule name="required-entry" xsi:type="boolean">true</rule>
+                </validation>
+            </settings>
+            <formElements>
+                <select>
+                    <settings>
+                        <options>
+                            <option name="exact" xsi:type="array">
+                                <item name="value" xsi:type="string">exact</item>
+                                <item name="label" xsi:type="string" translate="true">Exact</item>
+                            </option>
+                            <option name="contains" xsi:type="array">
+                                <item name="value" xsi:type="string">contains</item>
+                                <item name="label" xsi:type="string" translate="true">Contains</item>
+                            </option>
+                        </options>
+                    </settings>
+                </select>
+            </formElements>
+        </field>
+        <field name="store_id" formElement="select">
+            <settings>
+                <dataType>int</dataType>
+                <label translate="true">Store</label>
+                <validation>
+                    <rule name="required-entry" xsi:type="boolean">true</rule>
+                </validation>
+            </settings>
+            <formElements>
+                <select>
+                    <settings>
+                        <options class="Magento\Store\Model\System\Store"/>
+                    </settings>
+                </select>
+            </formElements>
+        </field>
+        <field name="is_active" formElement="checkbox">
+            <settings>
+                <dataType>boolean</dataType>
+                <label translate="true">Is Active</label>
+            </settings>
+            <formElements>
+                <checkbox>
+                    <settings>
+                        <valueMap>
+                            <map name="false" xsi:type="string">0</map>
+                            <map name="true" xsi:type="string">1</map>
+                        </valueMap>
+                        <prefer>toggle</prefer>
+                    </settings>
+                </checkbox>
+            </formElements>
+        </field>
+    </fieldset>
+    <fieldset name="banner">
+        <settings>
+            <collapsible>true</collapsible>
+            <opened>false</opened>
+            <label translate="true">Banner</label>
+        </settings>
+        <field name="banner_config" formElement="textarea">
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Banner Config (JSON)</label>
+                <notice translate="true">JSON configuration for the banner displayed with this query override.</notice>
+            </settings>
+        </field>
+    </fieldset>
+    <fieldset name="product_merchandising">
+        <settings>
+            <collapsible>true</collapsible>
+            <opened>true</opened>
+            <label translate="true">Product Merchandising</label>
+        </settings>
+        <field name="includes" formElement="input">
+            <settings>
+                <dataType>text</dataType>
+                <visible>false</visible>
+                <label translate="true">Includes (JSON)</label>
+            </settings>
+        </field>
+        <field name="excludes" formElement="input">
+            <settings>
+                <dataType>text</dataType>
+                <visible>false</visible>
+                <label translate="true">Excludes (JSON)</label>
+            </settings>
+        </field>
+        <htmlContent name="query_merchandiser_widget">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="component" xsi:type="string">Magento_Ui/js/form/components/html</item>
+                </item>
+            </argument>
+            <settings>
+                <additionalClasses>
+                    <class name="typesense-query-merchandiser-container">true</class>
+                </additionalClasses>
+            </settings>
+        </htmlContent>
+    </fieldset>
+</form>
