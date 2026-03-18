@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Model\Client;
 
 use Psr\Log\LoggerInterface;
+use RunAsRoot\TypeSense\Api\TypeSenseClientFactoryInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use Typesense\Client;
 
-readonly class TypeSenseClientFactory
+readonly class TypeSenseClientFactory implements TypeSenseClientFactoryInterface
 {
     public function __construct(
         private TypeSenseConfigInterface $config,

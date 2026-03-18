@@ -3,6 +3,12 @@
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
 
     <!-- Interface preferences -->
+    <preference for="RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\IndexerOrchestrator"/>
+
+    <preference for="RunAsRoot\TypeSense\Api\TypeSenseClientFactoryInterface"
+                type="RunAsRoot\TypeSense\Model\Client\TypeSenseClientFactory"/>
+
     <preference for="RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface"
                 type="RunAsRoot\TypeSense\Model\Config\TypeSenseConfig"/>
 
@@ -53,6 +59,18 @@
                 <item name="category" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Category\CategoryEntityIndexer</item>
                 <item name="cms_page" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\CmsPage\CmsPageEntityIndexer</item>
                 <item name="suggestion" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionEntityIndexer</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <!-- CLI commands -->
+    <type name="Magento\Framework\Console\CommandListInterface">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="typesense_reindex" xsi:type="object">RunAsRoot\TypeSense\Console\Command\ReindexCommand</item>
+                <item name="typesense_collection_list" xsi:type="object">RunAsRoot\TypeSense\Console\Command\CollectionListCommand</item>
+                <item name="typesense_collection_delete" xsi:type="object">RunAsRoot\TypeSense\Console\Command\CollectionDeleteCommand</item>
+                <item name="typesense_health" xsi:type="object">RunAsRoot\TypeSense\Console\Command\HealthCheckCommand</item>
             </argument>
         </arguments>
     </type>

@@ -7,11 +7,12 @@ namespace RunAsRoot\TypeSense\Model\Indexer;
 use Magento\Store\Api\StoreRepositoryInterface;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
+use RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface;
 use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
 use RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
-readonly class IndexerOrchestrator
+readonly class IndexerOrchestrator implements IndexerOrchestratorInterface
 {
     public function __construct(
         private EntityIndexerPool $indexerPool,
