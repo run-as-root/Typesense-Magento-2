@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Cron:etc/crontab.xsd">
+    <group id="default">
+        <job name="typesense_reindex" instance="RunAsRoot\TypeSense\Cron\ReindexCron" method="execute">
+            <config_path>run_as_root_typesense/indexing/cron_schedule</config_path>
+        </job>
+    </group>
+</config>
