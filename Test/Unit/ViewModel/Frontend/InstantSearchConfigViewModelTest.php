@@ -69,6 +69,8 @@ final class InstantSearchConfigViewModelTest extends TestCase
         $this->config->method('getSearchProtocol')->willReturn('https');
         $this->config->method('getSearchOnlyApiKey')->willReturn('xyz-search-key');
         $this->config->method('getProductsPerPage')->willReturn(24);
+        $this->config->method('getEnabledSortOptions')->willReturn([]);
+        $this->config->method('getTileAttributes')->willReturn([]);
 
         $this->collectionNameResolver
             ->method('resolve')
@@ -85,6 +87,7 @@ final class InstantSearchConfigViewModelTest extends TestCase
         self::assertArrayHasKey('productsPerPage', $result);
         self::assertArrayHasKey('facetAttributes', $result);
         self::assertArrayHasKey('sortOptions', $result);
+        self::assertArrayHasKey('tileAttributes', $result);
 
         self::assertSame('search.example.com', $result['typesenseHost']);
         self::assertSame(8108, $result['typesensePort']);
@@ -94,17 +97,17 @@ final class InstantSearchConfigViewModelTest extends TestCase
         self::assertSame(24, $result['productsPerPage']);
     }
 
-    public function test_get_sort_options_returns_non_empty_array(): void
+    public function test_get_sort_options_returns_array_from_config(): void
     {
+        $sortOptions = [
+            ['label' => 'Relevance', 'value' => ''],
+            ['label' => 'Price: Low to High', 'value' => 'price:asc'],
+        ];
+        $this->config->method('getEnabledSortOptions')->willReturn($sortOptions);
+
         $result = $this->sut->getSortOptions();
 
-        self::assertNotEmpty($result);
-        self::assertIsArray($result);
-
-        foreach ($result as $option) {
-            self::assertArrayHasKey('label', $option);
-            self::assertArrayHasKey('value', $option);
-        }
+        self::assertSame($sortOptions, $result);
     }
 
     public function test_get_facet_attributes_returns_non_empty_array(): void

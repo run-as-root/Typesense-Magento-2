@@ -41,6 +41,7 @@ class InstantSearchConfigViewModel implements ArgumentInterface
             'productsPerPage'           => $this->config->getProductsPerPage(),
             'facetAttributes'           => $this->getFacetAttributes(),
             'sortOptions'               => $this->getSortOptions(),
+            'tileAttributes'            => $this->config->getTileAttributes(),
         ];
     }
 
@@ -62,11 +63,6 @@ class InstantSearchConfigViewModel implements ArgumentInterface
      */
     public function getSortOptions(): array
     {
-        return [
-            ['label' => 'Relevance', 'value' => ''],
-            ['label' => 'Price: Low to High', 'value' => 'price:asc'],
-            ['label' => 'Price: High to Low', 'value' => 'price:desc'],
-            ['label' => 'Newest', 'value' => 'created_at:desc'],
-        ];
+        return $this->config->getEnabledSortOptions();
     }
 }

@@ -93,6 +93,8 @@ final class CategorySearchConfigViewModelTest extends TestCase
         $this->config->method('getSearchProtocol')->willReturn('http');
         $this->config->method('getSearchOnlyApiKey')->willReturn('xyz');
         $this->config->method('getProductsPerPage')->willReturn(24);
+        $this->config->method('getEnabledSortOptions')->willReturn([]);
+        $this->config->method('getTileAttributes')->willReturn([]);
 
         $this->collectionNameResolver->method('resolve')
             ->with('product', 'default', 1)
@@ -122,6 +124,8 @@ final class CategorySearchConfigViewModelTest extends TestCase
         $this->config->method('getSearchProtocol')->willReturn('http');
         $this->config->method('getSearchOnlyApiKey')->willReturn('xyz');
         $this->config->method('getProductsPerPage')->willReturn(24);
+        $this->config->method('getEnabledSortOptions')->willReturn([]);
+        $this->config->method('getTileAttributes')->willReturn([]);
 
         $this->collectionNameResolver->method('resolve')->willReturn('rar_products_default');
         $this->registry->method('registry')->willReturn(null);

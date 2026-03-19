@@ -7,6 +7,7 @@ namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product\Attribute\Collection as AttributeCollection;
 use Magento\Catalog\Model\ResourceModel\Product\Attribute\CollectionFactory as AttributeCollectionFactory;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
 class AttributeResolver implements AttributeResolverInterface
 {
@@ -21,6 +22,7 @@ class AttributeResolver implements AttributeResolverInterface
 
     public function __construct(
         private readonly AttributeCollectionFactory $attributeCollectionFactory,
+        private readonly TypeSenseConfigInterface $config,
     ) {
     }
 
@@ -52,11 +54,15 @@ class AttributeResolver implements AttributeResolverInterface
     private function getAttributeCollection(): AttributeCollection
     {
         if ($this->cachedCollection === null) {
+            $additionalAttributes = $this->config->getAdditionalAttributes();
             $collection = $this->attributeCollectionFactory->create();
-            $collection->addFieldToFilter(
-                ['is_searchable', 'is_filterable'],
-                [['eq' => 1], ['gt' => 0]],
-            );
+
+            if ($additionalAttributes !== []) {
+                $collection->addFieldToFilter('attribute_code', ['in' => $additionalAttributes]);
+            } else {
+                $collection->addFieldToFilter('attribute_code', ['in' => ['__none__']]);
+            }
+
             $this->cachedCollection = $collection;
         }
 
