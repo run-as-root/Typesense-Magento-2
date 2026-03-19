@@ -227,20 +227,26 @@ require(['jquery', 'jquery/ui'], function ($) {
             $('#merchandiser-grid').show();
         }
 
-        // Sortable on all non-hidden rows — dragging auto-pins
+        // Sortable on all non-hidden rows — dragging auto-pins the dragged item
         $tbody.sortable({
             items: 'tr:not(.merchandiser-hidden)',
             handle: '.drag-handle',
             axis: 'y',
             placeholder: 'ui-sortable-placeholder',
             forcePlaceholderSize: true,
-            update: function () {
-                // Auto-pin any dragged normal rows and recalc all positions
+            update: function (event, ui) {
+                // Only pin the item that was actually dragged
+                var draggedId = ui.item.data('product-id');
+                if (products[draggedId] && products[draggedId].action !== 'pin') {
+                    products[draggedId].action = 'pin';
+                    products[draggedId].position = getNextPinPosition();
+                }
+
+                // Recalc positions for ALL pinned items based on current DOM order
                 var pos = 1;
                 $tbody.find('tr:not(.merchandiser-hidden)').each(function () {
                     var id = $(this).data('product-id');
-                    if (products[id]) {
-                        products[id].action = 'pin';
+                    if (products[id] && products[id].action === 'pin') {
                         products[id].position = pos;
                         pos++;
                     }
