@@ -60,14 +60,23 @@ class CollectionListCommand extends Command
     /**
      * Build a reverse map from collection name to alias name.
      *
-     * @param array<int, array{name: string, collection_name: string}> $aliases
+     * The Typesense API returns { "aliases": [ { "name": "...", "collection_name": "..." }, ... ] }
+     * so we unwrap the outer "aliases" key before iterating.
+     *
+     * @param array<string, mixed> $aliasesResponse
      * @return array<string, string>
      */
-    private function buildAliasMap(array $aliases): array
+    private function buildAliasMap(array $aliasesResponse): array
     {
         $map = [];
 
+        $aliases = $aliasesResponse['aliases'] ?? $aliasesResponse;
+
         foreach ($aliases as $alias) {
+            if (!is_array($alias)) {
+                continue;
+            }
+
             $collectionName = $alias['collection_name'] ?? '';
             $aliasName = $alias['name'] ?? '';
 

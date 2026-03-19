@@ -31,8 +31,12 @@ final class CollectionListCommandTest extends TestCase
             ['name' => 'categories_v1', 'num_documents' => 10],
         ]);
 
+        // The Typesense API wraps the list in an "aliases" key:
+        // { "aliases": [ { "name": "...", "collection_name": "..." }, ... ] }
         $this->aliasManager->method('listAliases')->willReturn([
-            ['name' => 'products', 'collection_name' => 'products_v1'],
+            'aliases' => [
+                ['name' => 'products', 'collection_name' => 'products_v1'],
+            ],
         ]);
 
         $tester = new CommandTester($this->command);
@@ -52,13 +56,37 @@ final class CollectionListCommandTest extends TestCase
     public function test_shows_empty_table_when_no_collections_exist(): void
     {
         $this->collectionManager->method('listCollections')->willReturn([]);
-        $this->aliasManager->method('listAliases')->willReturn([]);
+        $this->aliasManager->method('listAliases')->willReturn(['aliases' => []]);
 
         $tester = new CommandTester($this->command);
         $exitCode = $tester->execute([]);
 
         self::assertSame(0, $exitCode);
         self::assertStringContainsString('Total collections: 0', $tester->getDisplay());
+    }
+
+    public function test_multiple_aliases_are_all_resolved(): void
+    {
+        $this->collectionManager->method('listCollections')->willReturn([
+            ['name' => 'rar_product_default_v5', 'num_documents' => 100],
+            ['name' => 'rar_category_default_v4', 'num_documents' => 20],
+        ]);
+
+        $this->aliasManager->method('listAliases')->willReturn([
+            'aliases' => [
+                ['name' => 'rar_product_default', 'collection_name' => 'rar_product_default_v5'],
+                ['name' => 'rar_category_default', 'collection_name' => 'rar_category_default_v4'],
+            ],
+        ]);
+
+        $tester = new CommandTester($this->command);
+        $exitCode = $tester->execute([]);
+
+        self::assertSame(0, $exitCode);
+
+        $output = $tester->getDisplay();
+        self::assertStringContainsString('rar_product_default', $output);
+        self::assertStringContainsString('rar_category_default', $output);
     }
 
     public function test_handles_exception_gracefully_and_returns_failure(): void
