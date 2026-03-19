@@ -23,6 +23,7 @@
                 <cron_enabled>0</cron_enabled>
                 <cron_schedule>0 2 * * *</cron_schedule>
                 <queue_enabled>0</queue_enabled>
+                <additional_attributes/>
             </indexing>
             <search>
                 <typo_tolerance_enabled>1</typo_tolerance_enabled>
@@ -37,6 +38,8 @@
                 <image_type>small_image</image_type>
                 <image_width>300</image_width>
                 <image_height>300</image_height>
+                <tile_attributes/>
+                <sort_options>relevance,price_asc,price_desc,newest</sort_options>
             </instant_search>
             <autocomplete>
                 <enabled>1</enabled>

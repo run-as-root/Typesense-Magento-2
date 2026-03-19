@@ -175,6 +175,61 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return $this->getFlag('merchandising/query_merchandiser_enabled', $storeId);
     }
 
+    public function getAdditionalAttributes(?int $storeId = null): array
+    {
+        $value = (string) $this->getValue('indexing/additional_attributes', $storeId);
+
+        if ($value === '') {
+            return [];
+        }
+
+        return explode(',', $value);
+    }
+
+    public function getTileAttributes(?int $storeId = null): array
+    {
+        $value = (string) $this->getValue('instant_search/tile_attributes', $storeId);
+
+        if ($value === '') {
+            return [];
+        }
+
+        return explode(',', $value);
+    }
+
+    public function getEnabledSortOptions(?int $storeId = null): array
+    {
+        $value = (string) $this->getValue('instant_search/sort_options', $storeId);
+
+        if ($value === '') {
+            return [];
+        }
+
+        $sortOptionMap = [
+            'relevance'     => ['label' => 'Relevance', 'value' => ''],
+            'price_asc'     => ['label' => 'Price: Low to High', 'value' => 'price:asc'],
+            'price_desc'    => ['label' => 'Price: High to Low', 'value' => 'price:desc'],
+            'newest'        => ['label' => 'Newest', 'value' => 'created_at:desc'],
+            'name_asc'      => ['label' => 'Name: A–Z', 'value' => 'name:asc'],
+            'name_desc'     => ['label' => 'Name: Z–A', 'value' => 'name:desc'],
+            'best_selling'  => ['label' => 'Best Selling', 'value' => 'sales_count:desc'],
+            'top_rated'     => ['label' => 'Top Rated', 'value' => 'rating_summary:desc'],
+            'most_reviewed' => ['label' => 'Most Reviewed', 'value' => 'review_count:desc'],
+        ];
+
+        $options = [];
+
+        foreach (explode(',', $value) as $key) {
+            $key = trim($key);
+
+            if (isset($sortOptionMap[$key])) {
+                $options[] = $sortOptionMap[$key];
+            }
+        }
+
+        return $options;
+    }
+
     private function getValue(string $path, ?int $storeId = null): mixed
     {
         return $this->scopeConfig->getValue(

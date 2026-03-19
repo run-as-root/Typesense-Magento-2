@@ -65,4 +65,13 @@ interface TypeSenseConfigInterface
     public function isCategoryMerchandiserEnabled(?int $storeId = null): bool;
 
     public function isQueryMerchandiserEnabled(?int $storeId = null): bool;
+
+    /** @return string[] */
+    public function getAdditionalAttributes(?int $storeId = null): array;
+
+    /** @return string[] */
+    public function getTileAttributes(?int $storeId = null): array;
+
+    /** @return array<int, array{label: string, value: string}> */
+    public function getEnabledSortOptions(?int $storeId = null): array;
 }

@@ -108,6 +108,12 @@
                     <label>Enable Suggestion Indexing</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
+                <field id="additional_attributes" translate="label comment" type="multiselect" sortOrder="55" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Additional Attributes to Index</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\ProductAttributeSource</source_model>
+                    <comment>Select product attributes to include in the Typesense index. Core fields (name, SKU, price, etc.) are always indexed. Changes require a full reindex.</comment>
+                    <can_be_empty>1</can_be_empty>
+                </field>
                 <field id="zero_downtime_enabled" translate="label comment" type="select"
                        sortOrder="60" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Zero-Downtime Reindexing</label>
@@ -174,6 +180,18 @@
                        sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Products Per Page</label>
                     <validate>validate-digits</validate>
+                </field>
+                <field id="tile_attributes" translate="label comment" type="multiselect" sortOrder="25" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Product Tile Attributes</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\ProductAttributeSource</source_model>
+                    <comment>Attributes to display on product cards in search results and category pages. Must also be in "Additional Attributes to Index".</comment>
+                    <can_be_empty>1</can_be_empty>
+                </field>
+                <field id="sort_options" translate="label comment" type="multiselect" sortOrder="26" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Sort Options</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\SortOptionSource</source_model>
+                    <comment>Sort options available to customers on search results and category pages.</comment>
+                    <can_be_empty>1</can_be_empty>
                 </field>
                 <field id="replace_category_page" translate="label comment" type="select"
                        sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
