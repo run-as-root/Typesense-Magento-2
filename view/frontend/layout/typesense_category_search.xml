@@ -1,9 +1,6 @@
 <?xml version="1.0"?>
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
-    <head>
-        <css src="RunAsRoot_TypeSense::css/instant-search.css"/>
-    </head>
     <body>
         <referenceContainer name="content">
             <block class="Magento\Framework\View\Element\Template"
@@ -15,7 +12,11 @@
                 </arguments>
             </block>
         </referenceContainer>
-        <!-- Remove default product listing to avoid duplicate content -->
-        <referenceBlock name="category.products.list" remove="true"/>
+
+        <!-- Remove default Magento product listing and toolbar -->
+        <referenceBlock name="category.products" remove="true"/>
+
+        <!-- Remove layered navigation sidebar (we have our own facets) -->
+        <referenceBlock name="catalog.leftnav" remove="true"/>
     </body>
 </page>
