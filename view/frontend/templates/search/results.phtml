@@ -45,6 +45,7 @@ $sortOptions = $viewModel->getSortOptions();
             totalPages: 1,
             sortBy: '',
             filters: {},
+            priceRange: null,
             client: null,
 
             init() {
@@ -83,6 +84,9 @@ $sortOptions = $viewModel->getSortOptions();
                 for (const [field, values] of Object.entries(this.filters)) {
                     if (values.length > 0) filterParts.push(field + ':[' + values.join(',') + ']');
                 }
+                if (this.priceRange) {
+                    filterParts.push('price:>=' + this.priceRange.min + ' && price:<=' + this.priceRange.max);
+                }
                 if (filterParts.length > 0) searchParams.filter_by = filterParts.join(' && ');
 
                 try {
@@ -115,6 +119,16 @@ $sortOptions = $viewModel->getSortOptions();
 
             nextPage() { if (this.page < this.totalPages) { this.page++; this.search(); window.scrollTo(0, 0); } },
             prevPage() { if (this.page > 1) { this.page--; this.search(); window.scrollTo(0, 0); } },
+
+            setPriceRange(min, max) {
+                if (this.priceRange && this.priceRange.min === min && this.priceRange.max === max) {
+                    this.priceRange = null;
+                } else {
+                    this.priceRange = { min, max };
+                }
+                this.page = 1;
+                this.search();
+            },
 
             onSortChange() {
                 this.page = 1;
@@ -203,13 +217,36 @@ $sortOptions = $viewModel->getSortOptions();
                 const container = this.$el.querySelector('[data-facets]');
                 if (!container) return;
 
-                if (this.facets.length === 0) {
+                const meaningfulFacets = this.facets.filter(f => f.counts && f.counts.length > 1);
+
+                if (meaningfulFacets.length === 0 && this.hits.length === 0) {
                     container.innerHTML = '';
                     return;
                 }
 
                 let html = '';
-                for (const facet of this.facets) {
+
+                // Price range filter
+                const priceRanges = [
+                    { min: 0, max: 25, label: 'Under $25' },
+                    { min: 25, max: 50, label: '$25 – $50' },
+                    { min: 50, max: 100, label: '$50 – $100' },
+                    { min: 100, max: 200, label: '$100 – $200' },
+                    { min: 200, max: 99999, label: '$200+' },
+                ];
+                html += '<div class="mb-6 border-b pb-4">'
+                    + '<h3 class="font-semibold text-gray-800 mb-3">Price</h3>';
+                for (const range of priceRanges) {
+                    const isActive = this.priceRange && this.priceRange.min === range.min && this.priceRange.max === range.max;
+                    html += '<label class="flex items-center gap-2 text-sm text-gray-700 mb-1.5 cursor-pointer hover:text-gray-900">'
+                        + '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' data-price-min="' + range.min + '" data-price-max="' + range.max + '" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 ts-price-checkbox"/>'
+                        + '<span class="flex-1">' + range.label + '</span>'
+                        + '</label>';
+                }
+                html += '</div>';
+
+                // Regular facets
+                for (const facet of meaningfulFacets) {
                     const label = this.prettifyFacetName(facet.field_name);
                     html += '<div class="mb-6 border-b pb-4">'
                         + '<h3 class="font-semibold text-gray-800 mb-3 capitalize">' + this.esc(label) + '</h3>';
@@ -227,6 +264,12 @@ $sortOptions = $viewModel->getSortOptions();
                 }
 
                 container.innerHTML = html;
+
+                container.querySelectorAll('.ts-price-checkbox').forEach(cb => {
+                    cb.addEventListener('change', () => {
+                        this.setPriceRange(parseInt(cb.dataset.priceMin), parseInt(cb.dataset.priceMax));
+                    });
+                });
 
                 container.querySelectorAll('.ts-facet-checkbox').forEach(cb => {
                     cb.addEventListener('change', () => {
