@@ -5,6 +5,11 @@
         <css src="RunAsRoot_TypeSense::css/instant-search.css"/>
     </head>
     <body>
+        <!-- Remove the default Magento/Hyva search result blocks to avoid duplicate results -->
+        <referenceBlock name="search.result" remove="true"/>
+        <referenceBlock name="catalogsearch.leftnav" remove="true"/>
+        <referenceBlock name="search.search_terms_log" remove="true"/>
+
         <referenceContainer name="content">
             <block class="Magento\Framework\View\Element\Template"
                    name="typesense.instant.search"
