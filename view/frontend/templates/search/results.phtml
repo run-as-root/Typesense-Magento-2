@@ -1,6 +1,9 @@
 <?php
 /**
- * Typesense Instant Search Results — Hyva CSP-compatible Alpine.js component
+ * Typesense Instant Search Results — Hyva CSP-compatible
+ *
+ * Uses JS DOM rendering for product grid, facets, and pagination
+ * to avoid CSP-blocked Alpine expressions.
  */
 
 declare(strict_types=1);
@@ -80,6 +83,10 @@ $sortOptions = $viewModel->getSortOptions();
                 } catch (error) {
                     console.error('Typesense instant search error:', error);
                 }
+
+                this.renderProducts();
+                this.renderFacets();
+                this.renderPagination();
             },
 
             toggleFilter(field, value) {
@@ -90,11 +97,134 @@ $sortOptions = $viewModel->getSortOptions();
                 this.page = 1;
                 this.search();
             },
+
             isFilterActive(field, value) {
                 return this.filters[field] ? this.filters[field].includes(value) : false;
             },
-            nextPage() { if (this.page < this.totalPages) { this.page++; this.search(); } },
-            prevPage() { if (this.page > 1) { this.page--; this.search(); } },
+
+            nextPage() { if (this.page < this.totalPages) { this.page++; this.search(); window.scrollTo(0, 0); } },
+            prevPage() { if (this.page > 1) { this.page--; this.search(); window.scrollTo(0, 0); } },
+
+            onSortChange() {
+                this.page = 1;
+                this.search();
+            },
+
+            esc(str) {
+                const div = document.createElement('div');
+                div.textContent = String(str || '');
+                return div.innerHTML;
+            },
+
+            renderProducts() {
+                const container = this.$el.querySelector('[data-products]');
+                if (!container) return;
+
+                if (this.hits.length === 0 && this.stats !== '') {
+                    container.innerHTML = '<div class="text-center py-16 col-span-full">'
+                        + '<p class="text-gray-500 text-lg"><?= $escaper->escapeJs(__('No products found')) ?></p>'
+                        + '<p class="text-gray-400 text-sm mt-2"><?= $escaper->escapeJs(__('Try adjusting your search or filters')) ?></p>'
+                        + '</div>';
+                    return;
+                }
+
+                if (this.hits.length === 0) {
+                    container.innerHTML = '<div class="text-center py-16 col-span-full"><p class="text-gray-400 text-sm"><?= $escaper->escapeJs(__('Enter a search term to see results')) ?></p></div>';
+                    return;
+                }
+
+                let html = '';
+                for (const hit of this.hits) {
+                    const doc = hit.document;
+                    const price = doc.price ? '$' + Number(doc.price).toFixed(2) : '';
+                    const imgHtml = doc.image_url
+                        ? '<img src="' + this.esc(doc.image_url) + '" alt="' + this.esc(doc.name) + '" class="w-full h-full object-contain" loading="lazy"/>'
+                        : '<div class="w-full h-full bg-gray-100 flex items-center justify-center"><span class="text-gray-300 text-xs">No image</span></div>';
+
+                    let tileAttrsHtml = '';
+                    if (config.tileAttributes && config.tileAttributes.length > 0) {
+                        for (const attr of config.tileAttributes) {
+                            const val = doc[attr];
+                            if (val !== undefined && val !== null && val !== '') {
+                                const displayVal = Array.isArray(val) ? val.join(', ') : String(val);
+                                tileAttrsHtml += '<div class="text-xs text-gray-500 truncate"><span class="text-gray-400">' + this.esc(attr.replace(/_/g, ' ')) + ':</span> ' + this.esc(displayVal) + '</div>';
+                            }
+                        }
+                    }
+
+                    html += '<div class="border border-gray-200 rounded-lg p-3 flex flex-col hover:shadow-md transition-shadow">'
+                        + '<a href="/' + this.esc(doc.url) + '" class="flex flex-col flex-1">'
+                        + '<div class="aspect-square mb-3 overflow-hidden rounded">' + imgHtml + '</div>'
+                        + '<h3 class="text-sm font-medium text-gray-800 mb-1 line-clamp-2">' + this.esc(doc.name) + '</h3>'
+                        + tileAttrsHtml
+                        + '<div class="mt-auto pt-2"><span class="text-sm font-bold text-gray-800">' + this.esc(price) + '</span></div>'
+                        + '</a>'
+                        + '<a href="/' + this.esc(doc.url) + '" class="mt-3 w-full text-center text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-2 transition-colors">'
+                        + '<?= $escaper->escapeJs(__('View Product')) ?>'
+                        + '</a></div>';
+                }
+
+                container.innerHTML = html;
+            },
+
+            renderFacets() {
+                const container = this.$el.querySelector('[data-facets]');
+                if (!container) return;
+
+                if (this.facets.length === 0) {
+                    container.innerHTML = '';
+                    return;
+                }
+
+                let html = '';
+                for (const facet of this.facets) {
+                    const label = facet.field_name.replace(/_/g, ' ');
+                    html += '<div class="mb-6 border-b pb-4">'
+                        + '<h3 class="font-semibold text-gray-800 mb-3 capitalize">' + this.esc(label) + '</h3>';
+
+                    for (const count of facet.counts) {
+                        const isActive = this.isFilterActive(facet.field_name, count.value);
+                        html += '<label class="flex items-center gap-2 text-sm text-gray-700 mb-1.5 cursor-pointer hover:text-gray-900">'
+                            + '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' data-facet-field="' + this.esc(facet.field_name) + '" data-facet-value="' + this.esc(count.value) + '" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 ts-facet-checkbox"/>'
+                            + '<span class="flex-1">' + this.esc(count.value) + '</span>'
+                            + '<span class="text-gray-400 text-xs">(' + count.count + ')</span>'
+                            + '</label>';
+                    }
+                    html += '</div>';
+                }
+
+                container.innerHTML = html;
+
+                container.querySelectorAll('.ts-facet-checkbox').forEach(cb => {
+                    cb.addEventListener('change', () => {
+                        this.toggleFilter(cb.dataset.facetField, cb.dataset.facetValue);
+                    });
+                });
+            },
+
+            renderPagination() {
+                const container = this.$el.querySelector('[data-pagination]');
+                if (!container) return;
+
+                if (this.totalPages <= 1) {
+                    container.innerHTML = '';
+                    return;
+                }
+
+                const prevDisabled = this.page <= 1;
+                const nextDisabled = this.page >= this.totalPages;
+
+                container.innerHTML = '<div class="flex justify-center items-center gap-3 mt-8">'
+                    + '<button class="px-4 py-2 text-sm border border-gray-300 rounded transition-colors ' + (prevDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100 cursor-pointer') + '" data-action="prev" ' + (prevDisabled ? 'disabled' : '') + '><?= $escaper->escapeJs(__('Previous')) ?></button>'
+                    + '<span class="text-sm text-gray-600">' + this.page + ' / ' + this.totalPages + '</span>'
+                    + '<button class="px-4 py-2 text-sm border border-gray-300 rounded transition-colors ' + (nextDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100 cursor-pointer') + '" data-action="next" ' + (nextDisabled ? 'disabled' : '') + '><?= $escaper->escapeJs(__('Next')) ?></button>'
+                    + '</div>';
+
+                const prevBtn = container.querySelector('[data-action="prev"]');
+                const nextBtn = container.querySelector('[data-action="next"]');
+                if (prevBtn) prevBtn.addEventListener('click', () => this.prevPage());
+                if (nextBtn) nextBtn.addEventListener('click', () => this.nextPage());
+            },
         };
     }
 
@@ -111,7 +241,7 @@ $sortOptions = $viewModel->getSortOptions();
         <p class="text-sm text-gray-600" x-text="stats"></p>
         <div class="flex items-center gap-2">
             <label for="typesense-sort" class="text-sm text-gray-600 shrink-0"><?= $escaper->escapeHtml(__('Sort by:')) ?></label>
-            <select id="typesense-sort" x-model="sortBy" @change="page = 1; search()"
+            <select id="typesense-sort" x-model="sortBy" @change="onSortChange"
                     class="text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <?php foreach ($sortOptions as $option): ?>
                     <option value="<?= $escaper->escapeHtmlAttr($option['value']) ?>"><?= $escaper->escapeHtml(__($option['label'])) ?></option>
@@ -121,68 +251,16 @@ $sortOptions = $viewModel->getSortOptions();
     </div>
 
     <div class="flex gap-6">
-        <aside class="w-64 shrink-0 hidden lg:block">
-            <template x-for="facet in facets" :key="facet.field_name">
-                <div class="mb-6 border-b pb-4">
-                    <h3 class="font-semibold text-gray-800 mb-3 capitalize" x-text="facet.field_name.replace(/_/g, ' ')"></h3>
-                    <template x-for="count in facet.counts" :key="count.value">
-                        <label class="flex items-center gap-2 text-sm text-gray-700 mb-1.5 cursor-pointer hover:text-gray-900">
-                            <input type="checkbox" :checked="isFilterActive(facet.field_name, count.value)"
-                                   @change="toggleFilter(facet.field_name, count.value)"
-                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
-                            <span x-text="count.value" class="flex-1"></span>
-                            <span class="text-gray-400 text-xs" x-text="'(' + count.count + ')'"></span>
-                        </label>
-                    </template>
-                </div>
-            </template>
-        </aside>
+        <aside class="w-64 shrink-0 hidden lg:block" data-facets></aside>
 
         <div class="flex-1 min-w-0">
-            <template x-if="hits.length === 0 && stats !== ''">
-                <div class="text-center py-16">
-                    <p class="text-gray-500 text-lg"><?= $escaper->escapeHtml(__('No products found')) ?></p>
-                    <p class="text-gray-400 text-sm mt-2"><?= $escaper->escapeHtml(__('Try adjusting your search or filters')) ?></p>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-products>
+                <div class="text-center py-16 col-span-full">
+                    <p class="text-gray-400 text-sm"><?= $escaper->escapeHtml(__('Loading results…')) ?></p>
                 </div>
-            </template>
-
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <template x-for="hit in hits" :key="hit.document.id">
-                    <div class="border border-gray-200 rounded-lg p-3 flex flex-col hover:shadow-md transition-shadow">
-                        <a :href="'/' + hit.document.url" class="flex flex-col flex-1">
-                            <div class="aspect-square mb-3 overflow-hidden rounded">
-                                <img :src="hit.document.image_url" :alt="hit.document.name"
-                                     class="w-full h-full object-contain" loading="lazy"/>
-                            </div>
-                            <h3 class="text-sm font-medium text-gray-800 mb-1 line-clamp-2" x-text="hit.document.name"></h3>
-                            <div class="mt-auto pt-2">
-                                <span class="text-sm font-bold text-gray-800"
-                                      x-text="hit.document.price ? '$' + Number(hit.document.price).toFixed(2) : ''"></span>
-                            </div>
-                        </a>
-                        <a :href="'/' + hit.document.url"
-                           class="mt-3 w-full text-center text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-2 transition-colors">
-                            <?= $escaper->escapeHtml(__('View Product')) ?>
-                        </a>
-                    </div>
-                </template>
             </div>
 
-            <template x-if="totalPages > 1">
-                <div class="flex justify-center items-center gap-3 mt-8">
-                    <button @click="prevPage()" :disabled="page <= 1"
-                            :class="page <= 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100'"
-                            class="px-4 py-2 text-sm border border-gray-300 rounded transition-colors">
-                        <?= $escaper->escapeHtml(__('Previous')) ?>
-                    </button>
-                    <span class="text-sm text-gray-600"><span x-text="page"></span> / <span x-text="totalPages"></span></span>
-                    <button @click="nextPage()" :disabled="page >= totalPages"
-                            :class="page >= totalPages ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100'"
-                            class="px-4 py-2 text-sm border border-gray-300 rounded transition-colors">
-                        <?= $escaper->escapeHtml(__('Next')) ?>
-                    </button>
-                </div>
-            </template>
+            <div data-pagination></div>
         </div>
     </div>
 </div>
