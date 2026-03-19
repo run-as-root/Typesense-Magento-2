@@ -54,6 +54,17 @@ $sortOptions = $viewModel->getSortOptions();
                     apiKey: config.typesenseSearchOnlyApiKey,
                     connectionTimeoutSeconds: 2,
                 });
+
+                // Bind sort change via native event (CSP blocks @change with method names)
+                const sortSelect = this.$el.querySelector('[data-sort-select]');
+                if (sortSelect) {
+                    sortSelect.addEventListener('change', () => {
+                        this.sortBy = sortSelect.value;
+                        this.page = 1;
+                        this.search();
+                    });
+                }
+
                 this.search();
             },
 
@@ -239,7 +250,7 @@ $sortOptions = $viewModel->getSortOptions();
         <p class="text-sm text-gray-600" x-text="stats"></p>
         <div class="flex items-center gap-2">
             <label for="typesense-category-sort" class="text-sm text-gray-600 shrink-0"><?= $escaper->escapeHtml(__('Sort by:')) ?></label>
-            <select id="typesense-category-sort" x-model="sortBy" @change="onSortChange"
+            <select id="typesense-category-sort" data-sort-select
                     class="text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <?php foreach ($sortOptions as $option): ?>
                     <option value="<?= $escaper->escapeHtmlAttr($option['value']) ?>"><?= $escaper->escapeHtml(__($option['label'])) ?></option>
