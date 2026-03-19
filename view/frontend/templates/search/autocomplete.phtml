@@ -137,7 +137,7 @@ $config = $viewModel->getJsonConfig();
                 const catIdx = this.selectedIndex - sugLen - prodLen;
                 const hit = this.results.categories[catIdx];
                 if (hit) {
-                    window.location.href = '/' + hit.document.url;
+                    window.location.href = hit.document.url;
                 }
             },
         };
@@ -182,7 +182,7 @@ $config = $viewModel->getJsonConfig();
                 <div class="p-2 border-b">
                     <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $escaper->escapeHtml(__('Products')) ?></h4>
                     <template x-for="(hit, i) in results.products" :key="hit.document.id">
-                        <a :href="'/' + hit.document.url"
+                        <a :href="hit.document.url"
                            class="flex items-center gap-3 px-2 py-2 hover:bg-gray-100 rounded"
                            :class="selectedIndex === (results.suggestions.length + i) ? 'bg-gray-100' : ''">
                             <template x-if="hit.document.image_url">
@@ -202,7 +202,7 @@ $config = $viewModel->getJsonConfig();
                 <div class="p-2">
                     <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $escaper->escapeHtml(__('Categories')) ?></h4>
                     <template x-for="(hit, i) in results.categories" :key="hit.document.id">
-                        <a :href="'/' + hit.document.url"
+                        <a :href="hit.document.url"
                            class="block px-2 py-1 text-sm hover:bg-gray-100"
                            :class="selectedIndex === (results.suggestions.length + results.products.length + i) ? 'bg-gray-100' : ''"
                            x-text="hit.document.name"></a>

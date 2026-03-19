@@ -179,13 +179,13 @@ $sortOptions = $viewModel->getSortOptions();
                     }
 
                     html += '<div class="border border-gray-200 rounded-lg p-3 flex flex-col hover:shadow-md transition-shadow">'
-                        + '<a href="/' + this.esc(doc.url) + '" class="flex flex-col flex-1">'
+                        + '<a href="' + this.esc(doc.url) + '" class="flex flex-col flex-1">'
                         + '<div class="aspect-square mb-3 overflow-hidden rounded">' + imgHtml + '</div>'
                         + '<h3 class="text-sm font-medium text-gray-800 mb-1 line-clamp-2">' + this.esc(doc.name) + '</h3>'
                         + tileAttrsHtml
                         + '<div class="mt-auto pt-2"><span class="text-sm font-bold text-gray-800">' + this.esc(price) + '</span></div>'
                         + '</a>'
-                        + '<a href="/' + this.esc(doc.url) + '" class="mt-3 w-full text-center text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-2 transition-colors">'
+                        + '<a href="' + this.esc(doc.url) + '" class="mt-3 w-full text-center text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-2 transition-colors">'
                         + '<?= $escaper->escapeJs(__('View Product')) ?>'
                         + '</a></div>';
                 }
