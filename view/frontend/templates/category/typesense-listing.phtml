@@ -229,25 +229,29 @@ $sortOptions = $viewModel->getSortOptions();
 
                 let html = '';
 
-                // Price range filter
-                const priceRanges = [
-                    { min: 0, max: 25, label: 'Under $25' },
-                    { min: 25, max: 50, label: '$25 – $50' },
-                    { min: 50, max: 100, label: '$50 – $100' },
-                    { min: 100, max: 200, label: '$100 – $200' },
-                    { min: 200, max: 99999, label: '$200+' },
-                ];
-
+                // Price range slider
+                const curMin = this.priceRange ? this.priceRange.min : 0;
+                const curMax = this.priceRange ? this.priceRange.max : 500;
                 html += '<div class="mb-6 border-b pb-4">'
-                    + '<h3 class="font-semibold text-gray-800 mb-3">Price</h3>';
-                for (const range of priceRanges) {
-                    const isActive = this.priceRange && this.priceRange.min === range.min && this.priceRange.max === range.max;
-                    html += '<label class="flex items-center gap-2 text-sm text-gray-700 mb-1.5 cursor-pointer hover:text-gray-900">'
-                        + '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' data-price-min="' + range.min + '" data-price-max="' + range.max + '" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 ts-price-checkbox"/>'
-                        + '<span class="flex-1">' + range.label + '</span>'
-                        + '</label>';
-                }
-                html += '</div>';
+                    + '<h3 class="font-semibold text-gray-800 mb-3">Price</h3>'
+                    + '<div class="flex justify-between text-sm text-gray-600 mb-2">'
+                    + '<span data-price-min-label>$' + curMin + '</span>'
+                    + '<span data-price-max-label>$' + (curMax >= 500 ? '500+' : curMax) + '</span>'
+                    + '</div>'
+                    + '<div class="relative h-6 mb-2" style="margin-top:4px;">'
+                    + '<input type="range" min="0" max="500" step="10" value="' + curMin + '" data-price-slider-min class="absolute w-full pointer-events-auto" style="appearance:none;-webkit-appearance:none;background:transparent;height:6px;pointer-events:none;position:absolute;top:8px;width:100%;"/>'
+                    + '<input type="range" min="0" max="500" step="10" value="' + Math.min(curMax, 500) + '" data-price-slider-max class="absolute w-full pointer-events-auto" style="appearance:none;-webkit-appearance:none;background:transparent;height:6px;pointer-events:none;position:absolute;top:8px;width:100%;"/>'
+                    + '<div style="position:absolute;top:8px;left:0;right:0;height:6px;background:#e5e7eb;border-radius:3px;"></div>'
+                    + '</div>'
+                    + '<style>'
+                    + '[data-price-slider-min]::-webkit-slider-thumb,[data-price-slider-max]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:#1979c3;cursor:pointer;pointer-events:auto;position:relative;z-index:2;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);}'
+                    + '[data-price-slider-min]::-moz-range-thumb,[data-price-slider-max]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#1979c3;cursor:pointer;pointer-events:auto;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);}'
+                    + '</style>'
+                    + '<div class="flex gap-2 mt-1">'
+                    + '<button data-price-apply class="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer">Apply</button>'
+                    + (this.priceRange ? '<button data-price-clear class="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 cursor-pointer">Clear</button>' : '')
+                    + '</div>'
+                    + '</div>';
 
                 // Regular facets
                 for (const facet of meaningfulFacets) {
@@ -270,12 +274,42 @@ $sortOptions = $viewModel->getSortOptions();
 
                 container.innerHTML = html;
 
-                // Bind price range checkboxes
-                container.querySelectorAll('.ts-price-checkbox').forEach(cb => {
-                    cb.addEventListener('change', () => {
-                        this.setPriceRange(parseInt(cb.dataset.priceMin), parseInt(cb.dataset.priceMax));
+                // Bind price slider
+                const sliderMin = container.querySelector('[data-price-slider-min]');
+                const sliderMax = container.querySelector('[data-price-slider-max]');
+                const minLabel = container.querySelector('[data-price-min-label]');
+                const maxLabel = container.querySelector('[data-price-max-label]');
+
+                const updateLabels = () => {
+                    if (!sliderMin || !sliderMax) return;
+                    let lo = parseInt(sliderMin.value);
+                    let hi = parseInt(sliderMax.value);
+                    if (lo > hi) { const t = lo; lo = hi; hi = t; }
+                    if (minLabel) minLabel.textContent = '$' + lo;
+                    if (maxLabel) maxLabel.textContent = hi >= 500 ? '$500+' : '$' + hi;
+                };
+
+                if (sliderMin) sliderMin.addEventListener('input', updateLabels);
+                if (sliderMax) sliderMax.addEventListener('input', updateLabels);
+
+                const applyBtn = container.querySelector('[data-price-apply]');
+                if (applyBtn) {
+                    applyBtn.addEventListener('click', () => {
+                        let lo = parseInt(sliderMin.value);
+                        let hi = parseInt(sliderMax.value);
+                        if (lo > hi) { const t = lo; lo = hi; hi = t; }
+                        this.setPriceRange(lo, hi >= 500 ? 99999 : hi);
                     });
-                });
+                }
+
+                const clearBtn = container.querySelector('[data-price-clear]');
+                if (clearBtn) {
+                    clearBtn.addEventListener('click', () => {
+                        this.priceRange = null;
+                        this.page = 1;
+                        this.search();
+                    });
+                }
 
                 // Bind facet checkbox events
                 container.querySelectorAll('.ts-facet-checkbox').forEach(cb => {
