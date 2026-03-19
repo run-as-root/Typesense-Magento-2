@@ -40,12 +40,23 @@ class AttributeResolver implements AttributeResolverInterface
                 continue;
             }
 
-            $value = $product->getData($code);
-            if ($value === null || $value === '') {
-                continue;
-            }
+            $frontendInput = $attribute->getFrontendInput();
 
-            $extra[$code] = $value;
+            // For select/multiselect/boolean, resolve option labels instead of IDs
+            if (in_array($frontendInput, ['select', 'multiselect', 'boolean'], true)) {
+                $text = $product->getAttributeText($code);
+                if ($text === false || $text === '' || $text === null) {
+                    continue;
+                }
+                // getAttributeText returns string for select, array for multiselect
+                $extra[$code] = is_array($text) ? implode(', ', $text) : (string) $text;
+            } else {
+                $value = $product->getData($code);
+                if ($value === null || $value === '') {
+                    continue;
+                }
+                $extra[$code] = $value;
+            }
         }
 
         return $extra;
