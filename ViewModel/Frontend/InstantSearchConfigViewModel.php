@@ -55,7 +55,7 @@ class InstantSearchConfigViewModel implements ArgumentInterface
      */
     public function getFacetAttributes(): array
     {
-        return ['categories.lvl0', 'in_stock', 'type_id'];
+        return $this->config->getFacetFilters();
     }
 
     /**

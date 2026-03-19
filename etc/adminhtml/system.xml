@@ -193,6 +193,12 @@
                     <comment>Sort options available to customers on search results and category pages.</comment>
                     <can_be_empty>1</can_be_empty>
                 </field>
+                <field id="facet_filters" translate="label comment" type="multiselect" sortOrder="27" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Facet Filters</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\ProductAttributeSource</source_model>
+                    <comment>Product attributes to show as sidebar filters. "Category" is always included automatically. Only attributes marked as "Additional Attributes to Index" will work as facets.</comment>
+                    <can_be_empty>1</can_be_empty>
+                </field>
                 <field id="replace_category_page" translate="label comment" type="select"
                        sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Replace Category Pages</label>

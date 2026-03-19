@@ -72,6 +72,9 @@ interface TypeSenseConfigInterface
     /** @return string[] */
     public function getTileAttributes(?int $storeId = null): array;
 
+    /** @return string[] */
+    public function getFacetFilters(?int $storeId = null): array;
+
     /** @return array<int, array{label: string, value: string}> */
     public function getEnabledSortOptions(?int $storeId = null): array;
 }

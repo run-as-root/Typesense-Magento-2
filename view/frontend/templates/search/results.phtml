@@ -127,6 +127,27 @@ $sortOptions = $viewModel->getSortOptions();
                 return div.innerHTML;
             },
 
+            prettifyFacetName(fieldName) {
+                const labelMap = {
+                    'categories.lvl0': 'Category',
+                    'categories.lvl1': 'Subcategory',
+                    'categories.lvl2': 'Subcategory',
+                    'in_stock': 'Availability',
+                    'type_id': 'Product Type',
+                    'price': 'Price',
+                };
+                if (labelMap[fieldName]) return labelMap[fieldName];
+                // Generic: replace dots/underscores with spaces, capitalize each word
+                return fieldName.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            },
+
+            prettifyFacetValue(fieldName, value) {
+                if (fieldName === 'in_stock') {
+                    return value === 'true' ? 'In Stock' : 'Out of Stock';
+                }
+                return value;
+            },
+
             renderProducts() {
                 const container = this.$el.querySelector('[data-products]');
                 if (!container) return;
@@ -189,15 +210,16 @@ $sortOptions = $viewModel->getSortOptions();
 
                 let html = '';
                 for (const facet of this.facets) {
-                    const label = facet.field_name.replace(/_/g, ' ');
+                    const label = this.prettifyFacetName(facet.field_name);
                     html += '<div class="mb-6 border-b pb-4">'
                         + '<h3 class="font-semibold text-gray-800 mb-3 capitalize">' + this.esc(label) + '</h3>';
 
                     for (const count of facet.counts) {
                         const isActive = this.isFilterActive(facet.field_name, count.value);
+                        const displayValue = this.prettifyFacetValue(facet.field_name, count.value);
                         html += '<label class="flex items-center gap-2 text-sm text-gray-700 mb-1.5 cursor-pointer hover:text-gray-900">'
-                            + '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' data-facet-field="' + this.esc(facet.field_name) + '" data-facet-value="' + this.esc(count.value) + '" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 ts-facet-checkbox"/>'
-                            + '<span class="flex-1">' + this.esc(count.value) + '</span>'
+                            + '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' data-facet-field="' + this.esc(facet.field_name) + '" data-facet-value="' + this.esc(count.value) + '" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 ts-facet-checkbox" aria-label="' + this.esc(displayValue) + '"/>'
+                            + '<span class="flex-1">' + this.esc(displayValue) + '</span>'
                             + '<span class="text-gray-400 text-xs">(' + count.count + ')</span>'
                             + '</label>';
                     }
