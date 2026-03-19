@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+
 class ProductSchemaProvider implements ProductSchemaProviderInterface
 {
+    public function __construct(
+        private readonly TypeSenseConfigInterface $config,
+    ) {
+    }
+
     /** @return array<int, array<string, mixed>> */
     public function getFields(): array
     {
-        return [
+        $fields = [
             ['name' => 'id', 'type' => 'string'],
             ['name' => 'product_id', 'type' => 'int32'],
             ['name' => 'name', 'type' => 'string'],
@@ -30,6 +37,15 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'visibility', 'type' => 'int32'],
             ['name' => 'created_at', 'type' => 'int64'],
             ['name' => 'updated_at', 'type' => 'int64'],
+            ['name' => 'sales_count', 'type' => 'int32'],
+            ['name' => 'rating_summary', 'type' => 'int32'],
+            ['name' => 'review_count', 'type' => 'int32'],
         ];
+
+        foreach ($this->config->getAdditionalAttributes() as $attrCode) {
+            $fields[] = ['name' => $attrCode, 'type' => 'string', 'optional' => true, 'facet' => true];
+        }
+
+        return $fields;
     }
 }

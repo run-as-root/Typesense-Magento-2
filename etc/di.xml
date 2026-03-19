@@ -42,6 +42,12 @@
     <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface"
                 type="RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProvider"/>
 
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\SalesCountResolverInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Product\SalesCountResolver"/>
+
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\ReviewResolverInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Product\ReviewResolver"/>
+
     <preference for="RunAsRoot\TypeSense\Model\Indexer\Category\CategorySchemaProviderInterface"
                 type="RunAsRoot\TypeSense\Model\Indexer\Category\CategorySchemaProvider"/>
 

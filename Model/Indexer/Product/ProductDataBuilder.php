@@ -20,6 +20,8 @@ class ProductDataBuilder
         private readonly CategoryResolverInterface $categoryResolver,
         private readonly UrlResolverInterface $urlResolver,
         private readonly ProductCollectionFactory $collectionFactory,
+        private readonly SalesCountResolverInterface $salesCountResolver,
+        private readonly ReviewResolverInterface $reviewResolver,
     ) {
     }
 
@@ -72,6 +74,10 @@ class ProductDataBuilder
         if ($extra !== []) {
             $document = array_merge($document, $extra);
         }
+
+        $document['sales_count'] = $this->salesCountResolver->getSalesCount($productId);
+        $document['rating_summary'] = $this->reviewResolver->getRatingSummary($productId, $storeId);
+        $document['review_count'] = $this->reviewResolver->getReviewCount($productId, $storeId);
 
         return $document;
     }

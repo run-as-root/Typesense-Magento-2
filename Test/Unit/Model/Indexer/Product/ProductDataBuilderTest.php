@@ -16,6 +16,8 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\CategoryResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ImageResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\PriceCalculatorInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductDataBuilder;
+use RunAsRoot\TypeSense\Model\Indexer\Product\ReviewResolverInterface;
+use RunAsRoot\TypeSense\Model\Indexer\Product\SalesCountResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\StockResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\UrlResolverInterface;
 
@@ -28,6 +30,8 @@ final class ProductDataBuilderTest extends TestCase
     private CategoryResolverInterface&MockObject $categoryResolver;
     private UrlResolverInterface&MockObject $urlResolver;
     private ProductCollectionFactory&MockObject $collectionFactory;
+    private SalesCountResolverInterface&MockObject $salesCountResolver;
+    private ReviewResolverInterface&MockObject $reviewResolver;
     private ProductDataBuilder $sut;
 
     protected function setUp(): void
@@ -39,6 +43,12 @@ final class ProductDataBuilderTest extends TestCase
         $this->categoryResolver = $this->createMock(CategoryResolverInterface::class);
         $this->urlResolver = $this->createMock(UrlResolverInterface::class);
         $this->collectionFactory = $this->createMock(ProductCollectionFactory::class);
+        $this->salesCountResolver = $this->createMock(SalesCountResolverInterface::class);
+        $this->salesCountResolver->method('getSalesCount')->willReturn(0);
+
+        $this->reviewResolver = $this->createMock(ReviewResolverInterface::class);
+        $this->reviewResolver->method('getRatingSummary')->willReturn(0);
+        $this->reviewResolver->method('getReviewCount')->willReturn(0);
 
         $this->sut = new ProductDataBuilder(
             $this->attributeResolver,
@@ -48,6 +58,8 @@ final class ProductDataBuilderTest extends TestCase
             $this->categoryResolver,
             $this->urlResolver,
             $this->collectionFactory,
+            $this->salesCountResolver,
+            $this->reviewResolver,
         );
     }
 
@@ -374,6 +386,126 @@ final class ProductDataBuilderTest extends TestCase
             ->method('addFieldToFilter');
 
         $this->sut->getProductCollection([], 1);
+    }
+
+    public function test_build_includes_sales_count_from_resolver(): void
+    {
+        $product = $this->createProductMock(id: 10);
+
+        $this->priceCalculator->method('getFinalPrice')->willReturn(0.0);
+        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
+        $this->imageResolver->method('getImageUrl')->willReturn('');
+        $this->stockResolver->method('isInStock')->willReturn(true);
+        $this->urlResolver->method('getProductUrl')->willReturn('');
+        $this->categoryResolver->method('getCategoryData')->willReturn([
+            'categories' => [], 'category_ids' => [],
+            'categories.lvl0' => [], 'categories.lvl1' => [], 'categories.lvl2' => [],
+        ]);
+        $this->attributeResolver->method('getExtraAttributes')->willReturn([]);
+        $product->method('getData')->willReturn(null);
+
+        $salesCountResolver = $this->createMock(SalesCountResolverInterface::class);
+        $salesCountResolver->method('getSalesCount')->willReturn(42);
+
+        $reviewResolver = $this->createMock(ReviewResolverInterface::class);
+        $reviewResolver->method('getRatingSummary')->willReturn(0);
+        $reviewResolver->method('getReviewCount')->willReturn(0);
+
+        $sut = new ProductDataBuilder(
+            $this->attributeResolver,
+            $this->priceCalculator,
+            $this->imageResolver,
+            $this->stockResolver,
+            $this->categoryResolver,
+            $this->urlResolver,
+            $this->collectionFactory,
+            $salesCountResolver,
+            $reviewResolver,
+        );
+
+        $document = $sut->build($product, 1);
+
+        self::assertSame(42, $document['sales_count']);
+    }
+
+    public function test_build_includes_rating_summary_from_resolver(): void
+    {
+        $product = $this->createProductMock(id: 10);
+
+        $this->priceCalculator->method('getFinalPrice')->willReturn(0.0);
+        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
+        $this->imageResolver->method('getImageUrl')->willReturn('');
+        $this->stockResolver->method('isInStock')->willReturn(true);
+        $this->urlResolver->method('getProductUrl')->willReturn('');
+        $this->categoryResolver->method('getCategoryData')->willReturn([
+            'categories' => [], 'category_ids' => [],
+            'categories.lvl0' => [], 'categories.lvl1' => [], 'categories.lvl2' => [],
+        ]);
+        $this->attributeResolver->method('getExtraAttributes')->willReturn([]);
+        $product->method('getData')->willReturn(null);
+
+        $salesCountResolver = $this->createMock(SalesCountResolverInterface::class);
+        $salesCountResolver->method('getSalesCount')->willReturn(0);
+
+        $reviewResolver = $this->createMock(ReviewResolverInterface::class);
+        $reviewResolver->method('getRatingSummary')->willReturn(80);
+        $reviewResolver->method('getReviewCount')->willReturn(0);
+
+        $sut = new ProductDataBuilder(
+            $this->attributeResolver,
+            $this->priceCalculator,
+            $this->imageResolver,
+            $this->stockResolver,
+            $this->categoryResolver,
+            $this->urlResolver,
+            $this->collectionFactory,
+            $salesCountResolver,
+            $reviewResolver,
+        );
+
+        $document = $sut->build($product, 2);
+
+        self::assertSame(80, $document['rating_summary']);
+    }
+
+    public function test_build_includes_review_count_from_resolver(): void
+    {
+        $product = $this->createProductMock(id: 10);
+
+        $this->priceCalculator->method('getFinalPrice')->willReturn(0.0);
+        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
+        $this->imageResolver->method('getImageUrl')->willReturn('');
+        $this->stockResolver->method('isInStock')->willReturn(true);
+        $this->urlResolver->method('getProductUrl')->willReturn('');
+        $this->categoryResolver->method('getCategoryData')->willReturn([
+            'categories' => [], 'category_ids' => [],
+            'categories.lvl0' => [], 'categories.lvl1' => [], 'categories.lvl2' => [],
+        ]);
+        $this->attributeResolver->method('getExtraAttributes')->willReturn([]);
+        $product->method('getData')->willReturn(null);
+
+        $salesCountResolver = $this->createMock(SalesCountResolverInterface::class);
+        $salesCountResolver->method('getSalesCount')->willReturn(0);
+
+        $reviewResolver = $this->createMock(ReviewResolverInterface::class);
+        $reviewResolver->method('getRatingSummary')->willReturn(0);
+        $reviewResolver->method('getReviewCount')->willReturn(15);
+
+        $sut = new ProductDataBuilder(
+            $this->attributeResolver,
+            $this->priceCalculator,
+            $this->imageResolver,
+            $this->stockResolver,
+            $this->categoryResolver,
+            $this->urlResolver,
+            $this->collectionFactory,
+            $salesCountResolver,
+            $reviewResolver,
+        );
+
+        $document = $sut->build($product, 2);
+
+        self::assertSame(15, $document['review_count']);
     }
 
     /**
