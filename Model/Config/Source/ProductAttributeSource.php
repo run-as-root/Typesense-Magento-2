@@ -37,6 +37,22 @@ class ProductAttributeSource implements OptionSourceInterface
         'quantity_and_stock_status',
     ];
 
+    /**
+     * Human-readable labels for Magento frontend input types.
+     */
+    private const array INPUT_TYPE_LABELS = [
+        'text'        => 'text',
+        'textarea'    => 'textarea',
+        'select'      => 'select',
+        'multiselect' => 'multiselect',
+        'boolean'     => 'boolean',
+        'price'       => 'price',
+        'date'        => 'date',
+        'weight'      => 'weight',
+        'media_image' => 'image',
+        'gallery'     => 'gallery',
+    ];
+
     public function __construct(
         private readonly CollectionFactory $attributeCollectionFactory,
     ) {
@@ -48,7 +64,9 @@ class ProductAttributeSource implements OptionSourceInterface
         $collection->addVisibleFilter();
         $collection->setOrder('frontend_label', 'ASC');
 
-        $options = [];
+        // Group attributes by their frontend input type so admins can quickly
+        // identify which attributes make sense to index or use as facets.
+        $groups = [];
 
         foreach ($collection as $attribute) {
             $code = $attribute->getAttributeCode();
@@ -57,13 +75,45 @@ class ProductAttributeSource implements OptionSourceInterface
                 continue;
             }
 
-            $label = $attribute->getFrontendLabel() ?: $code;
-            $options[] = [
+            $label     = $attribute->getFrontendLabel() ?: $code;
+            $inputType = $attribute->getFrontendInput() ?? 'text';
+            $typeLabel = self::INPUT_TYPE_LABELS[$inputType] ?? $inputType;
+            $groupKey  = $this->resolveGroupKey($inputType);
+
+            $groups[$groupKey][] = [
                 'value' => $code,
-                'label' => $label . ' (' . $code . ')',
+                'label' => $label . ' (' . $code . ') — ' . $typeLabel,
+            ];
+        }
+
+        ksort($groups);
+
+        $options = [];
+
+        foreach ($groups as $groupLabel => $items) {
+            usort($items, static fn(array $a, array $b) => strcmp((string) $a['label'], (string) $b['label']));
+
+            $options[] = [
+                'label' => $groupLabel,
+                'value' => $items,
             ];
         }
 
         return $options;
+    }
+
+    /**
+     * Map a frontend input type to a human-readable optgroup label.
+     */
+    private function resolveGroupKey(string $inputType): string
+    {
+        return match ($inputType) {
+            'select', 'multiselect' => 'Filterable (Select / Multiselect)',
+            'boolean'               => 'Filterable (Yes/No)',
+            'price', 'weight'       => 'Numeric (Price / Weight)',
+            'date'                  => 'Date',
+            'text', 'textarea'      => 'Text',
+            default                 => 'Other',
+        };
     }
 }
