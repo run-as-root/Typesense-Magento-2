@@ -195,15 +195,23 @@ $sortOptions = $viewModel->getSortOptions();
 
             renderFacets() {
                 const container = this.$el.querySelector('[data-facets]');
+                const layout = this.$el.querySelector('[data-layout]');
                 if (!container) return;
 
-                if (this.facets.length === 0) {
-                    container.innerHTML = '';
+                // Count total meaningful facet options (exclude facets with only 1 value)
+                const meaningfulFacets = this.facets.filter(f => f.counts && f.counts.length > 1);
+
+                if (meaningfulFacets.length === 0) {
+                    container.style.display = 'none';
+                    if (layout) layout.style.display = 'block';
                     return;
                 }
 
+                container.style.display = '';
+                if (layout) layout.style.display = '';
+
                 let html = '';
-                for (const facet of this.facets) {
+                for (const facet of meaningfulFacets) {
                     const label = this.prettifyFacetName(facet.field_name);
                     html += '<div class="mb-6 border-b pb-4">'
                         + '<h3 class="font-semibold text-gray-800 mb-3 capitalize">' + this.esc(label) + '</h3>';
@@ -281,8 +289,8 @@ $sortOptions = $viewModel->getSortOptions();
         </div>
     </div>
 
-    <div class="flex gap-6">
-        <aside class="w-64 shrink-0 hidden lg:block" data-facets></aside>
+    <div class="flex gap-6" data-layout>
+        <aside class="w-56 shrink-0 hidden lg:block" data-facets></aside>
 
         <div class="flex-1 min-w-0">
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-products>
