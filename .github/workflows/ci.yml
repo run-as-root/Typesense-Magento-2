@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  compute_matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.supported-version.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: graycoreio/github-actions-magento2/supported-version@v6.0.0
+        id: supported-version
+        with:
+          kind: currently-supported
+          include_services: true
+
+  check-extension:
+    needs: compute_matrix
+    uses: graycoreio/github-actions-magento2/.github/workflows/check-extension.yaml@v6.0.0
+    with:
+      matrix: ${{ needs.compute_matrix.outputs.matrix }}
+
+  phpstan:
+    needs: compute_matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: graycoreio/github-actions-magento2/setup-magento@v6.0.0
+        id: setup
+        with:
+          php-version: "8.3"
+          mode: extension
+      - name: Install extension
+        working-directory: ${{ steps.setup.outputs.path }}
+        run: |
+          composer config repositories.local path $GITHUB_WORKSPACE
+          composer require run-as-root/magento2-typesense:@dev --no-interaction
+      - name: Run PHPStan
+        working-directory: ${{ steps.setup.outputs.path }}
+        run: vendor/bin/phpstan analyse -c $GITHUB_WORKSPACE/phpstan.neon
