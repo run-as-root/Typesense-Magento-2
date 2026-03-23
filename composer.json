@@ -22,5 +22,8 @@
         "psr-4": {
             "RunAsRoot\\TypeSense\\Test\\": "Test/"
         }
+    },
+    "scripts": {
+        "test": "phpunit --testsuite Unit --testdox"
     }
 }
