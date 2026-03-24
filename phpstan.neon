@@ -13,3 +13,4 @@ parameters:
         - '#no value type specified in iterable type array#'
         - '#Call to an undefined method Magento\\Framework\\#'
         - '#is never read, only written#'
+        - '#Magento\\Framework\\Phrase given#'
