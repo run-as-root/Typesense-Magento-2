@@ -29,12 +29,7 @@ jobs:
       - name: Merge matrices
         id: merge
         run: |
-          MERGED=$(jq -s '
-            {
-              magento: (.[0].magento + .[1].magento),
-              include: (.[0].include + .[1].include)
-            }
-          ' <(echo '${{ steps.magento.outputs.matrix }}') <(echo '${{ steps.mageos.outputs.matrix }}'))
+          MERGED=$(jq -sc '{magento: (.[0].magento + .[1].magento), include: (.[0].include + .[1].include)}' <(echo '${{ steps.magento.outputs.matrix }}') <(echo '${{ steps.mageos.outputs.matrix }}'))
           echo "matrix=$MERGED" >> $GITHUB_OUTPUT
 
   check-extension:
