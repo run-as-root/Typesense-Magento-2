@@ -10,6 +10,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
 use RunAsRoot\TypeSense\ViewModel\Frontend\InstantSearchConfigViewModel;
 
 final class InstantSearchConfigViewModelTest extends TestCase
@@ -17,14 +18,17 @@ final class InstantSearchConfigViewModelTest extends TestCase
     private TypeSenseConfigInterface&MockObject $config;
     private StoreManagerInterface&MockObject $storeManager;
     private CollectionNameResolverInterface&MockObject $collectionNameResolver;
+    private ConversationModelManager&MockObject $conversationModelManager;
     private StoreInterface&MockObject $store;
     private InstantSearchConfigViewModel $sut;
 
     protected function setUp(): void
     {
-        $this->config                 = $this->createMock(TypeSenseConfigInterface::class);
-        $this->storeManager           = $this->createMock(StoreManagerInterface::class);
-        $this->collectionNameResolver = $this->createMock(CollectionNameResolverInterface::class);
+        $this->config                    = $this->createMock(TypeSenseConfigInterface::class);
+        $this->storeManager              = $this->createMock(StoreManagerInterface::class);
+        $this->collectionNameResolver    = $this->createMock(CollectionNameResolverInterface::class);
+        $this->conversationModelManager  = $this->createMock(ConversationModelManager::class);
+        $this->conversationModelManager->method('getModelId')->willReturn('rar-product-assistant');
 
         $this->store = $this->createMock(StoreInterface::class);
         $this->store->method('getCode')->willReturn('default');
@@ -35,6 +39,7 @@ final class InstantSearchConfigViewModelTest extends TestCase
             $this->config,
             $this->storeManager,
             $this->collectionNameResolver,
+            $this->conversationModelManager,
         );
     }
 
@@ -117,5 +122,26 @@ final class InstantSearchConfigViewModelTest extends TestCase
         $result = $this->sut->getFacetAttributes();
 
         self::assertSame(['color', 'size'], $result);
+    }
+
+    public function test_get_config_includes_conversational_search_when_enabled(): void
+    {
+        $this->config->method('isConversationalSearchEnabled')->willReturn(true);
+        $this->config->method('getSearchHost')->willReturn('localhost');
+        $this->config->method('getSearchPort')->willReturn(8108);
+        $this->config->method('getSearchProtocol')->willReturn('https');
+        $this->config->method('getSearchOnlyApiKey')->willReturn('key');
+        $this->config->method('getProductsPerPage')->willReturn(24);
+        $this->config->method('getEnabledSortOptions')->willReturn([]);
+        $this->config->method('getTileAttributes')->willReturn([]);
+        $this->config->method('getFacetFilters')->willReturn([]);
+
+        $this->collectionNameResolver->method('resolve')->willReturn('test_collection');
+
+        $result = $this->sut->getConfig();
+
+        self::assertArrayHasKey('conversationalSearch', $result);
+        self::assertTrue($result['conversationalSearch']['enabled']);
+        self::assertSame('rar-product-assistant', $result['conversationalSearch']['modelId']);
     }
 }
