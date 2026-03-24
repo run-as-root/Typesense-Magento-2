@@ -16,7 +16,8 @@ jobs:
       - uses: graycoreio/github-actions-magento2/supported-version@v6.0.0
         id: supported-version
         with:
-          kind: currently-supported
+          kind: custom
+          custom_versions: "magento/project-community-edition:2.4.7-p9,magento/project-community-edition:2.4.8-p4,mage-os/project-community-edition:2.2.0"
           include_services: true
 
   check-extension:
