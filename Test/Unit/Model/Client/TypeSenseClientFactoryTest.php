@@ -9,7 +9,6 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Model\Client\TypeSenseClientFactory;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
-use Typesense\Client;
 
 final class TypeSenseClientFactoryTest extends TestCase
 {
@@ -24,22 +23,14 @@ final class TypeSenseClientFactoryTest extends TestCase
         $this->sut = new TypeSenseClientFactory($this->config, $this->logger);
     }
 
-    public function test_create_returns_typesense_client(): void
+    public function test_create_reads_config_with_null_store_id(): void
     {
-        $this->config->method('getApiKey')->willReturn('test_api_key');
-        $this->config->method('getHost')->willReturn('localhost');
-        $this->config->method('getPort')->willReturn(8108);
-        $this->config->method('getProtocol')->willReturn('http');
+        $this->config->expects(self::once())->method('getApiKey')->with(null)->willReturn('test_api_key');
+        $this->config->expects(self::once())->method('getHost')->with(null)->willReturn('localhost');
+        $this->config->expects(self::once())->method('getPort')->with(null)->willReturn(8108);
+        $this->config->expects(self::once())->method('getProtocol')->with(null)->willReturn('http');
 
-        try {
-            $client = $this->sut->create();
-            self::assertInstanceOf(Client::class, $client);
-        } catch (\TypeError $e) {
-            if (str_contains($e->getMessage(), 'Psr18Client::__construct')) {
-                self::markTestSkipped('Phalcon HTTP factory conflicts with Symfony PSR-18 client on this runner');
-            }
-            throw $e;
-        }
+        $this->sut->create();
     }
 
     public function test_create_with_store_id_passes_to_config(): void
@@ -49,14 +40,6 @@ final class TypeSenseClientFactoryTest extends TestCase
         $this->config->expects(self::once())->method('getPort')->with(42)->willReturn(443);
         $this->config->expects(self::once())->method('getProtocol')->with(42)->willReturn('https');
 
-        try {
-            $client = $this->sut->create(42);
-            self::assertInstanceOf(Client::class, $client);
-        } catch (\TypeError $e) {
-            if (str_contains($e->getMessage(), 'Psr18Client::__construct')) {
-                self::markTestSkipped('Phalcon HTTP factory conflicts with Symfony PSR-18 client on this runner');
-            }
-            throw $e;
-        }
+        $this->sut->create(42);
     }
 }
