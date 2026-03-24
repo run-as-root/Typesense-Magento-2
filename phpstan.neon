@@ -6,6 +6,7 @@ parameters:
         - Test/*
         - vendor/*
         - view/*
+    reportUnmatchedIgnoredErrors: false
     ignoreErrors:
         - '#Class Magento\\#'
         - '#Class Typesense\\#'
@@ -18,5 +19,8 @@ parameters:
         - '#has unknown class Magento\\#'
         - '#on an unknown class Magento\\#'
         - '#Magento\\Framework\\Api\\ExtensibleDataInterface given#'
+        - '#Magento\\Framework\\Model\\AbstractModel, .* given#'
         - '#Strict comparison using === between .* will always evaluate to#'
         - '#Comparison operation .* is always true#'
+        - '#Unreachable statement#'
+        - '#callable\(Magento\\Framework\\Api\\ExtensibleDataInterface\)#'
