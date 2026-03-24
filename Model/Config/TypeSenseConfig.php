@@ -246,6 +246,40 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return $options;
     }
 
+    // Conversational Search
+    public function isConversationalSearchEnabled(?int $storeId = null): bool
+    {
+        return $this->isEnabled($storeId)
+            && (bool) $this->getValue('conversational_search/enabled', $storeId);
+    }
+
+    public function getOpenAiApiKey(?int $storeId = null): string
+    {
+        $encrypted = (string) $this->getValue('conversational_search/openai_api_key', $storeId);
+        return $this->encryptor->decrypt($encrypted);
+    }
+
+    public function getOpenAiModel(?int $storeId = null): string
+    {
+        return (string) ($this->getValue('conversational_search/openai_model', $storeId) ?: 'openai/gpt-4o-mini');
+    }
+
+    public function getConversationalSystemPrompt(?int $storeId = null): string
+    {
+        return (string) $this->getValue('conversational_search/system_prompt', $storeId);
+    }
+
+    public function getEmbeddingFields(?int $storeId = null): array
+    {
+        $value = (string) $this->getValue('conversational_search/embedding_fields', $storeId);
+        return $value !== '' ? explode(',', $value) : ['name', 'description'];
+    }
+
+    public function getConversationTtl(?int $storeId = null): int
+    {
+        return (int) ($this->getValue('conversational_search/conversation_ttl', $storeId) ?: 86400);
+    }
+
     private function getValue(string $path, ?int $storeId = null): mixed
     {
         return $this->scopeConfig->getValue(
