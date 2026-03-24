@@ -24,9 +24,6 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 ### Query Merchandiser
 ![Query Merchandiser](docs/images/admin-query-merchandiser.png)
 
-### Frontend — Instant Search
-![Frontend Search](docs/images/frontend-search.png)
-
 ### Frontend — Category Page
 ![Frontend Category](docs/images/frontend-category.png)
 
