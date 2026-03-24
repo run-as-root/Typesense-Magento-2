@@ -110,12 +110,12 @@ final class InstantSearchConfigViewModelTest extends TestCase
         self::assertSame($sortOptions, $result);
     }
 
-    public function test_get_facet_attributes_returns_non_empty_array(): void
+    public function test_get_facet_attributes_returns_configured_filters(): void
     {
+        $this->config->method('getFacetFilters')->willReturn(['color', 'size']);
+
         $result = $this->sut->getFacetAttributes();
 
-        self::assertNotEmpty($result);
-        self::assertIsArray($result);
-        self::assertContainsOnly('string', $result);
+        self::assertSame(['color', 'size'], $result);
     }
 }

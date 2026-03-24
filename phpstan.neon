@@ -10,3 +10,6 @@ parameters:
         - '#Class Magento\\#'
         - '#Class Typesense\\#'
         - '#Class Psr\\#'
+        - '#no value type specified in iterable type array#'
+        - '#Call to an undefined method Magento\\Framework\\#'
+        - '#is never read, only written#'
