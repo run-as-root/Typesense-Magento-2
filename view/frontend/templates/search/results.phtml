@@ -47,6 +47,10 @@ $sortOptions = $viewModel->getSortOptions();
             filters: {},
             priceRange: null,
             client: null,
+            aiAnswer: '',
+            conversationId: null,
+            isConversational: config.conversationalSearch?.enabled || false,
+            conversationModelId: config.conversationalSearch?.modelId || '',
 
             init() {
                 this.client = new Typesense.Client({
@@ -89,18 +93,61 @@ $sortOptions = $viewModel->getSortOptions();
                 }
                 if (filterParts.length > 0) searchParams.filter_by = filterParts.join(' && ');
 
+                const filterStr = searchParams.filter_by || '';
+
+                if (this.isConversational && this.query.length > 5) {
+                    try {
+                        const response = await this.client.multiSearch.perform(
+                            { searches: [{
+                                collection: config.productCollection,
+                                query_by: 'embedding',
+                                exclude_fields: 'embedding',
+                                per_page: perPage,
+                                filter_by: filterStr || undefined,
+                            }] },
+                            {
+                                q: this.query,
+                                conversation: true,
+                                conversation_model_id: this.conversationModelId,
+                                ...(this.conversationId ? { conversation_id: this.conversationId } : {}),
+                            }
+                        );
+
+                        if (response.conversation) {
+                            this.aiAnswer = response.conversation.answer || '';
+                            this.conversationId = response.conversation.conversation_id || null;
+                        }
+
+                        const result = response.results[0];
+                        this.hits = (result.hits || []).map(h => ({ document: h.document }));
+                        this.facets = result.facet_counts || [];
+                        this.stats = (result.found || 0) + ' results found in ' + result.search_time_ms + 'ms';
+                        this.totalPages = Math.ceil((result.found || 0) / perPage);
+                        this.renderProducts();
+                        this.renderFacets();
+                        this.renderAiAnswer();
+                        this.renderPagination();
+                        return;
+                    } catch (e) {
+                        console.warn('Conversational search failed, falling back to keyword search', e);
+                        this.aiAnswer = '';
+                    }
+                }
+
                 try {
                     const result = await this.client.collections(config.productCollection).documents().search(searchParams);
                     this.hits = result.hits || [];
                     this.facets = result.facet_counts || [];
                     this.totalPages = Math.ceil((result.found || 0) / perPage);
                     this.stats = (result.found || 0) + ' results found in ' + result.search_time_ms + 'ms';
+                    this.aiAnswer = '';
                 } catch (error) {
                     console.error('Typesense instant search error:', error);
                 }
 
                 this.renderProducts();
                 this.renderFacets();
+                this.renderAiAnswer();
                 this.renderPagination();
             },
 
@@ -304,6 +351,20 @@ $sortOptions = $viewModel->getSortOptions();
                 });
             },
 
+            renderAiAnswer() {
+                const container = document.getElementById('typesense-ai-answer');
+                if (!container) return;
+                if (!this.aiAnswer) {
+                    container.style.display = 'none';
+                    return;
+                }
+                container.style.display = 'block';
+                container.innerHTML = '<div class="ts-ai-answer">'
+                    + '<div class="ts-ai-answer-label">AI Shopping Assistant</div>'
+                    + '<div class="ts-ai-answer-text">' + this.esc(this.aiAnswer) + '</div>'
+                    + '</div>';
+            },
+
             renderPagination() {
                 const container = this.$el.querySelector('[data-pagination]');
                 if (!container) return;
@@ -351,6 +412,8 @@ $sortOptions = $viewModel->getSortOptions();
             </select>
         </div>
     </div>
+
+    <div id="typesense-ai-answer" style="display:none;"></div>
 
     <div class="flex gap-6">
         <aside class="w-64 shrink-0 hidden lg:block" data-facets></aside>
