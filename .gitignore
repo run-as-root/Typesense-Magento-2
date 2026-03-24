@@ -1,4 +1,5 @@
 .idea/
 .playwright-mcp/
 *.png
+!docs/images/*.png
 .phpunit.cache/

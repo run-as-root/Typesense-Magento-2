@@ -10,6 +10,28 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 
 ---
 
+## Screenshots
+
+### Admin Dashboard
+![Admin Dashboard](docs/images/admin-dashboard.png)
+
+### Admin Configuration
+![Admin Configuration](docs/images/admin-configuration.png)
+
+### Collection Browser
+![Collection Browser](docs/images/admin-collections.png)
+
+### Query Merchandiser
+![Query Merchandiser](docs/images/admin-query-merchandiser.png)
+
+### Frontend — Instant Search
+![Frontend Search](docs/images/frontend-search.png)
+
+### Frontend — Category Page
+![Frontend Category](docs/images/frontend-category.png)
+
+---
+
 ## Features
 
 - Full-text search powered by Typesense with typo tolerance and instant results
