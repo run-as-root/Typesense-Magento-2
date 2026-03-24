@@ -8,6 +8,7 @@ use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
 
 class InstantSearchConfigViewModel implements ArgumentInterface
 {
@@ -15,6 +16,7 @@ class InstantSearchConfigViewModel implements ArgumentInterface
         private readonly TypeSenseConfigInterface $config,
         private readonly StoreManagerInterface $storeManager,
         private readonly CollectionNameResolverInterface $collectionNameResolver,
+        private readonly ConversationModelManager $conversationModelManager,
     ) {
     }
 
@@ -42,6 +44,10 @@ class InstantSearchConfigViewModel implements ArgumentInterface
             'facetAttributes'           => $this->getFacetAttributes(),
             'sortOptions'               => $this->getSortOptions(),
             'tileAttributes'            => $this->config->getTileAttributes(),
+            'conversationalSearch'      => [
+                'enabled' => $this->config->isConversationalSearchEnabled(),
+                'modelId' => $this->conversationModelManager->getModelId(),
+            ],
         ];
     }
 

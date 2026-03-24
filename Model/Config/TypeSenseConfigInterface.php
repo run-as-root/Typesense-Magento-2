@@ -77,4 +77,16 @@ interface TypeSenseConfigInterface
 
     /** @return array<int, array{label: string, value: string}> */
     public function getEnabledSortOptions(?int $storeId = null): array;
+
+    public function isConversationalSearchEnabled(?int $storeId = null): bool;
+
+    public function getOpenAiApiKey(?int $storeId = null): string;
+
+    public function getOpenAiModel(?int $storeId = null): string;
+
+    public function getConversationalSystemPrompt(?int $storeId = null): string;
+
+    public function getEmbeddingFields(?int $storeId = null): array;
+
+    public function getConversationTtl(?int $storeId = null): int;
 }

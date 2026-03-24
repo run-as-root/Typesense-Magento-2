@@ -82,4 +82,34 @@ final class TypeSenseConfigTest extends TestCase
 
         self::assertSame(200, $this->sut->getBatchSize());
     }
+
+    public function test_is_conversational_search_enabled_returns_false_when_module_disabled(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/general/enabled', ScopeInterface::SCOPE_STORE, null, '0'],
+            ]);
+
+        self::assertFalse($this->sut->isConversationalSearchEnabled());
+    }
+
+    public function test_get_embedding_fields_returns_array(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/conversational_search/embedding_fields', ScopeInterface::SCOPE_STORE, null, 'name,description,sku'],
+            ]);
+
+        self::assertSame(['name', 'description', 'sku'], $this->sut->getEmbeddingFields());
+    }
+
+    public function test_get_embedding_fields_returns_defaults_when_empty(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/conversational_search/embedding_fields', ScopeInterface::SCOPE_STORE, null, ''],
+            ]);
+
+        self::assertSame(['name', 'description'], $this->sut->getEmbeddingFields());
+    }
 }

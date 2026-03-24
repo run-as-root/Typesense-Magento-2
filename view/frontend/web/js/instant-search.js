@@ -15,6 +15,10 @@ function typesenseInstantSearch(config) {
         sortBy: '',
         filters: {},
         client: null,
+        aiAnswer: '',
+        conversationId: null,
+        isConversational: config.conversationalSearch?.enabled || false,
+        conversationModelId: config.conversationalSearch?.modelId || '',
 
         init() {
             this.client = new Typesense.Client({
@@ -60,6 +64,43 @@ function typesenseInstantSearch(config) {
                 searchParams.filter_by = filterParts.join(' && ');
             }
 
+            const filterStr = searchParams.filter_by || '';
+
+            if (this.isConversational && this.query.length > 5) {
+                try {
+                    const response = await this.client.multiSearch.perform(
+                        { searches: [{
+                            collection: config.productCollection,
+                            query_by: 'embedding',
+                            exclude_fields: 'embedding',
+                            per_page: perPage,
+                            filter_by: filterStr || undefined,
+                        }] },
+                        {
+                            q: this.query,
+                            conversation: true,
+                            conversation_model_id: this.conversationModelId,
+                            ...(this.conversationId ? { conversation_id: this.conversationId } : {}),
+                        }
+                    );
+
+                    if (response.conversation) {
+                        this.aiAnswer = response.conversation.answer || '';
+                        this.conversationId = response.conversation.conversation_id || null;
+                    }
+
+                    const result = response.results[0];
+                    this.hits = result.hits || [];
+                    this.facets = result.facet_counts || [];
+                    this.stats = `${result.found || 0} results found in ${result.search_time_ms}ms`;
+                    this.totalPages = Math.ceil((result.found || 0) / perPage);
+                    return;
+                } catch (e) {
+                    console.warn('Conversational search failed, falling back to keyword search', e);
+                    this.aiAnswer = '';
+                }
+            }
+
             try {
                 const result = await this.client
                     .collections(config.productCollection)
@@ -70,6 +111,7 @@ function typesenseInstantSearch(config) {
                 this.facets = result.facet_counts || [];
                 this.totalPages = Math.ceil((result.found || 0) / perPage);
                 this.stats = `${result.found || 0} results found in ${result.search_time_ms}ms`;
+                this.aiAnswer = '';
             } catch (error) {
                 console.error('Typesense instant search error:', error);
             }

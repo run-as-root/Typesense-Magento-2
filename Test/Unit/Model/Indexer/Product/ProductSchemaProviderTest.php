@@ -244,9 +244,41 @@ final class ProductSchemaProviderTest extends TestCase
         $coreNames = ['id', 'product_id', 'name', 'sku', 'url', 'image_url', 'price',
             'special_price', 'description', 'short_description', 'categories', 'category_ids',
             'categories.lvl0', 'categories.lvl1', 'categories.lvl2', 'in_stock', 'type_id',
-            'visibility', 'created_at', 'updated_at', 'sales_count', 'rating_summary', 'review_count'];
+            'visibility', 'created_at', 'updated_at', 'sales_count', 'rating_summary', 'review_count',
+            'categories_text'];
 
         self::assertSame($coreNames, $fieldNames);
+    }
+
+    public function test_get_fields_includes_embedding_when_conversational_enabled(): void
+    {
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->config->method('isConversationalSearchEnabled')->willReturn(true);
+        $this->config->method('getEmbeddingFields')->willReturn(['name', 'description']);
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+
+        $sut = new ProductSchemaProvider($this->config);
+        $fields = $sut->getFields();
+        $fieldNames = array_column($fields, 'name');
+
+        self::assertContains('embedding', $fieldNames);
+
+        $embeddingField = array_values(array_filter($fields, fn($f) => $f['name'] === 'embedding'))[0];
+        self::assertSame('float[]', $embeddingField['type']);
+        self::assertSame(['name', 'description'], $embeddingField['embed']['from']);
+    }
+
+    public function test_get_fields_excludes_embedding_when_conversational_disabled(): void
+    {
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->config->method('isConversationalSearchEnabled')->willReturn(false);
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+
+        $sut = new ProductSchemaProvider($this->config);
+        $fields = $sut->getFields();
+        $fieldNames = array_column($fields, 'name');
+
+        self::assertNotContains('embedding', $fieldNames);
     }
 
     /** @param array<int, array<string, mixed>> $fields */
