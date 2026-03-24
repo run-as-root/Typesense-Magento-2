@@ -10,27 +10,15 @@ jobs:
   compute_matrix:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.merge.outputs.matrix }}
+      matrix: ${{ steps.supported-version.outputs.matrix }}
     steps:
       - uses: actions/checkout@v6
       - uses: graycoreio/github-actions-magento2/supported-version@v6.0.0
-        id: magento
+        id: supported-version
         with:
           kind: custom
           custom_versions: "magento/project-community-edition:2.4.7-p9,magento/project-community-edition:2.4.8-p4"
           include_services: true
-      - uses: graycoreio/github-actions-magento2/supported-version@v6.0.0
-        id: mageos
-        with:
-          kind: custom
-          project: mage-os
-          custom_versions: "mage-os/project-community-edition:2.2.0"
-          include_services: true
-      - name: Merge matrices
-        id: merge
-        run: |
-          MERGED=$(jq -sc '{magento: (.[0].magento + .[1].magento), include: (.[0].include + .[1].include)}' <(echo '${{ steps.magento.outputs.matrix }}') <(echo '${{ steps.mageos.outputs.matrix }}'))
-          echo "matrix=$MERGED" >> $GITHUB_OUTPUT
 
   check-extension:
     needs: compute_matrix
