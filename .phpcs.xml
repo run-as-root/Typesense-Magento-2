@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<ruleset name="RunAsRoot TypeSense">
+    <rule ref="Magento2">
+        <exclude name="Magento2.PHP.FinalImplementation"/>
+    </rule>
+</ruleset>
