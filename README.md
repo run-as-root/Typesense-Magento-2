@@ -1,6 +1,6 @@
 # RunAsRoot Magento 2 TypeSense
 
-[![CI](https://github.com/run-as-root/Typesense-Magento-2/actions/workflows/ci.yml/badge.svg)](https://github.com/run-as-root/Typesense-Magento-2/actions/workflows/ci.yml)
+[![Check Extension](https://github.com/run-as-root/Typesense-Magento-2/actions/workflows/ci.yml/badge.svg)](https://github.com/run-as-root/Typesense-Magento-2/actions/workflows/ci.yml)
 ![PHP](https://img.shields.io/badge/PHP-8.3+-blue)
 ![Magento](https://img.shields.io/badge/Magento-2.4.7+-orange)
 ![Mage-OS](https://img.shields.io/badge/Mage--OS-2.2+-purple)
