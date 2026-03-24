@@ -24,6 +24,7 @@ jobs:
     uses: graycoreio/github-actions-magento2/.github/workflows/check-extension.yaml@v6.0.0
     with:
       matrix: ${{ needs.compute_matrix.outputs.matrix }}
+      fail-fast: false
 
   phpstan:
     needs: compute_matrix
