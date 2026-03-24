@@ -268,6 +268,46 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
             </group>
+
+            <!-- Conversational Search (AI) -->
+            <group id="conversational_search" translate="label" type="text" sortOrder="70"
+                   showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Conversational Search (AI)</label>
+                <field id="enabled" translate="label comment" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Conversational Search</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>When enabled, search results include an AI-generated answer above the product grid. Requires OpenAI API key and Typesense v30+.</comment>
+                </field>
+                <field id="openai_api_key" translate="label comment" type="obscure" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>OpenAI API Key</label>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <comment>API key for generating conversational answers. Get one at platform.openai.com.</comment>
+                </field>
+                <field id="openai_model" translate="label comment" type="select" sortOrder="30"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>OpenAI Model</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\OpenAiModelSource</source_model>
+                    <comment>The model used for generating answers. gpt-4o-mini is cheapest and fastest.</comment>
+                </field>
+                <field id="system_prompt" translate="label comment" type="textarea" sortOrder="40"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>System Prompt</label>
+                    <comment>Instructions for the AI assistant. Controls tone, scope, and behavior.</comment>
+                </field>
+                <field id="embedding_fields" translate="label comment" type="multiselect" sortOrder="50"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Embedding Source Fields</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\EmbeddingFieldSource</source_model>
+                    <comment>Product fields used to generate semantic embeddings. Changes require a full product reindex.</comment>
+                </field>
+                <field id="conversation_ttl" translate="label comment" type="text" sortOrder="60"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Conversation TTL (seconds)</label>
+                    <comment>How long conversation history is kept. Default: 86400 (24 hours).</comment>
+                </field>
+            </group>
         </section>
     </system>
 </config>

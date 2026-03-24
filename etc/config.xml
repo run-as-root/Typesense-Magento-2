@@ -53,6 +53,14 @@
                 <category_merchandiser_enabled>0</category_merchandiser_enabled>
                 <query_merchandiser_enabled>0</query_merchandiser_enabled>
             </merchandising>
+            <conversational_search>
+                <enabled>0</enabled>
+                <openai_api_key/>
+                <openai_model>openai/gpt-4o-mini</openai_model>
+                <system_prompt>You are a helpful shopping assistant for an online store. Answer questions about products based only on the provided context. Include specific product names and prices when relevant. If you cannot answer from the context, say so politely.</system_prompt>
+                <embedding_fields>name,description</embedding_fields>
+                <conversation_ttl>86400</conversation_ttl>
+            </conversational_search>
         </run_as_root_typesense>
     </default>
 </config>
