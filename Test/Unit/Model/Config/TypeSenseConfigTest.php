@@ -85,10 +85,9 @@ final class TypeSenseConfigTest extends TestCase
 
     public function test_is_conversational_search_enabled_returns_false_when_module_disabled(): void
     {
-        $this->scopeConfig->method('getValue')
-            ->willReturnMap([
-                ['run_as_root_typesense/general/enabled', ScopeInterface::SCOPE_STORE, null, '0'],
-            ]);
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/general/enabled', ScopeInterface::SCOPE_STORE, null)
+            ->willReturn(false);
 
         self::assertFalse($this->sut->isConversationalSearchEnabled());
     }
