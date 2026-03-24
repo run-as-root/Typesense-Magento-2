@@ -326,13 +326,13 @@ Your entity type is now available to `typesense:reindex --entity=blog_post` and 
 
 ```bash
 # Clone the repository
-git clone git@github.com:run-as-root/magento2-typesense.git
+git clone git@github.com:run-as-root/Typesense-Magento-2.git
 
 # Install dependencies
 composer install
 
 # Run static analysis
-vendor/bin/phpstan analyse --level=8
+vendor/bin/phpstan analyse
 
 # Run unit tests
 vendor/bin/phpunit --testsuite Unit
@@ -375,7 +375,7 @@ vendor/bin/phpunit --testsuite Integration --group integration
 - `declare(strict_types=1)` in every file
 - snake_case test method names
 - All public methods covered by unit tests
-- PHPStan level 8
+- PHPStan level 6
 
 ---
 
