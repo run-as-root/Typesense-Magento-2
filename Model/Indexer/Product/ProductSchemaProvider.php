@@ -46,6 +46,23 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             $fields[] = ['name' => $attrCode, 'type' => 'string', 'optional' => true, 'facet' => true];
         }
 
+        // Text representation of categories for embedding
+        $fields[] = ['name' => 'categories_text', 'type' => 'string', 'optional' => true];
+
+        // Auto-embedding for conversational/semantic search
+        if ($this->config->isConversationalSearchEnabled()) {
+            $fields[] = [
+                'name' => 'embedding',
+                'type' => 'float[]',
+                'embed' => [
+                    'from' => $this->config->getEmbeddingFields(),
+                    'model_config' => [
+                        'model_name' => 'ts/all-MiniLM-L12-v2',
+                    ],
+                ],
+            ];
+        }
+
         return $fields;
     }
 }

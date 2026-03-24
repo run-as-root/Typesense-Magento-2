@@ -49,6 +49,7 @@ class ProductDataBuilder
             'categories.lvl0' => $categoryData['categories.lvl0'],
             'categories.lvl1' => $categoryData['categories.lvl1'],
             'categories.lvl2' => $categoryData['categories.lvl2'],
+            'categories_text' => implode(', ', $categoryData['categories']),
             'in_stock' => $this->stockResolver->isInStock($product),
             'type_id' => (string) $product->getTypeId(),
             'visibility' => (int) $product->getVisibility(),
