@@ -21,8 +21,11 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 ### Collection Browser
 ![Collection Browser](docs/images/admin-collections.png)
 
-### Query Merchandiser
-![Query Merchandiser](docs/images/admin-query-merchandiser.png)
+### Visual Category Merchandiser
+![Visual Category Merchandiser](docs/images/admin-category-merchandiser.png)
+
+### Synonym Management
+![Synonym Management](docs/images/admin-synonyms.png)
 
 ### Frontend — Category Page
 ![Frontend Category](docs/images/frontend-category.png)
