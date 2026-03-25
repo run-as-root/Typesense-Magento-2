@@ -89,4 +89,8 @@ interface TypeSenseConfigInterface
     public function getEmbeddingFields(?int $storeId = null): array;
 
     public function getConversationTtl(?int $storeId = null): int;
+
+    public function isRecommendationsEnabled(?int $storeId = null): bool;
+
+    public function getRecommendationsLimit(?int $storeId = null): int;
 }

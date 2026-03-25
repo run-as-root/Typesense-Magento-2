@@ -111,4 +111,56 @@ final class TypeSenseConfigTest extends TestCase
 
         self::assertSame(['name', 'description'], $this->sut->getEmbeddingFields());
     }
+
+    public function test_is_recommendations_enabled_returns_true_when_all_conditions_met(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->willReturnMap([
+                ['run_as_root_typesense/general/enabled', ScopeInterface::SCOPE_STORE, null, true],
+                ['run_as_root_typesense/recommendations/enabled', ScopeInterface::SCOPE_STORE, null, true],
+            ]);
+
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/conversational_search/enabled', ScopeInterface::SCOPE_STORE, null, '1'],
+            ]);
+
+        self::assertTrue($this->sut->isRecommendationsEnabled());
+    }
+
+    public function test_is_recommendations_enabled_returns_false_when_conversational_search_disabled(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->willReturnMap([
+                ['run_as_root_typesense/general/enabled', ScopeInterface::SCOPE_STORE, null, true],
+                ['run_as_root_typesense/recommendations/enabled', ScopeInterface::SCOPE_STORE, null, true],
+            ]);
+
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/conversational_search/enabled', ScopeInterface::SCOPE_STORE, null, '0'],
+            ]);
+
+        self::assertFalse($this->sut->isRecommendationsEnabled());
+    }
+
+    public function test_get_recommendations_limit_returns_configured_value(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/recommendations/limit', ScopeInterface::SCOPE_STORE, null, '12'],
+            ]);
+
+        self::assertSame(12, $this->sut->getRecommendationsLimit());
+    }
+
+    public function test_get_recommendations_limit_returns_default_when_empty(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/recommendations/limit', ScopeInterface::SCOPE_STORE, null, ''],
+            ]);
+
+        self::assertSame(8, $this->sut->getRecommendationsLimit());
+    }
 }

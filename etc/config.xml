@@ -61,6 +61,10 @@
                 <embedding_fields>name,description</embedding_fields>
                 <conversation_ttl>86400</conversation_ttl>
             </conversational_search>
+            <recommendations>
+                <enabled>0</enabled>
+                <limit>8</limit>
+            </recommendations>
         </run_as_root_typesense>
     </default>
 </config>
