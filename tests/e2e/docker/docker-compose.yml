@@ -1,6 +1,8 @@
 services:
   magento:
-    image: ghcr.io/mage-os/magento2:2.4.8-php8.3-apache
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8080:80"
     environment:

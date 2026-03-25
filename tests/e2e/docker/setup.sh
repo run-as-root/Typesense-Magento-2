@@ -4,9 +4,21 @@ set -euo pipefail
 echo "=== Waiting for services ==="
 until mysql -h mysql -u magento -pmagento -e "SELECT 1" &>/dev/null; do sleep 2; done
 until curl -sf http://typesense:8108/health &>/dev/null; do sleep 2; done
+echo "Services ready."
+
+cd /var/www/html
+
+echo "=== Creating Magento project via Composer ==="
+if [ ! -f composer.json ]; then
+  composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition . --no-install --no-interaction
+fi
+
+echo "=== Configuring Composer auth (public Mage-OS repo, no keys needed) ==="
+composer config --no-plugins allow-plugins true
+composer config repositories.mage-os composer https://repo.mage-os.org/
 
 echo "=== Installing Magento ==="
-cd /var/www/html
+composer install --no-interaction --prefer-dist
 
 bin/magento setup:install \
   --base-url=http://localhost:8080 \
@@ -32,7 +44,7 @@ bin/magento setup:install \
   --cache-backend-redis-port=6379
 
 echo "=== Installing sample data ==="
-bin/magento sampledata:deploy
+bin/magento sampledata:deploy || true
 bin/magento setup:upgrade
 
 echo "=== Installing TypeSense extension ==="
@@ -61,6 +73,9 @@ bin/magento config:set run_as_root_typesense/merchandising/query_merchandiser_en
 echo "=== Disabling TFA and admin captcha ==="
 bin/magento module:disable Magento_AdminAdobeImsTwoFactorAuth Magento_TwoFactorAuth || true
 bin/magento setup:upgrade
+
+echo "=== Setting file permissions ==="
+chown -R www-data:www-data /var/www/html
 
 echo "=== Flushing caches ==="
 bin/magento cache:flush
