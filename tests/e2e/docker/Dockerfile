@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y \
     libicu-dev libxslt-dev libonig-dev libsodium-dev default-mysql-client curl \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
-    gd intl pdo_mysql xsl zip soap bcmath sockets sodium opcache mbstring \
+    gd intl pdo_mysql xsl zip soap bcmath sockets sodium opcache mbstring ftp \
     && a2enmod rewrite headers \
     && rm -rf /var/lib/apt/lists/*
 
