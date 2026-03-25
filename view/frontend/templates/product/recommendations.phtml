@@ -1,0 +1,178 @@
+<?php
+/**
+ * Typesense Product Recommendations — Hyva CSP-compatible
+ *
+ * Vector similarity search for "similar products" on PDP.
+ * Uses JS DOM rendering for CSP compliance.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Catalog\Block\Product\View as ProductViewBlock;
+use Magento\Framework\Escaper;
+use RunAsRoot\TypeSense\ViewModel\Frontend\RecommendationsConfigViewModel;
+
+/** @var Escaper $escaper */
+/** @var ProductViewBlock $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var RecommendationsConfigViewModel $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel->isEnabled()) {
+    return;
+}
+
+$product = $block->getProduct();
+if (!$product) {
+    return;
+}
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+
+$config = $viewModel->getJsonConfig($product);
+?>
+
+<script src="https://cdn.jsdelivr.net/npm/typesense@1.8.2/dist/typesense.min.js"></script>
+<script>
+    function initTypesenseRecommendations() {
+        const config = <?= /* @noEscape */ $config ?>;
+
+        return {
+            recommendations: [],
+            loading: true,
+            error: false,
+            client: null,
+
+            init() {
+                this.client = new Typesense.Client({
+                    nodes: [{ host: config.typesenseHost, port: String(config.typesensePort), protocol: config.typesenseProtocol }],
+                    apiKey: config.typesenseSearchOnlyApiKey,
+                    connectionTimeoutSeconds: 2,
+                });
+
+                this.fetchRecommendations();
+            },
+
+            async fetchRecommendations() {
+                try {
+                    const result = await this.client.collections(config.productCollection).documents().search({
+                        q: '*',
+                        vector_query: 'embedding:([], id:' + config.productId + ')',
+                        filter_by: 'id:!=' + config.productId + ' && in_stock:true',
+                        per_page: config.limit,
+                        exclude_fields: 'embedding',
+                    });
+
+                    this.recommendations = (result.hits || []).map(h => h.document);
+                } catch (e) {
+                    console.warn('Typesense recommendations failed:', e);
+                    this.error = true;
+                }
+
+                this.loading = false;
+                this.$nextTick(() => this.renderProducts());
+            },
+
+            esc(str) {
+                const div = document.createElement('div');
+                div.textContent = String(str || '');
+                return div.innerHTML;
+            },
+
+            slideLeft() {
+                const container = this.$el.querySelector('[data-rec-slider]');
+                if (container) container.scrollBy({ left: -280, behavior: 'smooth' });
+            },
+
+            slideRight() {
+                const container = this.$el.querySelector('[data-rec-slider]');
+                if (container) container.scrollBy({ left: 280, behavior: 'smooth' });
+            },
+
+            renderProducts() {
+                const container = this.$el.querySelector('[data-rec-slider]');
+                const wrapper = this.$el.querySelector('[data-rec-wrapper]');
+                if (!container || !wrapper) return;
+
+                if (this.recommendations.length === 0) {
+                    wrapper.style.display = 'none';
+                    return;
+                }
+
+                let html = '';
+                for (const doc of this.recommendations) {
+                    const price = doc.price ? '$' + Number(doc.price).toFixed(2) : '';
+                    const specialPrice = doc.special_price ? '$' + Number(doc.special_price).toFixed(2) : '';
+                    const hasDiscount = specialPrice && doc.special_price < doc.price;
+
+                    const imgHtml = doc.image_url
+                        ? '<img src="' + this.esc(doc.image_url) + '" alt="' + this.esc(doc.name) + '" class="w-full h-full object-contain" loading="lazy"/>'
+                        : '<div class="w-full h-full bg-gray-100 flex items-center justify-center"><span class="text-gray-300 text-xs">No image</span></div>';
+
+                    let priceHtml = '';
+                    if (hasDiscount) {
+                        priceHtml = '<span class="text-sm font-bold text-red-600">' + this.esc(specialPrice) + '</span>'
+                            + ' <span class="text-xs text-gray-400 line-through">' + this.esc(price) + '</span>';
+                    } else {
+                        priceHtml = '<span class="text-sm font-bold text-gray-800">' + this.esc(price) + '</span>';
+                    }
+
+                    html += '<div class="flex-shrink-0 w-56 snap-start">'
+                        + '<a href="' + this.esc(doc.url) + '" class="block border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow h-full flex flex-col">'
+                        + '<div class="aspect-square mb-3 overflow-hidden rounded">' + imgHtml + '</div>'
+                        + '<h3 class="text-sm font-medium text-gray-800 mb-1 line-clamp-2">' + this.esc(doc.name) + '</h3>'
+                        + '<div class="mt-auto pt-2">' + priceHtml + '</div>'
+                        + '</a></div>';
+                }
+
+                container.innerHTML = html;
+
+                // Bind arrow buttons
+                const leftBtn = this.$el.querySelector('[data-rec-left]');
+                const rightBtn = this.$el.querySelector('[data-rec-right]');
+                if (leftBtn) leftBtn.addEventListener('click', () => this.slideLeft());
+                if (rightBtn) rightBtn.addEventListener('click', () => this.slideRight());
+            },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => {
+        Alpine.data('initTypesenseRecommendations', initTypesenseRecommendations);
+    }, { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>
+
+<div x-data="initTypesenseRecommendations" class="mt-12 mb-8" data-rec-wrapper>
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold text-gray-800">
+            <?= $escaper->escapeHtml(__('You May Also Like')) ?>
+        </h2>
+        <div class="flex gap-2">
+            <button data-rec-left
+                    class="p-2 rounded-full border border-gray-300 hover:bg-gray-100 transition-colors cursor-pointer"
+                    aria-label="<?= $escaper->escapeHtmlAttr(__('Previous')) ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </button>
+            <button data-rec-right
+                    class="p-2 rounded-full border border-gray-300 hover:bg-gray-100 transition-colors cursor-pointer"
+                    aria-label="<?= $escaper->escapeHtmlAttr(__('Next')) ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div data-rec-slider
+         class="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4"
+         style="-webkit-overflow-scrolling: touch; scrollbar-width: thin;">
+        <div class="text-center py-8 w-full">
+            <p class="text-gray-400 text-sm"><?= $escaper->escapeHtml(__('Loading recommendations...')) ?></p>
+        </div>
+    </div>
+</div>
