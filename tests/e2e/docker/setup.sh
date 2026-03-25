@@ -88,7 +88,8 @@ bin/magento module:disable Magento_AdminAdobeImsTwoFactorAuth Magento_TwoFactorA
 bin/magento setup:upgrade
 
 echo "=== Setting file permissions ==="
-find /var/www/html -path /var/www/html/typesense-extension -prune -o -exec chown www-data:www-data {} + 2>/dev/null || true
+chown -R www-data:www-data /var/www/html/var /var/www/html/generated /var/www/html/pub/static /var/www/html/app/etc 2>/dev/null || true
+chmod -R 777 /var/www/html/var /var/www/html/generated /var/www/html/pub/static 2>/dev/null || true
 
 echo "=== Deploying static content ==="
 bin/magento setup:static-content:deploy -f
