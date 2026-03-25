@@ -20,14 +20,17 @@ cd /var/www/html
 
 echo "=== Creating Magento project via Composer ==="
 if [ ! -f composer.json ]; then
-  composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition . --no-install --no-interaction
+  # Create project in temp dir then move files (directory must be empty for create-project)
+  composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition /tmp/magento --no-install --no-interaction
+  cp -a /tmp/magento/. /var/www/html/
+  rm -rf /tmp/magento
 fi
 
-echo "=== Configuring Composer auth (public Mage-OS repo, no keys needed) ==="
+echo "=== Configuring Composer ==="
 composer config --no-plugins allow-plugins true
 composer config repositories.mage-os composer https://repo.mage-os.org/
 
-echo "=== Installing Magento ==="
+echo "=== Installing Magento dependencies ==="
 composer install --no-interaction --prefer-dist
 
 bin/magento setup:install \
