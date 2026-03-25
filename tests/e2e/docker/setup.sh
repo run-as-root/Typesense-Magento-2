@@ -88,7 +88,7 @@ bin/magento module:disable Magento_AdminAdobeImsTwoFactorAuth Magento_TwoFactorA
 bin/magento setup:upgrade
 
 echo "=== Setting file permissions ==="
-chown -R www-data:www-data /var/www/html
+find /var/www/html -path /var/www/html/typesense-extension -prune -o -exec chown www-data:www-data {} + 2>/dev/null || true
 
 echo "=== Flushing caches ==="
 bin/magento cache:flush
