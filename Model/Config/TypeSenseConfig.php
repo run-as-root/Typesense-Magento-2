@@ -280,6 +280,19 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return (int) ($this->getValue('conversational_search/conversation_ttl', $storeId) ?: 86400);
     }
 
+    // Recommendations
+    public function isRecommendationsEnabled(?int $storeId = null): bool
+    {
+        return $this->isEnabled($storeId)
+            && $this->isConversationalSearchEnabled($storeId)
+            && $this->getFlag('recommendations/enabled', $storeId);
+    }
+
+    public function getRecommendationsLimit(?int $storeId = null): int
+    {
+        return (int) ($this->getValue('recommendations/limit', $storeId) ?: 8);
+    }
+
     private function getValue(string $path, ?int $storeId = null): mixed
     {
         return $this->scopeConfig->getValue(
