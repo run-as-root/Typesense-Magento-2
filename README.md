@@ -1,6 +1,7 @@
 # RunAsRoot Magento 2 TypeSense
 
 [![Check Extension](https://github.com/run-as-root/Typesense-Magento-2/actions/workflows/ci.yml/badge.svg)](https://github.com/run-as-root/Typesense-Magento-2/actions/workflows/ci.yml)
+[![E2E Tests](https://github.com/run-as-root/Typesense-Magento-2/actions/workflows/e2e.yml/badge.svg)](https://github.com/run-as-root/Typesense-Magento-2/actions/workflows/e2e.yml)
 ![PHP](https://img.shields.io/badge/PHP-8.3+-blue)
 ![Magento](https://img.shields.io/badge/Magento-2.4.7+-orange)
 ![Mage-OS](https://img.shields.io/badge/Mage--OS-2.2+-purple)
@@ -393,6 +394,13 @@ vendor/bin/phpunit --testsuite Unit
 
 # Run integration tests (requires running Typesense + Magento)
 vendor/bin/phpunit --testsuite Integration --group integration
+
+# Run E2E tests (requires Warden environment with indexed data)
+cd tests/e2e && npm install && npx playwright install chromium
+npx playwright test
+
+# Run E2E tests in UI mode (interactive debugging)
+npx playwright test --ui
 ```
 
 ### Architecture Overview
@@ -416,6 +424,7 @@ vendor/bin/phpunit --testsuite Integration --group integration
 ├── Test/
 │   ├── Unit/                   PHPUnit unit tests
 │   └── Integration/            Integration test stubs (@group integration)
+├── tests/e2e/                     Playwright E2E tests (Page Object Models + specs)
 ├── Ui/                         Magento UI component data providers
 ├── view/adminhtml/             Admin layout, templates, JS
 ├── view/frontend/              Hyva layout, Alpine.js components
