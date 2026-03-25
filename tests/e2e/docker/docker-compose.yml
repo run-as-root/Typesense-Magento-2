@@ -1,0 +1,62 @@
+services:
+  magento:
+    image: ghcr.io/mage-os/magento2:2.4.8-php8.3-apache
+    ports:
+      - "8080:80"
+    environment:
+      - MAGENTO_RUN_MODE=developer
+    volumes:
+      - magento-data:/var/www/html
+      - ../../../:/var/www/html/typesense-extension:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      typesense:
+        condition: service_started
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: magento
+      MYSQL_USER: magento
+      MYSQL_PASSWORD: magento
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  opensearch:
+    image: opensearchproject/opensearch:2.19.0
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  typesense:
+    image: typesense/typesense:28.0
+    command: --data-dir=/data --api-key=typesense_dev_key --enable-cors
+    volumes:
+      - typesense-data:/data
+
+volumes:
+  magento-data:
+  typesense-data:

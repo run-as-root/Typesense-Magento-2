@@ -1,0 +1,14 @@
+{
+  "name": "typesense-magento2-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:frontend": "playwright test tests/frontend/",
+    "test:admin": "playwright test tests/admin/",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}
