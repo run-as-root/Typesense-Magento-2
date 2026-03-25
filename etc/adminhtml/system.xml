@@ -308,6 +308,24 @@
                     <comment>How long conversation history is kept. Default: 86400 (24 hours).</comment>
                 </field>
             </group>
+
+            <!-- Product Recommendations -->
+            <group id="recommendations" translate="label" type="text" sortOrder="80"
+                   showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Product Recommendations</label>
+                <field id="enabled" translate="label comment" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Recommendations</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Show similar products on the product detail page using vector search. Requires Conversational Search to be enabled (for product embeddings).</comment>
+                </field>
+                <field id="limit" translate="label comment" type="text" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Number of Products</label>
+                    <validate>validate-digits</validate>
+                    <comment>Maximum number of recommended products to display. Default: 8.</comment>
+                </field>
+            </group>
         </section>
     </system>
 </config>
