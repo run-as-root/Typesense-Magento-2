@@ -2,9 +2,19 @@
 set -euo pipefail
 
 echo "=== Waiting for services ==="
-until mysql -h mysql -u magento -pmagento -e "SELECT 1" &>/dev/null; do sleep 2; done
-until curl -sf http://typesense:8108/health &>/dev/null; do sleep 2; done
-echo "Services ready."
+echo "Waiting for MySQL..."
+for i in $(seq 1 60); do
+  php -r "try { new PDO('mysql:host=mysql;dbname=magento', 'magento', 'magento'); echo 'ok'; exit(0); } catch(Exception \$e) { exit(1); }" 2>/dev/null && break
+  sleep 2
+done
+echo "MySQL ready."
+
+echo "Waiting for Typesense..."
+for i in $(seq 1 30); do
+  curl -sf http://typesense:8108/health &>/dev/null && break
+  sleep 2
+done
+echo "Typesense ready."
 
 cd /var/www/html
 
