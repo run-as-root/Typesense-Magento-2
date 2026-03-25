@@ -90,6 +90,9 @@ bin/magento setup:upgrade
 echo "=== Setting file permissions ==="
 find /var/www/html -path /var/www/html/typesense-extension -prune -o -exec chown www-data:www-data {} + 2>/dev/null || true
 
+echo "=== Deploying static content ==="
+bin/magento setup:static-content:deploy -f
+
 echo "=== Flushing caches ==="
 bin/magento cache:flush
 
