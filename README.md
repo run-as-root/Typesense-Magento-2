@@ -45,6 +45,8 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 - Admin synonym manager and collection browser
 - CLI commands for reindexing, collection management, and health checks
 - Cron-based and message-queue-based background reindexing
+- Conversational search (RAG) with AI-generated answers powered by OpenAI + Typesense embeddings
+- Product recommendations on the product detail page using vector similarity search
 - CSP whitelist for Typesense API endpoints
 - Configurable per store view
 
@@ -58,7 +60,7 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 | Magento 2 / Mage-OS | 2.4.7+ |
 | Typesense | 27+ |
 | Hyva Theme | 1.3+ |
-| typesense/typesense-php | ^4.9 |
+| typesense/typesense-php | ^6.0 |
 
 ---
 
@@ -135,6 +137,26 @@ Navigate to **Stores > Configuration > TypeSense > TypeSense Search**.
 | Category Count | 3 | Max category results |
 | CMS Page Count | 2 | Max CMS page results |
 | Suggestion Count | 4 | Max query suggestion results |
+
+### Conversational Search (AI) Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| Enable Conversational Search | No | Show AI-generated answers above search results |
+| OpenAI API Key | — | API key for answer generation (get one at platform.openai.com) |
+| OpenAI Model | gpt-4o-mini | Model used for generating answers |
+| System Prompt | — | Instructions for the AI assistant's tone and behavior |
+| Embedding Source Fields | name, description | Product fields used to generate semantic embeddings |
+| Conversation TTL | 86400 | How long conversation history is kept (seconds) |
+
+### Product Recommendations Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| Enable Recommendations | No | Show similar products on the product detail page |
+| Number of Products | 8 | Maximum recommended products to display |
+
+> **Note:** Product Recommendations require Conversational Search to be enabled, as they use the same product embeddings for vector similarity search.
 
 ---
 
@@ -279,6 +301,14 @@ Replaces the Magento search results page (`/catalogsearch/result`). Renders a fu
 ### Category Page
 
 When enabled, replaces the Magento category product listing with a Typesense-powered equivalent. Filtering, sorting, and pagination all happen client-side against Typesense.
+
+### Conversational Search (AI)
+
+When enabled with an OpenAI API key, search results include an AI-generated answer box above the product grid. Uses Typesense's built-in embedding model (`ts/all-MiniLM-L12-v2`) for semantic search and OpenAI for answer generation. Configurable model, system prompt, and embedding source fields.
+
+### Product Recommendations
+
+When enabled, a "You May Also Like" slider appears on every product detail page. Uses Typesense vector similarity search to find semantically similar products based on the current product's embedding — no manual curation needed. Requires Conversational Search to be enabled (for embeddings). The number of recommended products is configurable in admin.
 
 ---
 
