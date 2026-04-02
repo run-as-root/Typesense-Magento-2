@@ -10,16 +10,18 @@ use RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool;
 
 class SearchRequestBuilder
 {
-    /** @var array<string, string> */
+    /** @var array<string, string> Ordered by priority — customer/order data first for analytics queries */
     private const ENTITY_QUERY_BY = [
+        'customer' => 'email,firstname,lastname,group_name,default_shipping_country',
+        'order' => 'increment_id,customer_name,customer_email,item_names,shipping_country,status',
         'product' => 'name,description,sku,short_description',
         'category' => 'name,description',
         'cms_page' => 'title,content',
-        'order' => 'increment_id,customer_name,customer_email,item_names,shipping_country,status',
-        'customer' => 'email,firstname,lastname,group_name,default_shipping_country',
         'store' => 'store_name,website_name,store_code',
         'system_config' => 'path,label,value',
     ];
+
+    private const PER_PAGE = 5;
 
     /** @var array<string, bool>|null */
     private ?array $embeddingCache = null;
@@ -50,6 +52,7 @@ class SearchRequestBuilder
                 'collection' => $collectionName,
                 'query_by' => $queryBy,
                 'exclude_fields' => 'embedding',
+                'per_page' => self::PER_PAGE,
             ];
         }
 
