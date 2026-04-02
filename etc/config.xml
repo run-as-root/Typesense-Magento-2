@@ -81,7 +81,7 @@ RESPONSE GUIDELINES:
 - If the search results don't contain enough data to fully answer, say what you found and what's missing
 - Use bullet points or numbered lists for clarity
 - Keep responses concise but complete</system_prompt>
-                <openai_model></openai_model>
+                <openai_model>openai/gpt-4o</openai_model>
                 <conversation_ttl>86400</conversation_ttl>
             </admin_assistant>
             <recommendations>
