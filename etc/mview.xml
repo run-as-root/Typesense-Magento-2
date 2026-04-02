@@ -44,4 +44,13 @@
             <table name="customer_address_entity" entity_column="parent_id"/>
         </subscriptions>
     </view>
+    <!-- typesense_store: stores change infrequently; subscribe to store table for real-time updates -->
+    <view id="typesense_store" class="RunAsRoot\TypeSense\Model\Indexer\Store\StoreIndexer" group="indexer">
+        <subscriptions>
+            <table name="store" entity_column="store_id"/>
+        </subscriptions>
+    </view>
+    <!-- typesense_system_config: config changes are infrequent; manual/cron reindex is sufficient -->
+    <view id="typesense_system_config" class="RunAsRoot\TypeSense\Model\Indexer\SystemConfig\SystemConfigIndexer" group="indexer">
+    </view>
 </config>

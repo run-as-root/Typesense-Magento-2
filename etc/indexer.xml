@@ -37,4 +37,16 @@
         <title translate="true">TypeSense Customer Index</title>
         <description translate="true">Rebuilds TypeSense customer index for admin assistant</description>
     </indexer>
+    <indexer id="typesense_store"
+             view_id="typesense_store"
+             class="RunAsRoot\TypeSense\Model\Indexer\Store\StoreIndexer">
+        <title translate="true">TypeSense Store Index</title>
+        <description translate="true">Rebuilds TypeSense store index for admin assistant</description>
+    </indexer>
+    <indexer id="typesense_system_config"
+             view_id="typesense_system_config"
+             class="RunAsRoot\TypeSense\Model\Indexer\SystemConfig\SystemConfigIndexer">
+        <title translate="true">TypeSense System Config Index</title>
+        <description translate="true">Rebuilds TypeSense system configuration index for admin assistant</description>
+    </indexer>
 </config>

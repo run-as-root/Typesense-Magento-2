@@ -63,6 +63,12 @@
     <preference for="RunAsRoot\TypeSense\Api\CustomerSchemaProviderInterface"
                 type="RunAsRoot\TypeSense\Model\Indexer\Customer\CustomerSchemaProvider"/>
 
+    <preference for="RunAsRoot\TypeSense\Api\StoreSchemaProviderInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Store\StoreSchemaProvider"/>
+
+    <preference for="RunAsRoot\TypeSense\Api\SystemConfigSchemaProviderInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\SystemConfig\SystemConfigSchemaProvider"/>
+
     <!-- Merchandising data interface preferences -->
     <preference for="RunAsRoot\TypeSense\Api\Data\CategoryMerchandisingInterface"
                 type="RunAsRoot\TypeSense\Model\Merchandising\CategoryMerchandising"/>
@@ -91,6 +97,8 @@
                 <item name="suggestion" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionEntityIndexer</item>
                 <item name="order" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Order\OrderEntityIndexer</item>
                 <item name="customer" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Customer\CustomerEntityIndexer</item>
+                <item name="store" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Store\StoreEntityIndexer</item>
+                <item name="system_config" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\SystemConfig\SystemConfigEntityIndexer</item>
             </argument>
         </arguments>
     </type>
