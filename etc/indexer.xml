@@ -25,4 +25,10 @@
         <title translate="true">TypeSense Suggestion Index</title>
         <description translate="true">Rebuilds TypeSense search suggestion index</description>
     </indexer>
+    <indexer id="typesense_order"
+             view_id="typesense_order"
+             class="RunAsRoot\TypeSense\Model\Indexer\Order\OrderIndexer">
+        <title translate="true">TypeSense Order Index</title>
+        <description translate="true">Rebuilds TypeSense order search index for admin assistant</description>
+    </indexer>
 </config>

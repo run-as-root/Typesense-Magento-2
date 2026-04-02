@@ -57,6 +57,9 @@
     <preference for="RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionSchemaProviderInterface"
                 type="RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionSchemaProvider"/>
 
+    <preference for="RunAsRoot\TypeSense\Api\OrderSchemaProviderInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Order\OrderSchemaProvider"/>
+
     <!-- Merchandising data interface preferences -->
     <preference for="RunAsRoot\TypeSense\Api\Data\CategoryMerchandisingInterface"
                 type="RunAsRoot\TypeSense\Model\Merchandising\CategoryMerchandising"/>
@@ -83,6 +86,7 @@
                 <item name="category" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Category\CategoryEntityIndexer</item>
                 <item name="cms_page" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\CmsPage\CmsPageEntityIndexer</item>
                 <item name="suggestion" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionEntityIndexer</item>
+                <item name="order" xsi:type="object">RunAsRoot\TypeSense\Model\Indexer\Order\OrderEntityIndexer</item>
             </argument>
         </arguments>
     </type>

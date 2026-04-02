@@ -30,4 +30,12 @@
     <!-- typesense_suggestion has no subscriptions: suggestions are updated on search, not on entity save -->
     <view id="typesense_suggestion" class="RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionIndexer" group="indexer">
     </view>
+    <view id="typesense_order" class="RunAsRoot\TypeSense\Model\Indexer\Order\OrderIndexer" group="indexer">
+        <subscriptions>
+            <table name="sales_order" entity_column="entity_id"/>
+            <table name="sales_order_address" entity_column="parent_id"/>
+            <table name="sales_order_item" entity_column="order_id"/>
+            <table name="sales_order_payment" entity_column="parent_id"/>
+        </subscriptions>
+    </view>
 </config>
