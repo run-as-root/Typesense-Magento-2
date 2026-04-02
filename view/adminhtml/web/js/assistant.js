@@ -22,6 +22,8 @@ define([
     }
 
     function renderMarkdown(text) {
+        // Escape HTML entities first to prevent XSS
+        text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         // Basic markdown rendering
         return text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')

@@ -60,7 +60,7 @@ class AdminConversationModelManager
         }
     }
 
-    private function ensureHistoryCollectionExists(mixed $client, string $collectionName): void
+    private function ensureHistoryCollectionExists(\Typesense\Client $client, string $collectionName): void
     {
         try {
             $client->collections[$collectionName]->retrieve();

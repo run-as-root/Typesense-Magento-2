@@ -13,6 +13,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\TypeSenseClientFactoryInterface;
 use RunAsRoot\TypeSense\Model\Assistant\SearchRequestBuilder;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Conversation\AdminConversationModelManager;
 
 class Chat extends Action implements HttpPostActionInterface
@@ -27,6 +28,7 @@ class Chat extends Action implements HttpPostActionInterface
         private readonly SearchRequestBuilder $searchRequestBuilder,
         private readonly StoreManagerInterface $storeManager,
         private readonly LoggerInterface $logger,
+        private readonly TypeSenseConfigInterface $config,
     ) {
         parent::__construct($context);
     }
@@ -34,6 +36,10 @@ class Chat extends Action implements HttpPostActionInterface
     public function execute(): Json
     {
         $result = $this->jsonFactory->create();
+
+        if (!$this->config->isAdminAssistantEnabled() || !$this->config->isConversationalSearchEnabled()) {
+            return $result->setData(['success' => false, 'error' => 'AI Assistant is not enabled.']);
+        }
 
         try {
             $query = (string) $this->getRequest()->getParam('query', '');
@@ -44,6 +50,9 @@ class Chat extends Action implements HttpPostActionInterface
             }
 
             $store = $this->storeManager->getDefaultStoreView();
+            if ($store === null) {
+                return $result->setData(['success' => false, 'error' => 'No default store view configured.']);
+            }
             $storeId = (int) $store->getId();
             $storeCode = $store->getCode();
 

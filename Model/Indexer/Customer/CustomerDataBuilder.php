@@ -100,21 +100,22 @@ class CustomerDataBuilder
         $collection = $this->orderCollectionFactory->create();
         $collection->addFieldToFilter('customer_id', $customerId);
 
-        $orderCount = 0;
-        $lifetimeValue = 0.0;
+        $collection->getSelect()
+            ->reset(\Magento\Framework\DB\Select::COLUMNS)
+            ->columns([
+                'order_count' => new \Zend_Db_Expr('COUNT(*)'),
+                'lifetime_value' => new \Zend_Db_Expr('COALESCE(SUM(grand_total), 0)'),
+                'last_order_date' => new \Zend_Db_Expr('MAX(created_at)'),
+            ]);
+
+        $row = $collection->getConnection()->fetchRow($collection->getSelect());
+
         $lastOrderDate = null;
-
-        foreach ($collection as $order) {
-            $orderCount++;
-            $lifetimeValue += (float) $order->getGrandTotal();
-
-            $createdAt = $this->toTimestamp((string) $order->getCreatedAt());
-            if ($lastOrderDate === null || $createdAt > $lastOrderDate) {
-                $lastOrderDate = $createdAt;
-            }
+        if (!empty($row['last_order_date'])) {
+            $lastOrderDate = $this->toTimestamp($row['last_order_date']);
         }
 
-        return [$orderCount, $lifetimeValue, $lastOrderDate];
+        return [(int) ($row['order_count'] ?? 0), (float) ($row['lifetime_value'] ?? 0.0), $lastOrderDate];
     }
 
     /**

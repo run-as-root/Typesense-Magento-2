@@ -18,6 +18,12 @@ class SystemConfigDataBuilder
         'oauth',
         'api_key',
         'passphrase',
+        'private',
+        'cert',
+        'auth',
+        'hash',
+        'username',
+        'license',
     ];
 
     public function __construct(
@@ -77,6 +83,11 @@ class SystemConfigDataBuilder
         if ($entityIds !== []) {
             $select->where('config_id IN (?)', $entityIds);
         }
+
+        $select->where(
+            "(scope = 'default') OR (scope = 'stores' AND scope_id = ?)",
+            $storeId
+        );
 
         /** @var array<int, array<string, mixed>> $rows */
         $rows = $connection->fetchAll($select);

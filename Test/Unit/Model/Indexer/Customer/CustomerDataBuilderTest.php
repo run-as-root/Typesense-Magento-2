@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Test\Unit\Model\Indexer\Customer;
 
 use Magento\Customer\Api\Data\AddressInterface;
-use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Customer\Api\Data\GroupInterface;
+use Magento\Customer\Model\Customer;
 use Magento\Customer\Api\Data\RegionInterface;
 use Magento\Customer\Api\GroupRepositoryInterface;
 use Magento\Customer\Model\ResourceModel\Customer\Collection as CustomerCollection;
 use Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
-use Magento\Sales\Model\Order;
+use Magento\Framework\DB\Adapter\AdapterInterface;
+use Magento\Framework\DB\Select;
 use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -244,36 +245,37 @@ final class CustomerDataBuilderTest extends TestCase
 
     private function mockOrderStats(int $customerId, int $orderCount, float $total, string $lastDate = ''): void
     {
-        $orders = [];
-        if ($orderCount > 0) {
-            $perOrder = round($total / $orderCount, 2);
-            for ($i = 0; $i < $orderCount; $i++) {
-                $order = $this->createMock(Order::class);
-                $order->method('getGrandTotal')->willReturn((string) $perOrder);
-                $order->method('getCreatedAt')->willReturn($lastDate ?: '2024-01-01 00:00:00');
-                $orders[] = $order;
-            }
-        }
+        $row = [
+            'order_count' => $orderCount,
+            'lifetime_value' => $total,
+            'last_order_date' => $orderCount > 0 ? ($lastDate ?: '2024-01-01 00:00:00') : null,
+        ];
+
+        $select = $this->createMock(Select::class);
+        $select->method('reset')->willReturnSelf();
+        $select->method('columns')->willReturnSelf();
+
+        $connection = $this->createMock(AdapterInterface::class);
+        $connection->method('fetchRow')->willReturn($row);
 
         $orderCollection = $this->createMock(OrderCollection::class);
         $orderCollection->method('addFieldToFilter')->willReturnSelf();
-
-        // Make collection iterable
-        $orderCollection->method('getIterator')->willReturn(new \ArrayIterator($orders));
+        $orderCollection->method('getSelect')->willReturn($select);
+        $orderCollection->method('getConnection')->willReturn($connection);
 
         $this->orderCollectionFactory->method('create')->willReturn($orderCollection);
     }
 
     /**
-     * @return CustomerInterface&MockObject
+     * @return Customer&MockObject
      */
     private function createCustomerMock(
         int|null $gender = 1,
         string|null $dob = '1990-05-20',
         bool $withBillingAddress = true,
         bool $withShippingAddress = true,
-    ): CustomerInterface&MockObject {
-        $customer = $this->createMock(CustomerInterface::class);
+    ): Customer&MockObject {
+        $customer = $this->createMock(Customer::class);
         $customer->method('getId')->willReturn('10');
         $customer->method('getEmail')->willReturn('john.doe@example.com');
         $customer->method('getFirstname')->willReturn('John');

@@ -8,9 +8,9 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
+use RunAsRoot\TypeSense\Api\TypeSenseClientFactoryInterface;
 use RunAsRoot\TypeSense\Model\Assistant\SearchRequestBuilder;
 use RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool;
-
 /**
  * Tests for the Chat controller focus on its ADMIN_RESOURCE constant and the
  * SearchRequestBuilder collaborator (extracted to allow framework-free unit
@@ -20,11 +20,16 @@ use RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool;
 final class ChatTest extends TestCase
 {
     private CollectionNameResolverInterface&MockObject $collectionNameResolver;
+    private TypeSenseClientFactoryInterface&MockObject $clientFactory;
     private EntityIndexerPool $fullPool;
 
     protected function setUp(): void
     {
         $this->collectionNameResolver = $this->createMock(CollectionNameResolverInterface::class);
+
+        // Mock factory to throw so collectionHasEmbedding gracefully returns false (empty cache)
+        $this->clientFactory = $this->createMock(TypeSenseClientFactoryInterface::class);
+        $this->clientFactory->method('create')->willThrowException(new \RuntimeException('no real client in tests'));
 
         $mockIndexer = $this->createMock(EntityIndexerInterface::class);
         $this->fullPool = new EntityIndexerPool([
@@ -44,8 +49,8 @@ final class ChatTest extends TestCase
             static fn(string $entityType) => "col_{$entityType}"
         );
 
-        $builder = new SearchRequestBuilder($this->collectionNameResolver, $this->fullPool);
-        $requests = $builder->build('default', 1, 'test');
+        $builder = new SearchRequestBuilder($this->collectionNameResolver, $this->fullPool, $this->clientFactory);
+        $requests = $builder->build('default', 1);
 
         self::assertCount(7, $requests);
     }
@@ -62,8 +67,8 @@ final class ChatTest extends TestCase
             static fn(string $entityType, string $storeCode) => "test_{$entityType}_{$storeCode}"
         );
 
-        $builder = new SearchRequestBuilder($this->collectionNameResolver, $partialPool);
-        $requests = $builder->build('default', 1, 'shoes');
+        $builder = new SearchRequestBuilder($this->collectionNameResolver, $partialPool, $this->clientFactory);
+        $requests = $builder->build('default', 1);
 
         self::assertCount(2, $requests);
         $collections = array_column($requests, 'collection');
@@ -77,13 +82,12 @@ final class ChatTest extends TestCase
             static fn(string $entityType) => "col_{$entityType}"
         );
 
-        $builder = new SearchRequestBuilder($this->collectionNameResolver, $this->fullPool);
-        $requests = $builder->build('default', 1, 'blue widget');
+        $builder = new SearchRequestBuilder($this->collectionNameResolver, $this->fullPool, $this->clientFactory);
+        $requests = $builder->build('default', 1);
 
         $productRequest = $this->findRequestByCollection($requests, 'col_product');
 
         self::assertNotNull($productRequest);
-        self::assertSame('blue widget', $productRequest['q']);
         self::assertSame('name,description,sku,short_description', $productRequest['query_by']);
     }
 
@@ -93,8 +97,8 @@ final class ChatTest extends TestCase
             static fn(string $entityType) => "col_{$entityType}"
         );
 
-        $builder = new SearchRequestBuilder($this->collectionNameResolver, $this->fullPool);
-        $requests = $builder->build('default', 1, 'order 000001');
+        $builder = new SearchRequestBuilder($this->collectionNameResolver, $this->fullPool, $this->clientFactory);
+        $requests = $builder->build('default', 1);
 
         $orderRequest = $this->findRequestByCollection($requests, 'col_order');
 
@@ -111,8 +115,8 @@ final class ChatTest extends TestCase
             static fn(string $entityType) => "col_{$entityType}"
         );
 
-        $builder = new SearchRequestBuilder($this->collectionNameResolver, $this->fullPool);
-        $requests = $builder->build('default', 1, 'john');
+        $builder = new SearchRequestBuilder($this->collectionNameResolver, $this->fullPool, $this->clientFactory);
+        $requests = $builder->build('default', 1);
 
         $customerRequest = $this->findRequestByCollection($requests, 'col_customer');
 
@@ -135,30 +139,16 @@ final class ChatTest extends TestCase
             )
             ->willReturn('some_collection');
 
-        $builder = new SearchRequestBuilder($this->collectionNameResolver, $this->fullPool);
-        $builder->build('en_gb', 2, 'test query');
+        $builder = new SearchRequestBuilder($this->collectionNameResolver, $this->fullPool, $this->clientFactory);
+        $builder->build('en_gb', 2);
     }
 
     public function test_search_request_builder_returns_empty_array_when_no_indexers_registered(): void
     {
-        $builder = new SearchRequestBuilder($this->collectionNameResolver, new EntityIndexerPool([]));
-        $requests = $builder->build('default', 1, 'anything');
+        $builder = new SearchRequestBuilder($this->collectionNameResolver, new EntityIndexerPool([]), $this->clientFactory);
+        $requests = $builder->build('default', 1);
 
         self::assertSame([], $requests);
-    }
-
-    public function test_search_request_builder_forwards_query_to_all_requests(): void
-    {
-        $this->collectionNameResolver->method('resolve')->willReturnCallback(
-            static fn(string $entityType) => "col_{$entityType}"
-        );
-
-        $builder = new SearchRequestBuilder($this->collectionNameResolver, $this->fullPool);
-        $requests = $builder->build('default', 1, 'my specific query');
-
-        foreach ($requests as $request) {
-            self::assertSame('my specific query', $request['q']);
-        }
     }
 
     /** @param array<int, array<string, mixed>> $requests */
