@@ -47,9 +47,10 @@ class Chat extends Action implements HttpPostActionInterface
             $storeId = (int) $store->getId();
             $storeCode = $store->getCode();
 
-            $searchRequests = $this->searchRequestBuilder->build($storeCode, $storeId, $query);
+            $searchRequests = $this->searchRequestBuilder->build($storeCode, $storeId);
 
             $commonParams = [
+                'q' => $query,
                 'conversation' => true,
                 'conversation_model_id' => $this->modelManager->getModelId(),
             ];

@@ -27,7 +27,7 @@ class SearchRequestBuilder
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function build(string $storeCode, int $storeId, string $query): array
+    public function build(string $storeCode, int $storeId): array
     {
         $requests = [];
         foreach (self::ENTITY_QUERY_BY as $entityType => $queryBy) {
@@ -38,8 +38,8 @@ class SearchRequestBuilder
             $collectionName = $this->collectionNameResolver->resolve($entityType, $storeCode, $storeId);
             $requests[] = [
                 'collection' => $collectionName,
-                'q' => $query,
                 'query_by' => $queryBy,
+                'exclude_fields' => 'embedding',
             ];
         }
 

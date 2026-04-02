@@ -48,13 +48,33 @@ class AdminConversationModelManager
             $client = $this->clientFactory->create($storeId);
             $modelConfig = $this->getModelConfig($storeId);
 
+            $this->ensureHistoryCollectionExists($client, $modelConfig['history_collection']);
+
             try {
                 $client->conversations->getModels()[self::CONVERSATION_MODEL_ID]->update($modelConfig);
-            } catch (\Exception $e) {
+            } catch (\Exception) {
                 $client->conversations->getModels()->create($modelConfig);
             }
         } catch (\Exception $e) {
             $this->logger->error('Failed to sync admin conversation model: ' . $e->getMessage());
+        }
+    }
+
+    private function ensureHistoryCollectionExists(mixed $client, string $collectionName): void
+    {
+        try {
+            $client->collections[$collectionName]->retrieve();
+        } catch (\Exception) {
+            $client->collections->create([
+                'name' => $collectionName,
+                'fields' => [
+                    ['name' => 'conversation_id', 'type' => 'string'],
+                    ['name' => 'model_id', 'type' => 'string'],
+                    ['name' => 'timestamp', 'type' => 'int32'],
+                    ['name' => 'role', 'type' => 'string', 'index' => false],
+                    ['name' => 'message', 'type' => 'string', 'index' => false],
+                ],
+            ]);
         }
     }
 
