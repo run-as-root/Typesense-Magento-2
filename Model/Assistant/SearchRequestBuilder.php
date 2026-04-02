@@ -21,7 +21,18 @@ class SearchRequestBuilder
         'system_config' => 'path,label,value',
     ];
 
-    private const PER_PAGE = 5;
+    /** @var array<string, int> Per-collection result limits — prioritize customer/order data */
+    private const PER_PAGE = [
+        'customer' => 10,
+        'order' => 10,
+        'product' => 3,
+        'category' => 2,
+        'cms_page' => 2,
+        'store' => 2,
+        'system_config' => 2,
+    ];
+
+    private const DEFAULT_PER_PAGE = 3;
 
     /** @var array<string, bool>|null */
     private ?array $embeddingCache = null;
@@ -52,7 +63,7 @@ class SearchRequestBuilder
                 'collection' => $collectionName,
                 'query_by' => $queryBy,
                 'exclude_fields' => 'embedding',
-                'per_page' => self::PER_PAGE,
+                'per_page' => self::PER_PAGE[$entityType] ?? self::DEFAULT_PER_PAGE,
             ];
         }
 
