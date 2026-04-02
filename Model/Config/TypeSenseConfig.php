@@ -280,6 +280,33 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return (int) ($this->getValue('conversational_search/conversation_ttl', $storeId) ?: 86400);
     }
 
+    // Admin AI Assistant
+    public function isAdminAssistantEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('admin_assistant/enabled', $storeId);
+    }
+
+    public function getAdminAssistantSystemPrompt(?int $storeId = null): string
+    {
+        return (string) $this->getValue('admin_assistant/system_prompt', $storeId);
+    }
+
+    public function getAdminAssistantOpenAiModel(?int $storeId = null): string
+    {
+        $model = (string) $this->getValue('admin_assistant/openai_model', $storeId);
+
+        if ($model === '') {
+            return $this->getOpenAiModel($storeId);
+        }
+
+        return $model;
+    }
+
+    public function getAdminAssistantConversationTtl(?int $storeId = null): int
+    {
+        return (int) $this->getValue('admin_assistant/conversation_ttl', $storeId) ?: 86400;
+    }
+
     // Recommendations
     public function isRecommendationsEnabled(?int $storeId = null): bool
     {

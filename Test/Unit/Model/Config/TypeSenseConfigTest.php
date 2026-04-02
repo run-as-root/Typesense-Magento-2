@@ -163,4 +163,86 @@ final class TypeSenseConfigTest extends TestCase
 
         self::assertSame(8, $this->sut->getRecommendationsLimit());
     }
+
+    public function test_is_admin_assistant_enabled_returns_true_when_config_is_set(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/admin_assistant/enabled', ScopeInterface::SCOPE_STORE, null)
+            ->willReturn(true);
+
+        self::assertTrue($this->sut->isAdminAssistantEnabled());
+    }
+
+    public function test_is_admin_assistant_enabled_returns_false_when_config_not_set(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/admin_assistant/enabled', ScopeInterface::SCOPE_STORE, null)
+            ->willReturn(false);
+
+        self::assertFalse($this->sut->isAdminAssistantEnabled());
+    }
+
+    public function test_get_admin_assistant_system_prompt_returns_configured_value(): void
+    {
+        $expectedPrompt = 'You are a Magento store analytics assistant.';
+
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/admin_assistant/system_prompt', ScopeInterface::SCOPE_STORE, null, $expectedPrompt],
+            ]);
+
+        self::assertSame($expectedPrompt, $this->sut->getAdminAssistantSystemPrompt());
+    }
+
+    public function test_get_admin_assistant_openai_model_returns_configured_value(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/admin_assistant/openai_model', ScopeInterface::SCOPE_STORE, null, 'openai/gpt-4o'],
+            ]);
+
+        self::assertSame('openai/gpt-4o', $this->sut->getAdminAssistantOpenAiModel());
+    }
+
+    public function test_get_admin_assistant_openai_model_falls_back_to_conversational_search_model_when_empty(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/admin_assistant/openai_model', ScopeInterface::SCOPE_STORE, null, ''],
+                ['run_as_root_typesense/conversational_search/openai_model', ScopeInterface::SCOPE_STORE, null, 'openai/gpt-4o-mini'],
+            ]);
+
+        self::assertSame('openai/gpt-4o-mini', $this->sut->getAdminAssistantOpenAiModel());
+    }
+
+    public function test_get_admin_assistant_openai_model_falls_back_to_default_when_both_empty(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/admin_assistant/openai_model', ScopeInterface::SCOPE_STORE, null, ''],
+                ['run_as_root_typesense/conversational_search/openai_model', ScopeInterface::SCOPE_STORE, null, ''],
+            ]);
+
+        self::assertSame('openai/gpt-4o-mini', $this->sut->getAdminAssistantOpenAiModel());
+    }
+
+    public function test_get_admin_assistant_conversation_ttl_returns_configured_value(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/admin_assistant/conversation_ttl', ScopeInterface::SCOPE_STORE, null, '3600'],
+            ]);
+
+        self::assertSame(3600, $this->sut->getAdminAssistantConversationTtl());
+    }
+
+    public function test_get_admin_assistant_conversation_ttl_returns_integer(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/admin_assistant/conversation_ttl', ScopeInterface::SCOPE_STORE, null, '86400'],
+            ]);
+
+        self::assertSame(86400, $this->sut->getAdminAssistantConversationTtl());
+    }
 }

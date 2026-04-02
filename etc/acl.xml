@@ -12,6 +12,7 @@
                         <resource id="RunAsRoot_TypeSense::synonyms" title="Synonyms" sortOrder="40"/>
                         <resource id="RunAsRoot_TypeSense::overrides" title="Overrides" sortOrder="50"/>
                         <resource id="RunAsRoot_TypeSense::query_merchandiser" title="Query Merchandiser" sortOrder="60"/>
+                        <resource id="RunAsRoot_TypeSense::ai_assistant" title="AI Assistant" sortOrder="70"/>
                         <resource id="RunAsRoot_TypeSense::configuration" title="Configuration" sortOrder="80"/>
                     </resource>
                 </resource>

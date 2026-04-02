@@ -309,6 +309,35 @@
                 </field>
             </group>
 
+            <!-- Admin AI Assistant -->
+            <group id="admin_assistant" translate="label" type="text"
+                   sortOrder="90" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Admin AI Assistant</label>
+                <field id="enabled" translate="label comment" type="select"
+                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Admin AI Assistant</label>
+                    <comment>Requires Conversational Search to be enabled with a valid OpenAI API key.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="system_prompt" translate="label comment" type="textarea"
+                       sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>System Prompt</label>
+                    <comment>Instructions for the AI assistant. Describe what data it has access to and how it should respond.</comment>
+                </field>
+                <field id="openai_model" translate="label" type="select"
+                       sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>OpenAI Model</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\OpenAiModelSource</source_model>
+                    <comment>Leave empty to inherit from Conversational Search settings.</comment>
+                </field>
+                <field id="conversation_ttl" translate="label comment" type="text"
+                       sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Conversation TTL (seconds)</label>
+                    <comment>How long conversation history is retained. Default: 86400 (24 hours).</comment>
+                    <validate>validate-digits</validate>
+                </field>
+            </group>
+
             <!-- Product Recommendations -->
             <group id="recommendations" translate="label" type="text" sortOrder="80"
                    showInDefault="1" showInWebsite="1" showInStore="1">

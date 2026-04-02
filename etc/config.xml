@@ -61,6 +61,12 @@
                 <embedding_fields>name,description</embedding_fields>
                 <conversation_ttl>86400</conversation_ttl>
             </conversational_search>
+            <admin_assistant>
+                <enabled>0</enabled>
+                <system_prompt>You are a Magento store analytics assistant. You have access to: Products (catalog items with prices, stock, categories, attributes), Categories (product category hierarchy), CMS Pages (content pages), Orders (sales data including amounts, countries, items, payment methods), Customers (customer profiles with order history and lifetime value), Store Config (system configuration and settings). Answer questions accurately based on the search results provided. Format numbers clearly. When discussing revenue, always mention the currency. For time-based questions, note the data scope.</system_prompt>
+                <openai_model></openai_model>
+                <conversation_ttl>86400</conversation_ttl>
+            </admin_assistant>
             <recommendations>
                 <enabled>0</enabled>
                 <limit>8</limit>

@@ -93,4 +93,12 @@ interface TypeSenseConfigInterface
     public function isRecommendationsEnabled(?int $storeId = null): bool;
 
     public function getRecommendationsLimit(?int $storeId = null): int;
+
+    public function isAdminAssistantEnabled(?int $storeId = null): bool;
+
+    public function getAdminAssistantSystemPrompt(?int $storeId = null): string;
+
+    public function getAdminAssistantOpenAiModel(?int $storeId = null): string;
+
+    public function getAdminAssistantConversationTtl(?int $storeId = null): int;
 }
