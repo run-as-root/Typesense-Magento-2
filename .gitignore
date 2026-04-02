@@ -3,3 +3,4 @@
 *.png
 !docs/images/*.png
 .phpunit.cache/
+.worktrees/
