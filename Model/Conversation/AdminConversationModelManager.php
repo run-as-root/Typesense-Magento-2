@@ -32,7 +32,7 @@ class AdminConversationModelManager
             'api_key' => $this->config->getOpenAiApiKey($storeId),
             'history_collection' => $this->config->getIndexPrefix($storeId) . '_admin_conversation_history',
             'system_prompt' => $this->config->getAdminAssistantSystemPrompt($storeId),
-            'max_bytes' => 16384,
+            'max_bytes' => 65536,
             'ttl' => $this->config->getAdminAssistantConversationTtl($storeId),
         ];
     }
