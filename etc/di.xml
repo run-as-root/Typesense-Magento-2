@@ -103,6 +103,18 @@
         </arguments>
     </type>
 
+    <!-- Agent Assistant: Tool Registry with all registered tools -->
+    <type name="RunAsRoot\TypeSense\Model\Assistant\ToolRegistry">
+        <arguments>
+            <argument name="tools" xsi:type="array">
+                <item name="search_typesense" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\SearchTypesenseTool</item>
+                <item name="query_orders" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\QueryOrdersTool</item>
+                <item name="query_customers" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\QueryCustomersTool</item>
+                <item name="query_products" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\QueryProductsTool</item>
+            </argument>
+        </arguments>
+    </type>
+
     <!-- CLI commands -->
     <type name="Magento\Framework\Console\CommandListInterface">
         <arguments>
