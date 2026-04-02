@@ -17,7 +17,6 @@ class AssistantViewModel implements ArgumentInterface
     public function isEnabled(): bool
     {
         return $this->config->isEnabled()
-            && $this->config->isAdminAssistantEnabled()
-            && $this->config->isConversationalSearchEnabled();
+            && $this->config->isAdminAssistantEnabled();
     }
 }

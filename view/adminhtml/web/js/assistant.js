@@ -9,9 +9,9 @@ define([
     function getState() {
         try {
             var data = sessionStorage.getItem(STORAGE_KEY);
-            return data ? JSON.parse(data) : { messages: [], conversationId: '' };
+            return data ? JSON.parse(data) : { messages: [], openaiMessages: [] };
         } catch (e) {
-            return { messages: [], conversationId: '' };
+            return { messages: [], openaiMessages: [] };
         }
     }
 
@@ -127,7 +127,7 @@ define([
 
             // New chat
             $(document).on('click', '#typesense-chat-new', function() {
-                saveState({ messages: [], conversationId: '' });
+                saveState({ messages: [], openaiMessages: [] });
                 var container = document.getElementById('typesense-chat-messages');
                 renderMessages(container, []);
             });
@@ -162,7 +162,7 @@ define([
                 method: 'POST',
                 data: {
                     query: query,
-                    conversation_id: state.conversationId,
+                    history: JSON.stringify(state.openaiMessages || []),
                     form_key: window.FORM_KEY
                 },
                 dataType: 'json',
@@ -172,7 +172,7 @@ define([
 
                     if (response.success) {
                         state.messages.push({ role: 'assistant', content: response.answer });
-                        state.conversationId = response.conversation_id;
+                        state.openaiMessages = response.messages;
                     } else {
                         state.messages.push({
                             role: 'assistant',

@@ -63,24 +63,25 @@
             </conversational_search>
             <admin_assistant>
                 <enabled>0</enabled>
-                <system_prompt>You are an AI assistant for a Magento e-commerce store administrator. You answer questions by analyzing search results from the store's database.
+                <system_prompt>You are an AI assistant for a Magento e-commerce store administrator.
+You have tools to search and query store data. Always use tools to get data before answering — never guess or make assumptions.
 
-DATA YOU CAN ACCESS:
-- Products: name, SKU, price, special_price, description, categories, stock status, ratings, sales_count
-- Orders: increment_id, customer_name, customer_email, grand_total, subtotal, tax, shipping, discount, currency, payment_method, shipping_country/region/city, item_skus, item_names, status, created_at
-- Customers: email, name, customer_group, billing/shipping country/region/city, order_count, lifetime_value, last_order_date
-- Categories: name, URL, hierarchy level, product_count
-- CMS Pages: title, content, URL
-- Store Config: configuration paths and values (sensitive values excluded)
-- Store Info: store name, website, base URL, currency, locale
+TOOL SELECTION GUIDE:
+- "best selling products" → query_products(aggregation: top_by_sales_count)
+- "total revenue" / "how much did I sell" → query_orders(aggregation: total_revenue)
+- "revenue by country" → query_orders(aggregation: revenue_by_country)
+- "top customers" / "highest spending" → query_orders(aggregation: top_customers_by_revenue)
+- "how many customers in Germany" → query_customers(aggregation: count_by_country, filters: {country: DE})
+- "find product X" / "search for Y" → search_typesense(collection: product, query: X)
+- "what is my store URL" → search_typesense(collection: system_config, query: base_url)
+- "shipping policy" / CMS content → search_typesense(collection: cms_page, query: shipping policy)
 
 RESPONSE GUIDELINES:
-- Always base answers on the actual search results provided, not assumptions
-- When listing items, include specific names, numbers, and values from the data
-- For financial data, always include the currency code
-- If the search results don't contain enough data to fully answer, say what you found and what's missing
-- Use bullet points or numbered lists for clarity
-- Keep responses concise but complete</system_prompt>
+- Include specific numbers, names, currencies, and values
+- Use bullet points or tables for lists
+- For financial data, always include the currency
+- If a tool returns no results, say so clearly
+- You can call multiple tools to build a complete answer</system_prompt>
                 <openai_model>openai/gpt-4o</openai_model>
                 <conversation_ttl>86400</conversation_ttl>
             </admin_assistant>

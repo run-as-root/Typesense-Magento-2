@@ -9,12 +9,9 @@ use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
-use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
-use RunAsRoot\TypeSense\Api\TypeSenseClientFactoryInterface;
-use RunAsRoot\TypeSense\Model\Assistant\SearchRequestBuilder;
+use RunAsRoot\TypeSense\Model\Assistant\AgentLoop;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
-use RunAsRoot\TypeSense\Model\Conversation\AdminConversationModelManager;
 
 class Chat extends Action implements HttpPostActionInterface
 {
@@ -23,10 +20,7 @@ class Chat extends Action implements HttpPostActionInterface
     public function __construct(
         Context $context,
         private readonly JsonFactory $jsonFactory,
-        private readonly TypeSenseClientFactoryInterface $clientFactory,
-        private readonly AdminConversationModelManager $modelManager,
-        private readonly SearchRequestBuilder $searchRequestBuilder,
-        private readonly StoreManagerInterface $storeManager,
+        private readonly AgentLoop $agentLoop,
         private readonly LoggerInterface $logger,
         private readonly TypeSenseConfigInterface $config,
     ) {
@@ -37,50 +31,32 @@ class Chat extends Action implements HttpPostActionInterface
     {
         $result = $this->jsonFactory->create();
 
-        if (!$this->config->isAdminAssistantEnabled() || !$this->config->isConversationalSearchEnabled()) {
+        if (!$this->config->isAdminAssistantEnabled()) {
             return $result->setData(['success' => false, 'error' => 'AI Assistant is not enabled.']);
         }
 
         try {
             $query = (string) $this->getRequest()->getParam('query', '');
-            $conversationId = (string) $this->getRequest()->getParam('conversation_id', '');
+            $historyJson = (string) $this->getRequest()->getParam('history', '');
 
             if (trim($query) === '') {
                 return $result->setData(['success' => false, 'error' => 'Query cannot be empty.']);
             }
 
-            $store = $this->storeManager->getDefaultStoreView();
-            if ($store === null) {
-                return $result->setData(['success' => false, 'error' => 'No default store view configured.']);
-            }
-            $storeId = (int) $store->getId();
-            $storeCode = $store->getCode();
-
-            $searchRequests = $this->searchRequestBuilder->build($storeCode, $storeId);
-
-            $commonParams = [
-                'q' => $query,
-                'conversation' => true,
-                'conversation_model_id' => $this->modelManager->getModelId(),
-            ];
-
-            if ($conversationId !== '') {
-                $commonParams['conversation_id'] = $conversationId;
+            $history = [];
+            if ($historyJson !== '') {
+                $decoded = json_decode($historyJson, true);
+                if (is_array($decoded)) {
+                    $history = $decoded;
+                }
             }
 
-            $client = $this->clientFactory->create($storeId);
-            $response = $client->multiSearch->perform(
-                ['searches' => $searchRequests],
-                $commonParams,
-            );
-
-            $answer = $response['conversation']['answer'] ?? '';
-            $newConversationId = $response['conversation']['conversation_id'] ?? $conversationId;
+            $response = $this->agentLoop->run($query, $history);
 
             return $result->setData([
                 'success' => true,
-                'answer' => $answer,
-                'conversation_id' => $newConversationId,
+                'answer' => $response['answer'],
+                'messages' => $response['messages'],
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Admin AI Assistant error: ' . $e->getMessage());
