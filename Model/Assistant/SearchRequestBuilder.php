@@ -11,11 +11,11 @@ class SearchRequestBuilder
 {
     /** @var array<string, string> */
     private const ENTITY_QUERY_BY = [
-        'product' => 'name,description,sku,short_description',
+        'product' => 'embedding,name,description,sku,short_description',
         'category' => 'name,description',
         'cms_page' => 'title,content',
-        'order' => 'increment_id,customer_name,customer_email,item_names,shipping_country,status',
-        'customer' => 'email,firstname,lastname,group_name,default_shipping_country',
+        'order' => 'embedding,increment_id,customer_name,customer_email,item_names,shipping_country,status',
+        'customer' => 'embedding,email,firstname,lastname,group_name,default_shipping_country',
         'store' => 'store_name,website_name,store_code',
         'system_config' => 'path,label,value',
     ];
