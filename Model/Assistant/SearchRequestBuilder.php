@@ -61,7 +61,9 @@ class SearchRequestBuilder
         if ($this->embeddingCache === null) {
             $this->embeddingCache = [];
             try {
-                $collections = $this->clientFactory->create($storeId)->collections->retrieve();
+                $client = $this->clientFactory->create($storeId);
+
+                $collections = $client->collections->retrieve();
                 foreach ($collections as $collection) {
                     $hasEmbedding = false;
                     foreach ($collection['fields'] as $field) {
@@ -71,6 +73,15 @@ class SearchRequestBuilder
                         }
                     }
                     $this->embeddingCache[$collection['name']] = $hasEmbedding;
+                }
+
+                $aliases = $client->aliases->retrieve();
+                foreach ($aliases['aliases'] ?? [] as $alias) {
+                    $aliasName = $alias['name'];
+                    $targetName = $alias['collection_name'];
+                    if (isset($this->embeddingCache[$targetName])) {
+                        $this->embeddingCache[$aliasName] = $this->embeddingCache[$targetName];
+                    }
                 }
             } catch (\Exception) {
             }
