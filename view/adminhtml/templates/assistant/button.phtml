@@ -1,0 +1,23 @@
+<?php
+/** @var \Magento\Framework\View\Element\Template $block */
+/** @var \RunAsRoot\TypeSense\ViewModel\Adminhtml\AssistantViewModel $viewModel */
+$viewModel = $block->getViewModel();
+
+if (!$viewModel->isEnabled()) {
+    return;
+}
+
+$chatUrl = $block->getUrl('typesense/assistant/chat');
+?>
+
+<div id="typesense-ai-assistant-container"></div>
+
+<script>
+require([
+    'RunAsRoot_TypeSense/js/assistant'
+], function(assistant) {
+    assistant.init({
+        chatUrl: '<?= $block->escapeUrl($chatUrl) ?>'
+    });
+});
+</script>
