@@ -38,4 +38,10 @@
             <table name="sales_order_payment" entity_column="parent_id"/>
         </subscriptions>
     </view>
+    <view id="typesense_customer" class="RunAsRoot\TypeSense\Model\Indexer\Customer\CustomerIndexer" group="indexer">
+        <subscriptions>
+            <table name="customer_entity" entity_column="entity_id"/>
+            <table name="customer_address_entity" entity_column="parent_id"/>
+        </subscriptions>
+    </view>
 </config>

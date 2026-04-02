@@ -31,4 +31,10 @@
         <title translate="true">TypeSense Order Index</title>
         <description translate="true">Rebuilds TypeSense order search index for admin assistant</description>
     </indexer>
+    <indexer id="typesense_customer"
+             view_id="typesense_customer"
+             class="RunAsRoot\TypeSense\Model\Indexer\Customer\CustomerIndexer">
+        <title translate="true">TypeSense Customer Index</title>
+        <description translate="true">Rebuilds TypeSense customer index for admin assistant</description>
+    </indexer>
 </config>
