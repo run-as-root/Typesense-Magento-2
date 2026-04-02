@@ -5,24 +5,29 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Model\Assistant;
 
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
+use RunAsRoot\TypeSense\Api\TypeSenseClientFactoryInterface;
 use RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool;
 
 class SearchRequestBuilder
 {
     /** @var array<string, string> */
     private const ENTITY_QUERY_BY = [
-        'product' => 'embedding,name,description,sku,short_description',
+        'product' => 'name,description,sku,short_description',
         'category' => 'name,description',
         'cms_page' => 'title,content',
-        'order' => 'embedding,increment_id,customer_name,customer_email,item_names,shipping_country,status',
-        'customer' => 'embedding,email,firstname,lastname,group_name,default_shipping_country',
+        'order' => 'increment_id,customer_name,customer_email,item_names,shipping_country,status',
+        'customer' => 'email,firstname,lastname,group_name,default_shipping_country',
         'store' => 'store_name,website_name,store_code',
         'system_config' => 'path,label,value',
     ];
 
+    /** @var array<string, bool>|null */
+    private ?array $embeddingCache = null;
+
     public function __construct(
         private readonly CollectionNameResolverInterface $collectionNameResolver,
         private readonly EntityIndexerPool $entityIndexerPool,
+        private readonly TypeSenseClientFactoryInterface $clientFactory,
     ) {
     }
 
@@ -36,6 +41,11 @@ class SearchRequestBuilder
             }
 
             $collectionName = $this->collectionNameResolver->resolve($entityType, $storeCode, $storeId);
+
+            if ($this->collectionHasEmbedding($collectionName, $storeId)) {
+                $queryBy = 'embedding,' . $queryBy;
+            }
+
             $requests[] = [
                 'collection' => $collectionName,
                 'query_by' => $queryBy,
@@ -44,5 +54,28 @@ class SearchRequestBuilder
         }
 
         return $requests;
+    }
+
+    private function collectionHasEmbedding(string $collectionName, int $storeId): bool
+    {
+        if ($this->embeddingCache === null) {
+            $this->embeddingCache = [];
+            try {
+                $collections = $this->clientFactory->create($storeId)->collections->retrieve();
+                foreach ($collections as $collection) {
+                    $hasEmbedding = false;
+                    foreach ($collection['fields'] as $field) {
+                        if ($field['name'] === 'embedding') {
+                            $hasEmbedding = true;
+                            break;
+                        }
+                    }
+                    $this->embeddingCache[$collection['name']] = $hasEmbedding;
+                }
+            } catch (\Exception) {
+            }
+        }
+
+        return $this->embeddingCache[$collectionName] ?? false;
     }
 }
