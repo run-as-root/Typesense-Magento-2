@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Indexer\Customer;
 
-use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Customer\Api\GroupRepositoryInterface;
+use Magento\Customer\Model\Customer;
 use Magento\Customer\Model\ResourceModel\Customer\Collection as CustomerCollection;
 use Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
@@ -30,7 +30,7 @@ class CustomerDataBuilder
      *
      * @return array<string, mixed>
      */
-    public function build(CustomerInterface $customer, int $storeId): array
+    public function build(Customer $customer, int $storeId): array
     {
         $customerId = (int) $customer->getId();
         $groupName = $this->resolveGroupName((int) $customer->getGroupId());
@@ -120,10 +120,10 @@ class CustomerDataBuilder
     /**
      * @param array<string, mixed> $document
      */
-    private function appendAddressData(CustomerInterface $customer, array &$document): void
+    private function appendAddressData(Customer $customer, array &$document): void
     {
         $addresses = $customer->getAddresses();
-        if ($addresses === null) {
+        if (empty($addresses)) {
             return;
         }
 
@@ -135,7 +135,7 @@ class CustomerDataBuilder
 
             if ($defaultBillingId !== null && $addressId === (string) $defaultBillingId) {
                 $country = (string) $address->getCountryId();
-                $region = $address->getRegion() !== null ? (string) $address->getRegion()->getRegion() : '';
+                $region = (string) $address->getRegion();
                 $city = (string) $address->getCity();
 
                 if ($country !== '') {
@@ -151,7 +151,7 @@ class CustomerDataBuilder
 
             if ($defaultShippingId !== null && $addressId === (string) $defaultShippingId) {
                 $country = (string) $address->getCountryId();
-                $region = $address->getRegion() !== null ? (string) $address->getRegion()->getRegion() : '';
+                $region = (string) $address->getRegion();
                 $city = (string) $address->getCity();
 
                 if ($country !== '') {
