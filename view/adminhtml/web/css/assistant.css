@@ -128,8 +128,15 @@
     border-top: 1px solid #f0f0f0;
 }
 
-/* Slideout overrides */
+/* Slideout overrides — force right side */
+.typesense-ai-slideout {
+    right: 0;
+    left: auto !important;
+}
+
 .typesense-ai-slideout .modal-inner-wrap {
     width: 420px;
     max-width: 90vw;
+    margin-left: auto;
+    margin-right: 0;
 }
