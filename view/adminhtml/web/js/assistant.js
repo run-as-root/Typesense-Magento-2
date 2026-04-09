@@ -30,8 +30,8 @@ define([
             var rows = tableBlock.trim().split('\n');
             var html = '<table class="typesense-chat-table">';
             rows.forEach(function(row, i) {
-                // Skip separator rows (|---|---|)
-                if (/^\|[\s\-:]+\|$/.test(row.trim())) return;
+                // Skip separator rows (|---|---|---| or |---------|)
+                if (/^\|[\s\-:|]+$/.test(row.trim())) return;
                 var cells = row.split('|').filter(function(c, j, a) { return j > 0 && j < a.length - 1; });
                 var tag = i === 0 ? 'th' : 'td';
                 html += '<tr>';
