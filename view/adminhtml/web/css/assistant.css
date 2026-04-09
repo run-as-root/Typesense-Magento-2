@@ -158,8 +158,8 @@
 }
 
 .typesense-ai-slideout .modal-inner-wrap {
-    width: 420px;
-    max-width: 90vw;
+    width: 75vw;
+    max-width: 75vw;
     margin-left: auto;
     margin-right: 0;
 }
