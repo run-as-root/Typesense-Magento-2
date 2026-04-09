@@ -24,6 +24,26 @@ define([
     function renderMarkdown(text) {
         // Escape HTML entities first to prevent XSS
         text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        // Render markdown tables
+        text = text.replace(/((?:^\|.+\|$\n?)+)/gm, function(tableBlock) {
+            var rows = tableBlock.trim().split('\n');
+            var html = '<table class="typesense-chat-table">';
+            rows.forEach(function(row, i) {
+                // Skip separator rows (|---|---|)
+                if (/^\|[\s\-:]+\|$/.test(row.trim())) return;
+                var cells = row.split('|').filter(function(c, j, a) { return j > 0 && j < a.length - 1; });
+                var tag = i === 0 ? 'th' : 'td';
+                html += '<tr>';
+                cells.forEach(function(cell) {
+                    html += '<' + tag + '>' + cell.trim() + '</' + tag + '>';
+                });
+                html += '</tr>';
+            });
+            html += '</table>';
+            return html;
+        });
+
         // Basic markdown rendering
         return text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')

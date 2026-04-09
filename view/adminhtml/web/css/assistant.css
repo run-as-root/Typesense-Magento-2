@@ -84,6 +84,29 @@
     padding-left: 20px;
 }
 
+.typesense-chat-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0;
+    font-size: 0.9em;
+}
+
+.typesense-chat-table th,
+.typesense-chat-table td {
+    border: 1px solid #ddd;
+    padding: 6px 10px;
+    text-align: left;
+}
+
+.typesense-chat-table th {
+    background: #e8e8e8;
+    font-weight: 600;
+}
+
+.typesense-chat-table tr:nth-child(even) {
+    background: #f8f8f8;
+}
+
 .typesense-chat-typing {
     color: #999;
     font-style: italic;
