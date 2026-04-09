@@ -9,7 +9,7 @@ use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
 class AgentLoop
 {
-    private const MAX_ITERATIONS = 5;
+    private const MAX_ITERATIONS = 10;
 
     public function __construct(
         private readonly OpenAiClientFactory $openAiClientFactory,

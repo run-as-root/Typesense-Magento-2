@@ -107,10 +107,16 @@
     <type name="RunAsRoot\TypeSense\Model\Assistant\ToolRegistry">
         <arguments>
             <argument name="tools" xsi:type="array">
+                <item name="execute_sql" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\ExecuteSqlTool</item>
+                <item name="describe_database" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\DescribeDatabaseTool</item>
                 <item name="search_typesense" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\SearchTypesenseTool</item>
-                <item name="query_orders" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\QueryOrdersTool</item>
-                <item name="query_customers" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\QueryCustomersTool</item>
-                <item name="query_products" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\QueryProductsTool</item>
+                <item name="compare_periods" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\ComparePeriodsTool</item>
+                <item name="trend_analysis" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\TrendAnalysisTool</item>
+                <item name="customer_segmentation" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\CustomerSegmentationTool</item>
+                <item name="cohort_analysis" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\CohortAnalysisTool</item>
+                <item name="frequently_bought_together" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\FrequentlyBoughtTogetherTool</item>
+                <item name="inventory_forecast" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\InventoryForecastTool</item>
+                <item name="detect_anomalies" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\DetectAnomaliesTool</item>
             </argument>
         </arguments>
     </type>
