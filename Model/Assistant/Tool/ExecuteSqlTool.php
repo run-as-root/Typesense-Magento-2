@@ -23,7 +23,7 @@ class ExecuteSqlTool implements ToolInterface
 
     public function getDescription(): string
     {
-        return 'Execute a read-only SELECT query on the Magento MySQL database. Returns up to 100 rows. Use describe_database to explore table/column names first. Blocked tables: admin_user, oauth_token, authorization_role. Blocked columns: password_hash.';
+        return 'Execute a read-only SELECT query on the Magento MySQL database. Returns up to 100 rows. Use describe_database to explore table/column names first. Many tables and columns are blocked for security (admin_user, oauth_token, authorization_role, integration, vault_payment_token, etc). UNION, subqueries into blocked tables, and SQL comments are not allowed.';
     }
 
     public function getParametersSchema(): array
@@ -73,7 +73,7 @@ class ExecuteSqlTool implements ToolInterface
                 'count' => count($rows),
             ]);
         } catch (\Exception $e) {
-            return json_encode(['error' => 'SQL error: ' . $e->getMessage()]);
+            return json_encode(['error' => 'Query execution failed. Please check your SQL syntax and try again.']);
         }
     }
 }

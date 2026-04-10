@@ -100,7 +100,7 @@ class DescribeDatabaseTool implements ToolInterface
 
             return json_encode(['table' => $tableName, 'columns' => $columns]);
         } catch (\Exception $e) {
-            return json_encode(['error' => 'Could not describe table: ' . $e->getMessage()]);
+            return json_encode(['error' => 'Could not describe table. Please check the table name and try again.']);
         }
     }
 
@@ -143,7 +143,7 @@ class DescribeDatabaseTool implements ToolInterface
                 'referenced_by' => $incoming,
             ]);
         } catch (\Exception $e) {
-            return json_encode(['error' => 'Could not fetch relationships: ' . $e->getMessage()]);
+            return json_encode(['error' => 'Could not fetch relationships. Please check the table name and try again.']);
         }
     }
 }

@@ -19,7 +19,9 @@ final class ExecuteSqlToolTest extends TestCase
     protected function setUp(): void
     {
         $this->resource = $this->createMock(ResourceConnection::class);
-        $this->sandbox = new SqlSandbox();
+        $this->resource->method('getTableName')->willReturnArgument(0);
+
+        $this->sandbox = new SqlSandbox($this->resource);
 
         $this->sut = new ExecuteSqlTool(
             $this->resource,
