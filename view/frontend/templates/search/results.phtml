@@ -31,7 +31,7 @@ $config = $viewModel->getJsonConfig();
 $sortOptions = $viewModel->getSortOptions();
 ?>
 
-<script src="https://cdn.jsdelivr.net/npm/typesense@1.8.2/dist/typesense.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/typesense@1.8.2/dist/typesense.min.js" integrity="sha384-b1Uj2Udv6vFZ+nH6F6SaFpWpjpTqGXdfReSsqJhHUVr8yp2AehtZG/2EpA1dw0SN" crossorigin="anonymous"></script>
 <script>
     function initTypesenseInstantSearch() {
         const config = <?= /* @noEscape */ $config ?>;

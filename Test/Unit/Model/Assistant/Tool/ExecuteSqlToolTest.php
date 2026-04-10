@@ -7,6 +7,7 @@ namespace RunAsRoot\TypeSense\Test\Unit\Model\Assistant\Tool;
 use Magento\Framework\App\ResourceConnection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Model\Assistant\Tool\ExecuteSqlTool;
 use RunAsRoot\TypeSense\Model\Assistant\Tool\SqlSandbox;
 
@@ -19,11 +20,14 @@ final class ExecuteSqlToolTest extends TestCase
     protected function setUp(): void
     {
         $this->resource = $this->createMock(ResourceConnection::class);
-        $this->sandbox = new SqlSandbox();
+        $this->resource->method('getTableName')->willReturnArgument(0);
+
+        $this->sandbox = new SqlSandbox($this->resource);
 
         $this->sut = new ExecuteSqlTool(
             $this->resource,
             $this->sandbox,
+            $this->createMock(LoggerInterface::class),
         );
     }
 
