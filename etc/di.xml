@@ -117,6 +117,20 @@
                 <item name="frequently_bought_together" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\FrequentlyBoughtTogetherTool</item>
                 <item name="inventory_forecast" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\InventoryForecastTool</item>
                 <item name="detect_anomalies" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\DetectAnomaliesTool</item>
+                <item name="profit_analysis" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\ProfitAnalysisTool</item>
+                <item name="customer_lifetime_value" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\CustomerLifetimeValueTool</item>
+                <item name="funnel_analysis" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\FunnelAnalysisTool</item>
+                <item name="discount_effectiveness" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\DiscountEffectivenessTool</item>
+                <item name="returns_analysis" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\ReturnsAnalysisTool</item>
+                <item name="product_velocity" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\ProductVelocityTool</item>
+                <item name="customer_churn_risk" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\CustomerChurnRiskTool</item>
+                <item name="revenue_attribution" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\RevenueAttributionTool</item>
+                <item name="customer_purchase_journey" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\CustomerPurchaseJourneyTool</item>
+                <item name="basket_analysis" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\BasketAnalysisTool</item>
+                <item name="geographic_performance" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\GeographicPerformanceTool</item>
+                <item name="time_pattern_analysis" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\TimePatternAnalysisTool</item>
+                <item name="customer_concentration_risk" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\CustomerConcentrationRiskTool</item>
+                <item name="shipping_performance" xsi:type="object">RunAsRoot\TypeSense\Model\Assistant\Tool\ShippingPerformanceTool</item>
             </argument>
         </arguments>
     </type>

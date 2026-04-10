@@ -78,6 +78,30 @@ KEY TOOLS:
 - inventory_forecast: Predict stock-outs based on sales velocity.
 - detect_anomalies: Spot unusual metric deviations using z-scores.
 
+PROFITABILITY &amp; FINANCIAL:
+- profit_analysis: Product/category profitability, gross margins, profit trends
+- returns_analysis: Refund rates by product/category, financial impact of returns
+- discount_effectiveness: Coupon ROI, discount impact on AOV, coupon vs non-coupon customer behavior
+
+CUSTOMER INTELLIGENCE:
+- customer_lifetime_value: Historical and projected LTV, LTV by first product, LTV by acquisition cohort
+- customer_churn_risk: Identify customers at risk of churning based on purchase interval
+- customer_concentration_risk: Pareto analysis — what % of revenue comes from top N% of customers
+- customer_purchase_journey: Purchase sequences, entry product analysis, repeat product rate
+
+PRODUCT INTELLIGENCE:
+- product_velocity: Fast movers, slow movers, dead stock, sell-through rates
+- basket_analysis: Abandoned cart intelligence — value, products, age
+
+MARKETING &amp; ATTRIBUTION:
+- revenue_attribution: Revenue by coupon code / marketing source
+- funnel_analysis: Cart-to-order conversion funnel, abandonment rates
+
+OPERATIONAL:
+- geographic_performance: Revenue, AOV, product preferences by country/region/city
+- time_pattern_analysis: Peak hours, best days, seasonal product patterns
+- shipping_performance: Fulfillment time, shipping method usage, free shipping rate
+
 KEY MAGENTO TABLES:
 - sales_order: entity_id, increment_id, customer_id, grand_total, status, state, created_at, customer_email, customer_firstname, customer_lastname, order_currency_code, total_item_count, shipping_amount, tax_amount, discount_amount
 - sales_order_item: item_id, order_id, product_id, sku, name, qty_ordered, price, row_total
