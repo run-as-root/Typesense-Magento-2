@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Model\Assistant\Tool;
 
 use Magento\Framework\App\ResourceConnection;
+use Psr\Log\LoggerInterface;
 
 class ExecuteSqlTool implements ToolInterface
 {
@@ -13,6 +14,7 @@ class ExecuteSqlTool implements ToolInterface
     public function __construct(
         private readonly ResourceConnection $resource,
         private readonly SqlSandbox $sandbox,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -48,9 +50,15 @@ class ExecuteSqlTool implements ToolInterface
             return json_encode(['error' => 'Query cannot be empty.']);
         }
 
+        $this->logger->info('AI Assistant SQL query', ['query' => mb_substr($query, 0, 500)]);
+
         try {
             $this->sandbox->validate($query);
         } catch (\InvalidArgumentException $e) {
+            $this->logger->warning('AI Assistant blocked SQL query', [
+                'query' => mb_substr($query, 0, 500),
+                'reason' => $e->getMessage(),
+            ]);
             return json_encode(['error' => $e->getMessage()]);
         }
 
@@ -73,6 +81,10 @@ class ExecuteSqlTool implements ToolInterface
                 'count' => count($rows),
             ]);
         } catch (\Exception $e) {
+            $this->logger->error('AI Assistant SQL execution error', [
+                'query' => mb_substr($query, 0, 500),
+                'error' => $e->getMessage(),
+            ]);
             return json_encode(['error' => 'Query execution failed. Please check your SQL syntax and try again.']);
         }
     }
