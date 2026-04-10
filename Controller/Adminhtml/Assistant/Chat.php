@@ -47,7 +47,7 @@ class Chat extends Action implements HttpPostActionInterface
             if ($historyJson !== '') {
                 $decoded = json_decode($historyJson, true);
                 if (is_array($decoded)) {
-                    $history = $decoded;
+                    $history = $this->sanitizeHistory($decoded);
                 }
             }
 
@@ -56,7 +56,7 @@ class Chat extends Action implements HttpPostActionInterface
             return $result->setData([
                 'success' => true,
                 'answer' => $response['answer'],
-                'messages' => $response['messages'],
+                'messages' => $this->filterResponseMessages($response['messages']),
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Admin AI Assistant error: ' . $e->getMessage());
@@ -66,5 +66,62 @@ class Chat extends Action implements HttpPostActionInterface
                 'error' => 'Failed to get AI response. Please try again.',
             ]);
         }
+    }
+
+    /**
+     * Filter response messages to prevent leaking system prompt and tool internals.
+     *
+     * @param array<int, array<string, mixed>> $messages
+     * @return array<int, array{role: string, content: string}>
+     */
+    private function filterResponseMessages(array $messages): array
+    {
+        $exposedRoles = ['user', 'assistant'];
+        $filtered = [];
+
+        foreach ($messages as $message) {
+            $role = (string) ($message['role'] ?? '');
+            if (!in_array($role, $exposedRoles, true)) {
+                continue;
+            }
+
+            $filtered[] = [
+                'role' => $role,
+                'content' => (string) ($message['content'] ?? ''),
+            ];
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * Sanitize conversation history from client input.
+     * Only allow user and assistant roles. Strip tool_calls and system messages.
+     *
+     * @param array<int, mixed> $history
+     * @return array<int, array{role: string, content: string}>
+     */
+    private function sanitizeHistory(array $history): array
+    {
+        $allowedRoles = ['user', 'assistant'];
+        $sanitized = [];
+
+        foreach ($history as $message) {
+            if (!is_array($message)) {
+                continue;
+            }
+
+            $role = (string) ($message['role'] ?? '');
+            if (!in_array($role, $allowedRoles, true)) {
+                continue;
+            }
+
+            $sanitized[] = [
+                'role' => $role,
+                'content' => (string) ($message['content'] ?? ''),
+            ];
+        }
+
+        return $sanitized;
     }
 }
