@@ -7,6 +7,7 @@ namespace RunAsRoot\TypeSense\Controller\Adminhtml\Assistant;
 use Magento\Backend\App\Action;
 use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
+use Magento\Framework\App\CacheInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Psr\Log\LoggerInterface;
@@ -17,12 +18,16 @@ class Chat extends Action implements HttpPostActionInterface
 {
     public const ADMIN_RESOURCE = 'RunAsRoot_TypeSense::ai_assistant';
 
+    private const RATE_LIMIT_MAX_REQUESTS = 100;
+    private const RATE_LIMIT_WINDOW_SECONDS = 3600;
+
     public function __construct(
         Context $context,
         private readonly JsonFactory $jsonFactory,
         private readonly AgentLoop $agentLoop,
         private readonly LoggerInterface $logger,
         private readonly TypeSenseConfigInterface $config,
+        private readonly CacheInterface $cache,
     ) {
         parent::__construct($context);
     }
@@ -33,6 +38,11 @@ class Chat extends Action implements HttpPostActionInterface
 
         if (!$this->config->isAdminAssistantEnabled()) {
             return $result->setData(['success' => false, 'error' => 'AI Assistant is not enabled.']);
+        }
+
+        $rateLimitError = $this->checkRateLimit();
+        if ($rateLimitError !== null) {
+            return $result->setData(['success' => false, 'error' => $rateLimitError]);
         }
 
         try {
@@ -66,6 +76,29 @@ class Chat extends Action implements HttpPostActionInterface
                 'error' => 'Failed to get AI response. Please try again.',
             ]);
         }
+    }
+
+    private function checkRateLimit(): ?string
+    {
+        $adminId = (string) ($this->_auth->getUser()?->getId() ?? 'unknown');
+        $cacheKey = 'ai_assistant_rate_' . $adminId;
+
+        $count = (int) ($this->cache->load($cacheKey) ?: 0);
+
+        if ($count >= self::RATE_LIMIT_MAX_REQUESTS) {
+            $this->logger->warning('AI Assistant rate limit exceeded for admin ' . $adminId);
+            return 'Rate limit exceeded. Maximum ' . self::RATE_LIMIT_MAX_REQUESTS
+                . ' requests per hour. Please try again later.';
+        }
+
+        $this->cache->save(
+            (string) ($count + 1),
+            $cacheKey,
+            [],
+            self::RATE_LIMIT_WINDOW_SECONDS
+        );
+
+        return null;
     }
 
     /**
