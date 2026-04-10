@@ -7,7 +7,6 @@ namespace RunAsRoot\TypeSense\Controller\Adminhtml\CategoryMerchandiser;
 use Magento\Backend\App\Action;
 use Magento\Backend\App\Action\Context;
 use Magento\Framework\Api\SearchCriteriaBuilder;
-use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
@@ -17,7 +16,7 @@ use RunAsRoot\TypeSense\Api\CategoryMerchandisingRepositoryInterface;
 use RunAsRoot\TypeSense\Model\Curation\CategoryMerchandisingSync;
 use RunAsRoot\TypeSense\Model\Merchandising\CategoryMerchandisingFactory;
 
-class Save extends Action implements HttpPostActionInterface, HttpGetActionInterface
+class Save extends Action implements HttpPostActionInterface
 {
     public const ADMIN_RESOURCE = 'RunAsRoot_TypeSense::overrides';
 
@@ -38,45 +37,6 @@ class Save extends Action implements HttpPostActionInterface, HttpGetActionInter
     {
         $resultJson = $this->jsonFactory->create();
 
-        // Handle GET: return existing rules for a category
-        if ($this->getRequest()->isGet()) {
-            return $this->handleGet($resultJson);
-        }
-
-        return $this->handlePost($resultJson);
-    }
-
-    private function handleGet(Json $resultJson): Json
-    {
-        $categoryId = (int) $this->getRequest()->getParam('category_id', 0);
-
-        if ($categoryId === 0) {
-            return $resultJson->setData(['rules' => []]);
-        }
-
-        $searchCriteria = $this->searchCriteriaBuilder
-            ->addFilter('category_id', $categoryId)
-            ->create();
-
-        $searchResults = $this->repository->getList($searchCriteria);
-        $rules = [];
-
-        foreach ($searchResults->getItems() as $item) {
-            $rules[] = [
-                'product_id' => $item->getProductId(),
-                'position'   => $item->getPosition(),
-                'action'     => $item->getAction(),
-                'name'       => '',
-                'sku'        => '',
-                'image_url'  => '',
-            ];
-        }
-
-        return $resultJson->setData(['rules' => $rules]);
-    }
-
-    private function handlePost(Json $resultJson): Json
-    {
         try {
             $raw = $this->getRequest()->getParam('payload') ?: $this->getRequest()->getContent();
             $payload = json_decode((string) $raw, true, 512, JSON_THROW_ON_ERROR);
