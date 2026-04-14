@@ -198,17 +198,6 @@ final class OrderDataBuilderTest extends TestCase
         bool $withChildItem = false,
     ): MockObject {
         $order = $this->getMockBuilder(OrderInterface::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods([
-                'getEntityId', 'getBillingAddress', 'getPayment',
-                'getGrandTotal', 'getSubtotal', 'getTaxAmount',
-                'getShippingAmount', 'getDiscountAmount',
-                'getOrderCurrencyCode', 'getStatus', 'getState',
-                'getCreatedAt', 'getUpdatedAt', 'getIncrementId',
-                'getItems', 'getCustomerEmail', 'getShippingDescription',
-                'getCustomerGroupId', 'getCustomerFirstname',
-                'getCustomerLastname',
-            ])
             ->addMethods(['getShippingAddress'])
             ->getMock();
 
