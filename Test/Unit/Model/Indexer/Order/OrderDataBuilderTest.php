@@ -206,12 +206,10 @@ final class OrderDataBuilderTest extends TestCase
                 'getOrderCurrencyCode', 'getStatus', 'getState',
                 'getCreatedAt', 'getUpdatedAt', 'getIncrementId',
                 'getItems', 'getCustomerEmail', 'getShippingDescription',
-            ])
-            ->addMethods([
-                'getShippingAddress',
                 'getCustomerGroupId', 'getCustomerFirstname',
                 'getCustomerLastname',
             ])
+            ->addMethods(['getShippingAddress'])
             ->getMock();
 
         $order->method('getEntityId')->willReturn('42');
