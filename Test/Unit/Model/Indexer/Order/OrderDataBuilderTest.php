@@ -8,6 +8,7 @@ use Magento\Customer\Api\Data\GroupInterface;
 use Magento\Customer\Api\GroupRepositoryInterface;
 use Magento\Sales\Api\Data\OrderAddressInterface;
 use Magento\Sales\Api\Data\OrderInterface;
+use Magento\Sales\Model\Order;
 use Magento\Sales\Api\Data\OrderItemInterface;
 use Magento\Sales\Api\Data\OrderPaymentInterface;
 use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
@@ -189,7 +190,7 @@ final class OrderDataBuilderTest extends TestCase
     }
 
     /**
-     * @return OrderInterface&MockObject
+     * @return Order&MockObject
      */
     private function createOrderMock(
         bool $withShippingAddress = true,
@@ -197,9 +198,7 @@ final class OrderDataBuilderTest extends TestCase
         bool $withPayment = true,
         bool $withChildItem = false,
     ): MockObject {
-        $order = $this->getMockBuilder(OrderInterface::class)
-            ->addMethods(['getShippingAddress'])
-            ->getMock();
+        $order = $this->createMock(Order::class);
 
         $order->method('getEntityId')->willReturn('42');
         $order->method('getIncrementId')->willReturn('000000042');
