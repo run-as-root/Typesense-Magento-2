@@ -199,17 +199,19 @@ final class OrderDataBuilderTest extends TestCase
     ): MockObject {
         $order = $this->getMockBuilder(OrderInterface::class)
             ->disableOriginalConstructor()
-            ->addMethods([
-                'getShippingAddress', 'getBillingAddress', 'getPayment',
-                'getShippingDescription', 'getCustomerGroupId',
-                'getCustomerFirstname', 'getCustomerLastname',
-                'getCustomerEmail', 'getDiscountAmount', 'getShippingAmount',
-                'getTaxAmount', 'getSubtotal', 'getGrandTotal',
+            ->onlyMethods([
+                'getEntityId', 'getBillingAddress', 'getPayment',
+                'getGrandTotal', 'getSubtotal', 'getTaxAmount',
+                'getShippingAmount', 'getDiscountAmount',
                 'getOrderCurrencyCode', 'getStatus', 'getState',
                 'getCreatedAt', 'getUpdatedAt', 'getIncrementId',
-                'getItems',
+                'getItems', 'getCustomerEmail',
             ])
-            ->onlyMethods(['getEntityId'])
+            ->addMethods([
+                'getShippingAddress', 'getShippingDescription',
+                'getCustomerGroupId', 'getCustomerFirstname',
+                'getCustomerLastname',
+            ])
             ->getMock();
 
         $order->method('getEntityId')->willReturn('42');
