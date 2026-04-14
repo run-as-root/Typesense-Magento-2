@@ -83,8 +83,7 @@ class Chat extends Action implements HttpPostActionInterface
         $adminId = (string) $this->_auth->getUser()->getId();
         $cacheKey = 'ai_assistant_rate_' . $adminId;
 
-        $cached = $this->cache->load($cacheKey);
-        $count = $cached !== false ? (int) $cached : 0;
+        $count = (int) $this->cache->load($cacheKey);
 
         if ($count >= self::RATE_LIMIT_MAX_REQUESTS) {
             $this->logger->warning('AI Assistant rate limit exceeded for admin ' . $adminId);
