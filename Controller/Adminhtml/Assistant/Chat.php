@@ -80,7 +80,7 @@ class Chat extends Action implements HttpPostActionInterface
 
     private function checkRateLimit(): ?string
     {
-        $adminId = (string) ($this->_auth->getUser()?->getId() ?? 'unknown');
+        $adminId = (string) $this->_auth->getUser()->getId();
         $cacheKey = 'ai_assistant_rate_' . $adminId;
 
         $count = (int) ($this->cache->load($cacheKey) ?: 0);
