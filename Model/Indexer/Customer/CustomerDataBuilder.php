@@ -98,7 +98,7 @@ class CustomerDataBuilder
     private function resolveOrderStats(int $customerId): array
     {
         $collection = $this->orderCollectionFactory->create();
-        $collection->addFieldToFilter('customer_id', $customerId);
+        $collection->addFieldToFilter('customer_id', ['eq' => $customerId]);
 
         $collection->getSelect()
             ->reset(\Magento\Framework\DB\Select::COLUMNS)

@@ -196,8 +196,22 @@ final class OrderDataBuilderTest extends TestCase
         bool $withBillingAddress = true,
         bool $withPayment = true,
         bool $withChildItem = false,
-    ): OrderInterface&MockObject {
-        $order = $this->createMock(OrderInterface::class);
+    ): MockObject {
+        $order = $this->getMockBuilder(OrderInterface::class)
+            ->disableOriginalConstructor()
+            ->addMethods([
+                'getShippingAddress', 'getBillingAddress', 'getPayment',
+                'getShippingDescription', 'getCustomerGroupId',
+                'getCustomerFirstname', 'getCustomerLastname',
+                'getCustomerEmail', 'getDiscountAmount', 'getShippingAmount',
+                'getTaxAmount', 'getSubtotal', 'getGrandTotal',
+                'getOrderCurrencyCode', 'getStatus', 'getState',
+                'getCreatedAt', 'getUpdatedAt', 'getIncrementId',
+                'getItems',
+            ])
+            ->onlyMethods(['getEntityId'])
+            ->getMock();
+
         $order->method('getEntityId')->willReturn('42');
         $order->method('getIncrementId')->willReturn('000000042');
         $order->method('getStatus')->willReturn('processing');

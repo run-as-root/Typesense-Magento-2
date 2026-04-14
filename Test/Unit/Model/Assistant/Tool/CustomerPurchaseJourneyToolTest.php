@@ -104,7 +104,7 @@ final class CustomerPurchaseJourneyToolTest extends TestCase
 
         self::assertSame('entry_products_by_ltv', $result['aggregation']);
         self::assertSame(100, $result['rows'][0]['customer_count']);
-        self::assertSame(450.0, $result['rows'][0]['avg_customer_ltv']);
+        self::assertSame(450, $result['rows'][0]['avg_customer_ltv']);
     }
 
     public function test_execute_repeat_product_rate_returns_percentage(): void
@@ -125,7 +125,7 @@ final class CustomerPurchaseJourneyToolTest extends TestCase
         $result = json_decode($this->sut->execute(['aggregation' => 'repeat_product_rate']), true);
 
         self::assertSame('repeat_product_rate', $result['aggregation']);
-        self::assertSame(30.0, $result['rows'][0]['repeat_rate_pct']);
+        self::assertSame(30, $result['rows'][0]['repeat_rate_pct']);
         self::assertSame(30, $result['rows'][0]['repeat_orders']);
     }
 

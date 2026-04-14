@@ -93,8 +93,8 @@ final class ProfitAnalysisToolTest extends TestCase
         self::assertSame('profit_by_product', $result['aggregation']);
         self::assertCount(1, $result['rows']);
         self::assertSame('TEST-001', $result['rows'][0]['sku']);
-        self::assertSame(300.0, $result['rows'][0]['gross_profit']);
-        self::assertSame(60.0, $result['rows'][0]['margin_pct']);
+        self::assertSame(300, $result['rows'][0]['gross_profit']);
+        self::assertSame(60, $result['rows'][0]['margin_pct']);
     }
 
     public function test_execute_overall_summary_returns_single_row(): void
@@ -112,9 +112,9 @@ final class ProfitAnalysisToolTest extends TestCase
         $result = json_decode($this->sut->execute(['aggregation' => 'overall_summary']), true);
 
         self::assertSame('overall_summary', $result['aggregation']);
-        self::assertSame(10000.0, $result['total_revenue']);
-        self::assertSame(6000.0, $result['total_profit']);
-        self::assertSame(60.0, $result['avg_margin_pct']);
+        self::assertSame(10000, $result['total_revenue']);
+        self::assertSame(6000, $result['total_profit']);
+        self::assertSame(60, $result['avg_margin_pct']);
     }
 
     public function test_execute_handles_query_exception(): void

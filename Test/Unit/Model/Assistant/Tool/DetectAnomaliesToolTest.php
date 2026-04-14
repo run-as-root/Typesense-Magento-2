@@ -161,7 +161,7 @@ final class DetectAnomaliesToolTest extends TestCase
 
         self::assertArrayHasKey('status', $result);
         self::assertSame('normal', $result['status']);
-        self::assertSame(100.0, $result['current_value']);
+        self::assertSame(100, $result['current_value']);
     }
 
     public function test_execute_returns_critical_status_for_high_z_score(): void

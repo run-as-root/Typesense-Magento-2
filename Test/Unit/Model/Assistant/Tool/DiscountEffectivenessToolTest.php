@@ -93,7 +93,7 @@ final class DiscountEffectivenessToolTest extends TestCase
         self::assertCount(1, $result['rows']);
         self::assertSame('SAVE10', $result['rows'][0]['coupon_code']);
         self::assertSame(50, $result['rows'][0]['uses']);
-        self::assertSame(500.0, $result['rows'][0]['total_discount']);
+        self::assertSame(500, $result['rows'][0]['total_discount']);
     }
 
     public function test_execute_discount_impact_returns_summary(): void
@@ -116,8 +116,8 @@ final class DiscountEffectivenessToolTest extends TestCase
         self::assertSame('discount_impact', $result['aggregation']);
         self::assertSame(100, $result['coupon_orders']);
         self::assertSame(400, $result['no_coupon_orders']);
-        self::assertSame(95.0, $result['avg_order_value_with_coupon']);
-        self::assertSame(75.0, $result['avg_order_value_without_coupon']);
+        self::assertSame(95, $result['avg_order_value_with_coupon']);
+        self::assertSame(75, $result['avg_order_value_without_coupon']);
     }
 
     public function test_execute_coupon_vs_no_coupon_calculates_repeat_rates(): void
@@ -137,9 +137,9 @@ final class DiscountEffectivenessToolTest extends TestCase
         $result = json_decode($this->sut->execute(['aggregation' => 'coupon_vs_no_coupon']), true);
 
         self::assertSame('coupon_vs_no_coupon', $result['aggregation']);
-        self::assertSame(40.0, $result['coupon_customers']['repeat_rate_pct']);
-        self::assertSame(15.0, $result['no_coupon_customers']['repeat_rate_pct']);
-        self::assertSame(320.0, $result['coupon_customers']['avg_ltv']);
+        self::assertSame(40, $result['coupon_customers']['repeat_rate_pct']);
+        self::assertSame(15, $result['no_coupon_customers']['repeat_rate_pct']);
+        self::assertSame(320, $result['coupon_customers']['avg_ltv']);
     }
 
     public function test_execute_coupon_vs_no_coupon_handles_zero_customers(): void

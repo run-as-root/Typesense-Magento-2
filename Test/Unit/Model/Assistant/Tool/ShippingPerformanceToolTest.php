@@ -112,7 +112,7 @@ final class ShippingPerformanceToolTest extends TestCase
         self::assertSame('shipping_method_usage', $result['aggregation']);
         self::assertCount(2, $result['rows']);
         self::assertSame('Free Shipping - Free', $result['rows'][0]['shipping_method']);
-        self::assertSame(60.0, $result['rows'][0]['usage_pct']);
+        self::assertSame(60, $result['rows'][0]['usage_pct']);
     }
 
     public function test_execute_free_shipping_rate_returns_rate_percentage(): void
@@ -133,8 +133,8 @@ final class ShippingPerformanceToolTest extends TestCase
         self::assertSame('free_shipping_rate', $result['aggregation']);
         self::assertSame(1000, $result['total_orders']);
         self::assertSame(600, $result['free_shipping_orders']);
-        self::assertSame(60.0, $result['free_shipping_rate_pct']);
-        self::assertSame(8.0, $result['avg_paid_shipping_cost']);
+        self::assertSame(60, $result['free_shipping_rate_pct']);
+        self::assertSame(8, $result['avg_paid_shipping_cost']);
     }
 
     public function test_execute_handles_query_exception(): void

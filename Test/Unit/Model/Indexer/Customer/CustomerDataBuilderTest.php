@@ -7,7 +7,6 @@ namespace RunAsRoot\TypeSense\Test\Unit\Model\Indexer\Customer;
 use Magento\Customer\Api\Data\AddressInterface;
 use Magento\Customer\Api\Data\GroupInterface;
 use Magento\Customer\Model\Customer;
-use Magento\Customer\Api\Data\RegionInterface;
 use Magento\Customer\Api\GroupRepositoryInterface;
 use Magento\Customer\Model\ResourceModel\Customer\Collection as CustomerCollection;
 use Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
@@ -275,7 +274,29 @@ final class CustomerDataBuilderTest extends TestCase
         bool $withBillingAddress = true,
         bool $withShippingAddress = true,
     ): Customer&MockObject {
-        $customer = $this->createMock(Customer::class);
+        // Customer model uses __call() magic for getters, so addMethods() is required
+        // to declare them as configurable on the mock — createMock() alone cannot
+        // stub magic-method proxies that aren't declared on the class.
+        /** @var Customer&MockObject $customer */
+        $customer = $this->getMockBuilder(Customer::class)
+            ->disableOriginalConstructor()
+            ->addMethods([
+                'getId',
+                'getEmail',
+                'getFirstname',
+                'getLastname',
+                'getGroupId',
+                'getCreatedAt',
+                'getUpdatedAt',
+                'getWebsiteId',
+                'getGender',
+                'getDob',
+                'getDefaultBilling',
+                'getDefaultShipping',
+                'getAddresses',
+            ])
+            ->getMock();
+
         $customer->method('getId')->willReturn('10');
         $customer->method('getEmail')->willReturn('john.doe@example.com');
         $customer->method('getFirstname')->willReturn('John');
@@ -290,13 +311,11 @@ final class CustomerDataBuilderTest extends TestCase
         $addresses = [];
 
         if ($withBillingAddress) {
-            $billingRegion = $this->createMock(RegionInterface::class);
-            $billingRegion->method('getRegion')->willReturn('California');
-
             $billingAddress = $this->createMock(AddressInterface::class);
             $billingAddress->method('getId')->willReturn('100');
             $billingAddress->method('getCountryId')->willReturn('US');
-            $billingAddress->method('getRegion')->willReturn($billingRegion);
+            // getRegion() must return a string so (string) cast in the builder gives the region name
+            $billingAddress->method('getRegion')->willReturn('California');
             $billingAddress->method('getCity')->willReturn('Los Angeles');
             $addresses[] = $billingAddress;
 
@@ -306,13 +325,11 @@ final class CustomerDataBuilderTest extends TestCase
         }
 
         if ($withShippingAddress) {
-            $shippingRegion = $this->createMock(RegionInterface::class);
-            $shippingRegion->method('getRegion')->willReturn('California');
-
             $shippingAddress = $this->createMock(AddressInterface::class);
             $shippingAddress->method('getId')->willReturn('101');
             $shippingAddress->method('getCountryId')->willReturn('US');
-            $shippingAddress->method('getRegion')->willReturn($shippingRegion);
+            // getRegion() must return a string so (string) cast in the builder gives the region name
+            $shippingAddress->method('getRegion')->willReturn('California');
             $shippingAddress->method('getCity')->willReturn('San Francisco');
             $addresses[] = $shippingAddress;
 

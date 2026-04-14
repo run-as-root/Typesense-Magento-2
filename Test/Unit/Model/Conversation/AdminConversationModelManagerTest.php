@@ -45,7 +45,7 @@ final class AdminConversationModelManagerTest extends TestCase
         self::assertSame('openai/gpt-4o-mini', $modelConfig['model_name']);
         self::assertSame('sk-test-key', $modelConfig['api_key']);
         self::assertSame('You are an admin assistant.', $modelConfig['system_prompt']);
-        self::assertSame(16384, $modelConfig['max_bytes']);
+        self::assertSame(65536, $modelConfig['max_bytes']);
         self::assertSame(3600, $modelConfig['ttl']);
     }
 

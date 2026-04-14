@@ -98,7 +98,7 @@ final class CustomerLifetimeValueToolTest extends TestCase
         self::assertSame(42, $result['rows'][0]['customer_id']);
         self::assertSame('jane@example.com', $result['rows'][0]['email']);
         self::assertSame('Jane Doe', $result['rows'][0]['name']);
-        self::assertSame(1500.0, $result['rows'][0]['total_spend']);
+        self::assertSame(1500, $result['rows'][0]['total_spend']);
     }
 
     public function test_execute_average_ltv_returns_summary(): void

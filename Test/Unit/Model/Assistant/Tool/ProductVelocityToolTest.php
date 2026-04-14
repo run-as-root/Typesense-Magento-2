@@ -93,7 +93,7 @@ final class ProductVelocityToolTest extends TestCase
         self::assertSame(30, $result['days']);
         self::assertCount(1, $result['rows']);
         self::assertSame('FAST-001', $result['rows'][0]['sku']);
-        self::assertSame(5.0, $result['rows'][0]['units_per_day']);
+        self::assertSame(5, $result['rows'][0]['units_per_day']);
     }
 
     public function test_execute_dead_stock_returns_products_without_sales(): void
@@ -112,7 +112,7 @@ final class ProductVelocityToolTest extends TestCase
         self::assertSame(90, $result['days']);
         self::assertCount(2, $result['rows']);
         self::assertSame('DEAD-001', $result['rows'][0]['sku']);
-        self::assertSame(50.0, $result['rows'][0]['current_stock']);
+        self::assertSame(50, $result['rows'][0]['current_stock']);
     }
 
     public function test_execute_sell_through_rate_returns_percentage(): void
@@ -133,7 +133,7 @@ final class ProductVelocityToolTest extends TestCase
         $result = json_decode($this->sut->execute(['aggregation' => 'sell_through_rate']), true);
 
         self::assertSame('sell_through_rate', $result['aggregation']);
-        self::assertSame(80.0, $result['rows'][0]['sell_through_rate_pct']);
+        self::assertSame(80, $result['rows'][0]['sell_through_rate_pct']);
     }
 
     public function test_execute_handles_query_exception(): void

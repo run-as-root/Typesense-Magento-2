@@ -97,7 +97,7 @@ final class GeographicPerformanceToolTest extends TestCase
         self::assertNull($result['country_filter']);
         self::assertCount(2, $result['rows']);
         self::assertSame('US', $result['rows'][0]['country_id']);
-        self::assertSame(75000.0, $result['rows'][0]['revenue']);
+        self::assertSame(75000, $result['rows'][0]['revenue']);
     }
 
     public function test_execute_with_country_filter_passes_it_through(): void
@@ -130,8 +130,8 @@ final class GeographicPerformanceToolTest extends TestCase
         $result = json_decode($this->sut->execute(['aggregation' => 'aov_by_country']), true);
 
         self::assertSame('aov_by_country', $result['aggregation']);
-        self::assertSame(280.0, $result['rows'][0]['avg_order_value']);
-        self::assertSame(1200.0, $result['rows'][0]['max_order_value']);
+        self::assertSame(280, $result['rows'][0]['avg_order_value']);
+        self::assertSame(1200, $result['rows'][0]['max_order_value']);
     }
 
     public function test_execute_handles_query_exception(): void
