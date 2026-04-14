@@ -108,8 +108,8 @@ final class ComparePeriodsToolTest extends TestCase
 
         self::assertArrayHasKey('direction', $result);
         self::assertSame('up', $result['direction']);
-        self::assertSame(50.0, $result['absolute_change']);
-        self::assertSame(50.0, $result['percentage_change']);
+        self::assertSame(50, $result['absolute_change']);
+        self::assertSame(50, $result['percentage_change']);
     }
 
     public function test_execute_returns_direction_down_when_value_decreases(): void
@@ -129,8 +129,8 @@ final class ComparePeriodsToolTest extends TestCase
         ]), true);
 
         self::assertSame('down', $result['direction']);
-        self::assertSame(-100.0, $result['absolute_change']);
-        self::assertSame(-50.0, $result['percentage_change']);
+        self::assertSame(-100, $result['absolute_change']);
+        self::assertSame(-50, $result['percentage_change']);
     }
 
     public function test_execute_returns_direction_flat_when_equal(): void
@@ -150,7 +150,7 @@ final class ComparePeriodsToolTest extends TestCase
         ]), true);
 
         self::assertSame('flat', $result['direction']);
-        self::assertSame(0.0, $result['absolute_change']);
+        self::assertSame(0, $result['absolute_change']);
     }
 
     public function test_execute_handles_zero_period_1_value(): void

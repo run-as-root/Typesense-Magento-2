@@ -117,7 +117,7 @@ final class FunnelAnalysisToolTest extends TestCase
 
         $result = json_decode($this->sut->execute([]), true);
 
-        self::assertSame(50.0, $result['abandonment_rate_pct']);
+        self::assertSame(50, $result['abandonment_rate_pct']);
     }
 
     public function test_execute_handles_query_exception(): void

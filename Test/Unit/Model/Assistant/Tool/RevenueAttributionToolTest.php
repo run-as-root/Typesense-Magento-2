@@ -82,7 +82,7 @@ final class RevenueAttributionToolTest extends TestCase
         self::assertCount(1, $result['rows']);
         self::assertSame('SUMMER20', $result['rows'][0]['coupon_code']);
         self::assertSame(15, $result['rows'][0]['order_count']);
-        self::assertSame(2250.0, $result['rows'][0]['revenue']);
+        self::assertSame(2250, $result['rows'][0]['revenue']);
     }
 
     public function test_execute_summary_returns_coupon_vs_non_coupon_split(): void
@@ -105,8 +105,8 @@ final class RevenueAttributionToolTest extends TestCase
         self::assertSame('summary', $result['aggregation']);
         self::assertSame(100, $result['total_orders']);
         self::assertSame(40, $result['coupon_orders']);
-        self::assertSame(10000.0, $result['total_revenue']);
-        self::assertSame(40.0, $result['coupon_revenue_pct']);
+        self::assertSame(10000, $result['total_revenue']);
+        self::assertSame(40, $result['coupon_revenue_pct']);
     }
 
     public function test_execute_by_source_returns_note_about_fallback(): void

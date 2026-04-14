@@ -86,9 +86,9 @@ final class CustomerConcentrationRiskToolTest extends TestCase
         self::assertSame(10, $result['top_percentage']);
         self::assertSame(100, $result['total_customers']);
         self::assertSame(10, $result['top_n_customers']);
-        self::assertSame(100000.0, $result['total_revenue']);
-        self::assertSame(80.0, $result['top_customers_revenue_pct']);
-        self::assertSame(20.0, $result['remaining_customers_revenue_pct']);
+        self::assertSame(100000, $result['total_revenue']);
+        self::assertSame(80, $result['top_customers_revenue_pct']);
+        self::assertSame(20, $result['remaining_customers_revenue_pct']);
     }
 
     public function test_execute_pareto_analysis_handles_no_customers(): void
@@ -128,10 +128,10 @@ final class CustomerConcentrationRiskToolTest extends TestCase
 
         self::assertSame('top_customer_dependency', $result['aggregation']);
         self::assertSame(200, $result['total_customers']);
-        self::assertSame(50000.0, $result['total_revenue']);
+        self::assertSame(50000, $result['total_revenue']);
         self::assertCount(1, $result['rows']);
         self::assertSame('vip@example.com', $result['rows'][0]['customer_email']);
-        self::assertSame(10.0, $result['rows'][0]['revenue_share_pct']);
+        self::assertSame(10, $result['rows'][0]['revenue_share_pct']);
     }
 
     public function test_execute_handles_query_exception(): void

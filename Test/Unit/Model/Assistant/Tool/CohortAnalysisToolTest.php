@@ -110,12 +110,12 @@ final class CohortAnalysisToolTest extends TestCase
 
         // Period 0 = cohort period itself (100% retention)
         $period0 = $cohort['periods'][0];
-        self::assertSame(100.0, $period0['retention_rate']);
+        self::assertSame(100, $period0['retention_rate']);
         self::assertSame(2, $period0['returning_customers']);
 
         // Period 1 = 2025-02: only customer 1 returned (50%)
         $period1 = $cohort['periods'][1];
-        self::assertSame(50.0, $period1['retention_rate']);
+        self::assertSame(50, $period1['retention_rate']);
         self::assertSame(1, $period1['returning_customers']);
     }
 

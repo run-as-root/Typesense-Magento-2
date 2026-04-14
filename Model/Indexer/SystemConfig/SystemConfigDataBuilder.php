@@ -34,7 +34,6 @@ class SystemConfigDataBuilder
     /**
      * Build and yield Typesense documents for system config rows.
      *
-     * @param int[] $entityIds  When empty, all non-sensitive rows are returned.
      * @return iterable<array<string, mixed>>
      */
     public function buildDocuments(int $storeId): iterable

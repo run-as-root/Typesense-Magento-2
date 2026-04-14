@@ -74,7 +74,7 @@ class OrderDataBuilder
     public function getOrderCollection(array $entityIds, int $storeId): OrderCollection
     {
         $collection = $this->collectionFactory->create();
-        $collection->addFieldToFilter('store_id', $storeId);
+        $collection->addFieldToFilter('store_id', ['eq' => $storeId]);
 
         if ($entityIds !== []) {
             $collection->addFieldToFilter('entity_id', ['in' => $entityIds]);

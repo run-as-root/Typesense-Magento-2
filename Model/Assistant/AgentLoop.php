@@ -10,6 +10,7 @@ use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 class AgentLoop
 {
     private const MAX_ITERATIONS = 10;
+    private const MAX_EXECUTION_SECONDS = 60;
 
     public function __construct(
         private readonly OpenAiClientFactory $openAiClientFactory,
@@ -41,8 +42,19 @@ class AgentLoop
 
         $tools = $this->toolRegistry->getToolDefinitions();
         $client = $this->openAiClientFactory->create();
+        $startTime = microtime(true);
 
         for ($i = 0; $i < self::MAX_ITERATIONS; $i++) {
+            if ((microtime(true) - $startTime) > self::MAX_EXECUTION_SECONDS) {
+                $this->logger->warning('AI Assistant agent loop timed out', [
+                    'elapsed_seconds' => round(microtime(true) - $startTime, 1),
+                    'iterations' => $i,
+                ]);
+                return [
+                    'answer' => 'The request took too long to process. Please try a simpler question.',
+                    'messages' => $messages,
+                ];
+            }
             $response = $client->chat()->create([
                 'model' => $this->resolveModel(),
                 'messages' => $messages,

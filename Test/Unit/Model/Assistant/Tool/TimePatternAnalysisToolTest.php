@@ -137,7 +137,7 @@ final class TimePatternAnalysisToolTest extends TestCase
         $result = json_decode($this->sut->execute(['aggregation' => 'seasonal_products']), true);
 
         self::assertSame('seasonal_products', $result['aggregation']);
-        self::assertSame(150.0, $result['rows'][0]['variance_coefficient_pct']);
+        self::assertSame(150, $result['rows'][0]['variance_coefficient_pct']);
         self::assertArrayHasKey('description', $result);
     }
 

@@ -92,8 +92,8 @@ final class ReturnsAnalysisToolTest extends TestCase
         self::assertSame('return_rate_by_product', $result['aggregation']);
         self::assertCount(1, $result['rows']);
         self::assertSame('PROD-001', $result['rows'][0]['sku']);
-        self::assertSame(10.0, $result['rows'][0]['return_rate_pct']);
-        self::assertSame(150.0, $result['rows'][0]['total_refunded']);
+        self::assertSame(10, $result['rows'][0]['return_rate_pct']);
+        self::assertSame(150, $result['rows'][0]['total_refunded']);
     }
 
     public function test_execute_return_rate_by_product_handles_null_return_rate(): void
@@ -136,8 +136,8 @@ final class ReturnsAnalysisToolTest extends TestCase
 
         self::assertSame('total_refunds', $result['aggregation']);
         self::assertSame(25, $result['total_creditmemos']);
-        self::assertSame(2500.0, $result['total_refunded']);
-        self::assertSame(100.0, $result['avg_refund_amount']);
+        self::assertSame(2500, $result['total_refunded']);
+        self::assertSame(100, $result['avg_refund_amount']);
         self::assertSame('2024-02-01 08:00:00', $result['earliest_refund']);
     }
 
@@ -157,7 +157,7 @@ final class ReturnsAnalysisToolTest extends TestCase
         self::assertCount(2, $result['rows']);
         self::assertSame('2025-03', $result['rows'][0]['month']);
         self::assertSame(8, $result['rows'][0]['refund_count']);
-        self::assertSame(640.0, $result['rows'][0]['total_refunded']);
+        self::assertSame(640, $result['rows'][0]['total_refunded']);
     }
 
     public function test_execute_handles_query_exception(): void

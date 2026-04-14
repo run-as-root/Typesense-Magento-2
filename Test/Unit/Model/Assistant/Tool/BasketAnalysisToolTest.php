@@ -78,8 +78,8 @@ final class BasketAnalysisToolTest extends TestCase
 
         self::assertSame('abandoned_carts_summary', $result['aggregation']);
         self::assertSame(42, $result['abandoned_cart_count']);
-        self::assertSame(3150.0, $result['total_value']);
-        self::assertSame(75.0, $result['avg_value']);
+        self::assertSame(3150, $result['total_value']);
+        self::assertSame(75, $result['avg_value']);
         self::assertSame(18.5, $result['avg_age_hours']);
     }
 
@@ -103,7 +103,7 @@ final class BasketAnalysisToolTest extends TestCase
         self::assertCount(4, $result['buckets']);
         self::assertSame('Under $50', $result['buckets'][0]['range']);
         self::assertSame(10, $result['buckets'][0]['count']);
-        self::assertSame(20.0, $result['buckets'][0]['pct']);
+        self::assertSame(20, $result['buckets'][0]['pct']);
     }
 
     public function test_execute_abandoned_cart_products_returns_rows(): void
