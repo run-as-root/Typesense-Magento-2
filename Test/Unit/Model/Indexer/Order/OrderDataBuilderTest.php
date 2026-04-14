@@ -205,12 +205,9 @@ final class OrderDataBuilderTest extends TestCase
                 'getShippingAmount', 'getDiscountAmount',
                 'getOrderCurrencyCode', 'getStatus', 'getState',
                 'getCreatedAt', 'getUpdatedAt', 'getIncrementId',
-                'getItems', 'getCustomerEmail',
-            ])
-            ->addMethods([
-                'getShippingAddress', 'getShippingDescription',
-                'getCustomerGroupId', 'getCustomerFirstname',
-                'getCustomerLastname',
+                'getItems', 'getCustomerEmail', 'getShippingAddress',
+                'getShippingDescription', 'getCustomerGroupId',
+                'getCustomerFirstname', 'getCustomerLastname',
             ])
             ->getMock();
 

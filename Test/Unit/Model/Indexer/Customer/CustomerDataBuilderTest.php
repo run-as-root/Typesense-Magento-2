@@ -280,19 +280,11 @@ final class CustomerDataBuilderTest extends TestCase
         /** @var Customer&MockObject $customer */
         $customer = $this->getMockBuilder(Customer::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['getId', 'getAddresses'])
-            ->addMethods([
-                'getEmail',
-                'getFirstname',
-                'getLastname',
-                'getGroupId',
-                'getCreatedAt',
-                'getUpdatedAt',
-                'getWebsiteId',
-                'getGender',
-                'getDob',
-                'getDefaultBilling',
-                'getDefaultShipping',
+            ->onlyMethods([
+                'getId', 'getEmail', 'getFirstname', 'getLastname',
+                'getGroupId', 'getCreatedAt', 'getUpdatedAt', 'getWebsiteId',
+                'getGender', 'getDob', 'getDefaultBilling', 'getDefaultShipping',
+                'getAddresses',
             ])
             ->getMock();
 
