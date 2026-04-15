@@ -37,7 +37,7 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 
 - Full-text search powered by Typesense with typo tolerance and instant results
 - Zero-downtime reindexing using collection versioning and atomic alias swaps
-- Multi-entity indexing: products, categories, CMS pages, and search suggestions
+- Multi-entity indexing: products, categories, CMS pages, search suggestions, orders, customers, store, and system config
 - Hyva-compatible autocomplete (CSP-safe Alpine.js) with multi-index results
 - Instant search page replacing the default Magento catalog search
 - Category page powered by Typesense with client-side filtering and sorting
@@ -48,6 +48,7 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 - Cron-based and message-queue-based background reindexing
 - Conversational search (RAG) with AI-generated answers powered by OpenAI + Typesense embeddings
 - Product recommendations on the product detail page using vector similarity search
+- Admin AI Assistant with 24 agentic analytics tools (customer segmentation, inventory forecasting, cohort analysis, and more)
 - CSP whitelist for Typesense API endpoints
 - Configurable per store view
 
@@ -159,6 +160,17 @@ Navigate to **Stores > Configuration > TypeSense > TypeSense Search**.
 
 > **Note:** Product Recommendations require Conversational Search to be enabled, as they use the same product embeddings for vector similarity search.
 
+### Admin AI Assistant Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| Enable Admin AI Assistant | No | Activate the agentic AI chat in the admin panel |
+| System Prompt | — | Instructions for the AI assistant's tone, behavior, and data model context |
+| OpenAI Model | gpt-4o | Model used for function calling and answer generation (inherits from Conversational Search if empty) |
+| Conversation TTL | 86400 | How long conversation history is retained (seconds) |
+
+> **Note:** The Admin AI Assistant requires Conversational Search to be enabled with a valid OpenAI API key. The assistant uses the same API key configured under Conversational Search.
+
 ---
 
 ## Configurable Attributes
@@ -240,10 +252,14 @@ The indexer pipeline is split into three layers:
 
 | Entity | Collection Pattern | Magento Indexer ID |
 |---|---|---|
-| Products | `<prefix>_product_v<n>` | `run_as_root_typesense_product` |
-| Categories | `<prefix>_category_v<n>` | `run_as_root_typesense_category` |
-| CMS Pages | `<prefix>_cms_page_v<n>` | `run_as_root_typesense_cms_page` |
-| Suggestions | `<prefix>_suggestion_v<n>` | `run_as_root_typesense_suggestion` |
+| Products | `<prefix>_product_v<n>` | `typesense_product` |
+| Categories | `<prefix>_category_v<n>` | `typesense_category` |
+| CMS Pages | `<prefix>_cms_page_v<n>` | `typesense_cms_page` |
+| Suggestions | `<prefix>_suggestion_v<n>` | `typesense_suggestion` |
+| Orders | `<prefix>_order_v<n>` | `typesense_order` |
+| Customers | `<prefix>_customer_v<n>` | `typesense_customer` |
+| Store | `<prefix>_store_v<n>` | `typesense_store` |
+| System Config | `<prefix>_system_config_v<n>` | `typesense_system_config` |
 
 Collections are suffixed with a version number (e.g., `rar_product_v2`) so that the live collection pointed to by the alias is never written to during a reindex.
 
@@ -310,6 +326,51 @@ When enabled with an OpenAI API key, search results include an AI-generated answ
 ### Product Recommendations
 
 When enabled, a "You May Also Like" slider appears on every product detail page. Uses Typesense vector similarity search to find semantically similar products based on the current product's embedding — no manual curation needed. Requires Conversational Search to be enabled (for embeddings). The number of recommended products is configurable in admin.
+
+---
+
+## Admin AI Assistant
+
+The Admin AI Assistant is an agentic analytics tool built into the Magento admin panel. It uses OpenAI function calling to intelligently query your store data — deciding which tools to invoke, executing them, and synthesizing the results into a conversational answer.
+
+### How It Works
+
+1. You type a question in the admin chat panel (e.g., "What are my best-selling products this quarter?")
+2. The assistant sends your question plus tool definitions to OpenAI
+3. OpenAI decides which tools to call (e.g., `product_velocity`, `compare_periods`)
+4. PHP executes the tools and sends results back to OpenAI
+5. The loop repeats (up to 10 iterations) until a final answer is generated
+
+### Available Tools (24)
+
+| Category | Tools |
+|---|---|
+| **Data Access** | `execute_sql` (read-only sandbox), `describe_database`, `search_typesense` |
+| **Time Intelligence** | `compare_periods`, `trend_analysis` |
+| **Customer Intelligence** | `customer_segmentation` (RFM), `cohort_analysis`, `customer_lifetime_value`, `customer_churn_risk`, `customer_concentration_risk`, `customer_purchase_journey` |
+| **Product Intelligence** | `frequently_bought_together`, `inventory_forecast`, `product_velocity`, `profit_analysis` |
+| **Marketing & Attribution** | `discount_effectiveness`, `revenue_attribution`, `funnel_analysis` |
+| **Operational** | `geographic_performance`, `time_pattern_analysis`, `shipping_performance`, `returns_analysis`, `basket_analysis`, `detect_anomalies` |
+
+### Security
+
+- SQL execution is sandboxed: SELECT-only, blocked sensitive tables/columns, 100-row limit, 5-second timeout
+- Rate limited: 100 requests/hour per admin user
+- All queries are audit-logged with context
+- System prompt and tool call internals are filtered from responses
+- Agent loop has a 60-second wall-clock timeout
+- ACL-protected: requires `RunAsRoot_TypeSense::ai_assistant` permission
+
+### Additional Indexers
+
+The assistant indexes four additional entity types into Typesense beyond the standard search collections:
+
+| Entity | Purpose |
+|---|---|
+| Orders | Revenue, fulfillment, and basket analytics |
+| Customers | Segmentation, LTV, and churn analysis |
+| Store | Store configuration context |
+| System Config | Non-sensitive configuration entries |
 
 ---
 
