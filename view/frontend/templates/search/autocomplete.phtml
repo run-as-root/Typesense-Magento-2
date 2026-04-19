@@ -3,6 +3,8 @@
  * Typesense Autocomplete — Hyva CSP-compatible Alpine.js component
  *
  * Uses Alpine.data() registration pattern required by Hyva's alpine3-csp.min.js.
+ * Every template expression resolves to a bare identifier or a method call —
+ * CSP Alpine rejects inline comparisons, assignments, and ternaries.
  */
 
 declare(strict_types=1);
@@ -52,6 +54,17 @@ $config = $viewModel->getJsonConfig();
                     apiKey: config.typesenseSearchOnlyApiKey,
                     connectionTimeoutSeconds: 2,
                 });
+
+                // Alpine CSP build rejects `x-model` + `@input.debounce` together,
+                // so we bind natively and debounce ourselves.
+                const input = this.$el.querySelector('input[type="text"]');
+                if (!input) return;
+                let debounceTimer = null;
+                input.addEventListener('input', (e) => {
+                    this.query = e.target.value;
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => this.search(), 300);
+                });
             },
 
             async search() {
@@ -96,10 +109,52 @@ $config = $viewModel->getJsonConfig();
                 }
             },
 
+            // --- Getters used in x-if (CSP Alpine forbids inline comparisons)
+            get hasSuggestions() { return this.results.suggestions.length > 0; },
+            get hasProducts()    { return this.results.products.length > 0; },
+            get hasCategories()  { return this.results.categories.length > 0; },
+            get showNoResults()  {
+                return this.hasSearched
+                    && !this.hasSuggestions
+                    && !this.hasProducts
+                    && !this.hasCategories;
+            },
             get totalItems() {
                 return this.results.suggestions.length
                      + this.results.products.length
                      + this.results.categories.length;
+            },
+
+            // --- Methods used in event handlers (CSP Alpine forbids inline assignments)
+            close() { this.isOpen = false; },
+            openIfReady() { if (this.query.length >= 2) this.isOpen = true; },
+
+            selectSuggestion(hit) {
+                const q = hit.document.q;
+                this.query = q;
+                this.isOpen = false;
+                // :value is one-way in CSP build — sync the DOM input manually
+                const input = this.$el.querySelector('input[type="text"]');
+                if (input) input.value = q;
+                this.search();
+            },
+
+            formatPrice(p) {
+                if (p === null || p === undefined || p === '') return '';
+                return '$' + Number(p).toFixed(2);
+            },
+
+            // --- Row highlight helpers (CSP Alpine forbids inline arithmetic + ternary)
+            suggestionClass(i) {
+                return this.selectedIndex === i ? 'bg-gray-100' : '';
+            },
+            productClass(i) {
+                const abs = this.results.suggestions.length + i;
+                return this.selectedIndex === abs ? 'bg-gray-100' : '';
+            },
+            categoryClass(i) {
+                const abs = this.results.suggestions.length + this.results.products.length + i;
+                return this.selectedIndex === abs ? 'bg-gray-100' : '';
             },
 
             moveDown() {
@@ -121,16 +176,13 @@ $config = $viewModel->getJsonConfig();
                 const prodLen = this.results.products.length;
 
                 if (this.selectedIndex < sugLen) {
-                    const hit = this.results.suggestions[this.selectedIndex];
-                    this.query = hit.document.q;
-                    this.isOpen = false;
-                    this.search();
+                    this.selectSuggestion(this.results.suggestions[this.selectedIndex]);
                     return;
                 }
 
                 const prodIdx = this.selectedIndex - sugLen;
                 if (prodIdx < prodLen) {
-                    window.location.href = '/' + this.results.products[prodIdx].document.url;
+                    window.location.href = this.results.products[prodIdx].document.url;
                     return;
                 }
 
@@ -149,68 +201,67 @@ $config = $viewModel->getJsonConfig();
 </script>
 <?php $hyvaCsp->registerInlineScript() ?>
 
-<div class="relative" x-data="initTypesenseAutocomplete" @click.outside="isOpen = false">
+<div class="relative max-w-screen-xl mx-auto px-4 py-2" x-data="initTypesenseAutocomplete" @click.outside="close">
     <input type="text"
-           x-model="query"
-           @input.debounce.300ms="search"
-           @keydown.escape="isOpen = false"
+           :value="query"
+           @keydown.escape="close"
            @keydown.arrow-down.prevent="moveDown"
            @keydown.arrow-up.prevent="moveUp"
            @keydown.enter.prevent="selectCurrent"
-           @focus="query.length >= 2 && (isOpen = true)"
+           @focus="openIfReady"
            placeholder="<?= $escaper->escapeHtmlAttr(__('Search entire store here...')) ?>"
            class="form-input w-full"
            autocomplete="off"/>
 
     <template x-if="isOpen">
-        <div class="absolute z-50 w-full bg-white border border-gray-200 rounded-b shadow-lg mt-1 max-h-96 overflow-y-auto">
+        <div class="absolute z-50 left-4 right-4 bg-white border border-gray-200 rounded-b shadow-lg mt-1 max-h-96 overflow-y-auto">
 
-            <template x-if="results.suggestions.length > 0">
+            <template x-if="hasSuggestions">
                 <div class="p-2 border-b">
                     <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $escaper->escapeHtml(__('Suggestions')) ?></h4>
                     <template x-for="(hit, i) in results.suggestions" :key="hit.document.id">
                         <button type="button"
-                                @click="query = hit.document.q; isOpen = false; search()"
-                                class="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 cursor-pointer"
-                                :class="selectedIndex === i ? 'bg-gray-100' : ''"
+                                @click="selectSuggestion(hit)"
+                                class="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 cursor-pointer rounded"
+                                :class="suggestionClass(i)"
                                 x-text="hit.document.q"></button>
                     </template>
                 </div>
             </template>
 
-            <template x-if="results.products.length > 0">
+            <template x-if="hasProducts">
                 <div class="p-2 border-b">
                     <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $escaper->escapeHtml(__('Products')) ?></h4>
                     <template x-for="(hit, i) in results.products" :key="hit.document.id">
                         <a :href="hit.document.url"
                            class="flex items-center gap-3 px-2 py-2 hover:bg-gray-100 rounded"
-                           :class="selectedIndex === (results.suggestions.length + i) ? 'bg-gray-100' : ''">
+                           :class="productClass(i)">
                             <template x-if="hit.document.image_url">
                                 <img :src="hit.document.image_url" :alt="hit.document.name"
-                                     class="w-10 h-10 object-contain" loading="lazy"/>
+                                     class="w-10 h-10 object-contain flex-shrink-0" loading="lazy"/>
                             </template>
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium truncate" x-text="hit.document.name"></p>
-                                <p class="text-sm text-gray-600" x-text="hit.document.price ? '$' + hit.document.price : ''"></p>
+                                <p class="text-sm text-gray-600" x-text="formatPrice(hit.document.price)"></p>
                             </div>
                         </a>
                     </template>
                 </div>
             </template>
 
-            <template x-if="results.categories.length > 0">
+            <template x-if="hasCategories">
                 <div class="p-2">
                     <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $escaper->escapeHtml(__('Categories')) ?></h4>
                     <template x-for="(hit, i) in results.categories" :key="hit.document.id">
                         <a :href="hit.document.url"
-                           class="block px-2 py-1 text-sm hover:bg-gray-100"
-                           :class="selectedIndex === (results.suggestions.length + results.products.length + i) ? 'bg-gray-100' : ''"
+                           class="block px-2 py-1 text-sm hover:bg-gray-100 rounded"
+                           :class="categoryClass(i)"
                            x-text="hit.document.name"></a>
                     </template>
                 </div>
             </template>
 
-            <template x-if="hasSearched && results.products.length === 0 && results.categories.length === 0 && results.suggestions.length === 0">
+            <template x-if="showNoResults">
                 <div class="p-4 text-center text-sm text-gray-500">
                     <?= $escaper->escapeHtml(__('No results found')) ?>
                 </div>
