@@ -1,10 +1,11 @@
 <?php
 /**
- * Typesense Autocomplete — Hyva CSP-compatible Alpine.js component
+ * Typesense Autocomplete — Hyva CSP-compatible
  *
- * Uses Alpine.data() registration pattern required by Hyva's alpine3-csp.min.js.
- * Every template expression resolves to a bare identifier or a method call —
- * CSP Alpine rejects inline comparisons, assignments, and ternaries.
+ * Alpine CSP build rejects comparisons, assignments, ternaries, arithmetic,
+ * AND any function call that takes an argument. To stay safe we render
+ * imperatively via innerHTML and wire clicks through event delegation —
+ * same pattern used by product/recommendations.phtml in this module.
  */
 
 declare(strict_types=1);
@@ -29,12 +30,22 @@ if (!$viewModel->isEnabled()) {
 $hyvaCsp = $viewModels->require(HyvaCsp::class);
 
 $config = $viewModel->getJsonConfig();
+$labelSuggestions = $escaper->escapeJs(__('Suggestions'));
+$labelProducts    = $escaper->escapeJs(__('Products'));
+$labelCategories  = $escaper->escapeJs(__('Categories'));
+$labelNoResults   = $escaper->escapeJs(__('No results found'));
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/typesense@1.8.2/dist/typesense.min.js" integrity="sha384-b1Uj2Udv6vFZ+nH6F6SaFpWpjpTqGXdfReSsqJhHUVr8yp2AehtZG/2EpA1dw0SN" crossorigin="anonymous"></script>
 <script>
     function initTypesenseAutocomplete() {
         const config = <?= /* @noEscape */ $config ?>;
+        const T = {
+            suggestions: '<?= /* @noEscape */ $labelSuggestions ?>',
+            products:    '<?= /* @noEscape */ $labelProducts ?>',
+            categories:  '<?= /* @noEscape */ $labelCategories ?>',
+            noResults:   '<?= /* @noEscape */ $labelNoResults ?>',
+        };
 
         return {
             query: '',
@@ -43,6 +54,10 @@ $config = $viewModel->getJsonConfig();
             hasSearched: false,
             selectedIndex: -1,
             client: null,
+            _input: null,
+            _dropdown: null,
+            _debounceTimer: null,
+            _outsideClickHandler: null,
 
             init() {
                 this.client = new Typesense.Client({
@@ -55,123 +70,115 @@ $config = $viewModel->getJsonConfig();
                     connectionTimeoutSeconds: 2,
                 });
 
-                // Alpine CSP build rejects `x-model` + `@input.debounce` together,
-                // so we bind natively and debounce ourselves.
-                const input = this.$el.querySelector('input[type="text"]');
-                if (!input) return;
-                let debounceTimer = null;
-                input.addEventListener('input', (e) => {
+                this._input = this.$el.querySelector('[data-ac-input]');
+                this._dropdown = this.$el.querySelector('[data-ac-dropdown]');
+                if (!this._input || !this._dropdown) return;
+
+                this._input.addEventListener('input', (e) => {
                     this.query = e.target.value;
-                    clearTimeout(debounceTimer);
-                    debounceTimer = setTimeout(() => this.search(), 300);
+                    clearTimeout(this._debounceTimer);
+                    this._debounceTimer = setTimeout(() => this.search(), 300);
                 });
+
+                this._input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape')    { this.close(); return; }
+                    if (e.key === 'ArrowDown') { e.preventDefault(); this.moveDown(); return; }
+                    if (e.key === 'ArrowUp')   { e.preventDefault(); this.moveUp(); return; }
+                    if (e.key === 'Enter')     { e.preventDefault(); this.selectCurrent(); return; }
+                });
+
+                this._input.addEventListener('focus', () => {
+                    if (this.query.length >= 2 && this.hasSearched) {
+                        this.isOpen = true;
+                        this.render();
+                    }
+                });
+
+                // Event delegation for suggestion clicks (product/category links navigate natively).
+                this._dropdown.addEventListener('click', (e) => {
+                    const sugBtn = e.target.closest('[data-ac-suggestion-idx]');
+                    if (!sugBtn) return;
+                    e.preventDefault();
+                    const i = parseInt(sugBtn.getAttribute('data-ac-suggestion-idx'), 10);
+                    const hit = this.results.suggestions[i];
+                    if (hit) this.selectSuggestion(hit);
+                });
+
+                this._outsideClickHandler = (e) => {
+                    if (!this.$el.contains(e.target)) this.close();
+                };
+                document.addEventListener('click', this._outsideClickHandler);
+            },
+
+            destroy() {
+                if (this._outsideClickHandler) {
+                    document.removeEventListener('click', this._outsideClickHandler);
+                }
             },
 
             async search() {
                 if (this.query.length < 2) {
                     this.isOpen = false;
                     this.hasSearched = false;
+                    this.render();
                     return;
                 }
 
                 try {
                     const response = await this.client.multiSearch.perform({
                         searches: [
-                            {
-                                collection: config.productCollection,
-                                q: this.query,
-                                query_by: 'name,sku,description',
-                                per_page: config.productCount || 6,
-                            },
-                            {
-                                collection: config.categoryCollection,
-                                q: this.query,
-                                query_by: 'name',
-                                per_page: 4,
-                            },
-                            {
-                                collection: config.suggestionCollection,
-                                q: this.query,
-                                query_by: 'q',
-                                per_page: 5,
-                            },
+                            { collection: config.productCollection,    q: this.query, query_by: 'name,sku,description', per_page: config.productCount || 6 },
+                            { collection: config.categoryCollection,   q: this.query, query_by: 'name',                 per_page: 4 },
+                            { collection: config.suggestionCollection, q: this.query, query_by: 'q',                    per_page: 5 },
                         ],
                     }, {});
 
-                    this.results.products = response.results[0]?.hits || [];
-                    this.results.categories = response.results[1]?.hits || [];
+                    this.results.products    = response.results[0]?.hits || [];
+                    this.results.categories  = response.results[1]?.hits || [];
                     this.results.suggestions = response.results[2]?.hits || [];
                     this.isOpen = true;
                     this.hasSearched = true;
                     this.selectedIndex = -1;
+                    this.render();
                 } catch (error) {
                     console.error('Typesense search error:', error);
                 }
             },
 
-            // --- Getters used in x-if (CSP Alpine forbids inline comparisons)
-            get hasSuggestions() { return this.results.suggestions.length > 0; },
-            get hasProducts()    { return this.results.products.length > 0; },
-            get hasCategories()  { return this.results.categories.length > 0; },
-            get showNoResults()  {
-                return this.hasSearched
-                    && !this.hasSuggestions
-                    && !this.hasProducts
-                    && !this.hasCategories;
+            close() {
+                this.isOpen = false;
+                this.render();
             },
-            get totalItems() {
+
+            selectSuggestion(hit) {
+                const q = hit.document.q;
+                this.query = q;
+                this._input.value = q;
+                this.search();
+            },
+
+            totalItems() {
                 return this.results.suggestions.length
                      + this.results.products.length
                      + this.results.categories.length;
             },
 
-            // --- Methods used in event handlers (CSP Alpine forbids inline assignments)
-            close() { this.isOpen = false; },
-            openIfReady() { if (this.query.length >= 2) this.isOpen = true; },
-
-            selectSuggestion(hit) {
-                const q = hit.document.q;
-                this.query = q;
-                this.isOpen = false;
-                // :value is one-way in CSP build — sync the DOM input manually
-                const input = this.$el.querySelector('input[type="text"]');
-                if (input) input.value = q;
-                this.search();
-            },
-
-            formatPrice(p) {
-                if (p === null || p === undefined || p === '') return '';
-                return '$' + Number(p).toFixed(2);
-            },
-
-            // --- Row highlight helpers (CSP Alpine forbids inline arithmetic + ternary)
-            suggestionClass(i) {
-                return this.selectedIndex === i ? 'bg-gray-100' : '';
-            },
-            productClass(i) {
-                const abs = this.results.suggestions.length + i;
-                return this.selectedIndex === abs ? 'bg-gray-100' : '';
-            },
-            categoryClass(i) {
-                const abs = this.results.suggestions.length + this.results.products.length + i;
-                return this.selectedIndex === abs ? 'bg-gray-100' : '';
-            },
-
             moveDown() {
-                if (this.totalItems === 0) return;
-                this.selectedIndex = (this.selectedIndex + 1) % this.totalItems;
+                const total = this.totalItems();
+                if (total === 0) return;
+                this.selectedIndex = (this.selectedIndex + 1) % total;
+                this.updateHighlight();
             },
 
             moveUp() {
-                if (this.totalItems === 0) return;
-                this.selectedIndex = this.selectedIndex <= 0
-                    ? this.totalItems - 1
-                    : this.selectedIndex - 1;
+                const total = this.totalItems();
+                if (total === 0) return;
+                this.selectedIndex = this.selectedIndex <= 0 ? total - 1 : this.selectedIndex - 1;
+                this.updateHighlight();
             },
 
             selectCurrent() {
                 if (this.selectedIndex < 0) return;
-
                 const sugLen = this.results.suggestions.length;
                 const prodLen = this.results.products.length;
 
@@ -179,18 +186,117 @@ $config = $viewModel->getJsonConfig();
                     this.selectSuggestion(this.results.suggestions[this.selectedIndex]);
                     return;
                 }
-
                 const prodIdx = this.selectedIndex - sugLen;
                 if (prodIdx < prodLen) {
                     window.location.href = this.results.products[prodIdx].document.url;
                     return;
                 }
-
                 const catIdx = this.selectedIndex - sugLen - prodLen;
                 const hit = this.results.categories[catIdx];
-                if (hit) {
-                    window.location.href = hit.document.url;
+                if (hit) window.location.href = hit.document.url;
+            },
+
+            updateHighlight() {
+                const rows = this._dropdown.querySelectorAll('[data-ac-row-idx]');
+                rows.forEach((row) => {
+                    const idx = parseInt(row.getAttribute('data-ac-row-idx'), 10);
+                    row.classList.toggle('bg-gray-100', idx === this.selectedIndex);
+                });
+            },
+
+            formatPrice(p) {
+                if (p === null || p === undefined || p === '') return '';
+                return '$' + Number(p).toFixed(2);
+            },
+
+            esc(str) {
+                const div = document.createElement('div');
+                div.textContent = String(str ?? '');
+                return div.innerHTML;
+            },
+
+            render() {
+                if (!this._dropdown) return;
+
+                if (!this.isOpen) {
+                    this._dropdown.classList.add('hidden');
+                    this._dropdown.innerHTML = '';
+                    return;
                 }
+
+                const total = this.totalItems();
+                if (total === 0) {
+                    if (this.hasSearched) {
+                        this._dropdown.classList.remove('hidden');
+                        this._dropdown.innerHTML =
+                            '<div class="p-4 text-center text-sm text-gray-500">' + this.esc(T.noResults) + '</div>';
+                    } else {
+                        this._dropdown.classList.add('hidden');
+                        this._dropdown.innerHTML = '';
+                    }
+                    return;
+                }
+
+                let html = '';
+                let absIdx = 0;
+
+                if (this.results.suggestions.length > 0) {
+                    html += '<div class="p-2 border-b border-gray-200">'
+                         +  '<h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 px-2">' + this.esc(T.suggestions) + '</h4>';
+                    for (let i = 0; i < this.results.suggestions.length; i++) {
+                        const hit = this.results.suggestions[i];
+                        html += '<button type="button"'
+                             +  ' data-ac-row-idx="' + absIdx + '"'
+                             +  ' data-ac-suggestion-idx="' + i + '"'
+                             +  ' class="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 cursor-pointer rounded">'
+                             +  this.esc(hit.document.q)
+                             +  '</button>';
+                        absIdx++;
+                    }
+                    html += '</div>';
+                }
+
+                if (this.results.products.length > 0) {
+                    html += '<div class="p-2 border-b border-gray-200">'
+                         +  '<h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 px-2">' + this.esc(T.products) + '</h4>';
+                    for (let i = 0; i < this.results.products.length; i++) {
+                        const d = this.results.products[i].document;
+                        const imgHtml = d.image_url
+                            ? '<img src="' + this.esc(d.image_url) + '" alt="' + this.esc(d.name) + '" class="w-10 h-10 object-contain flex-shrink-0" loading="lazy"/>'
+                            : '<div class="w-10 h-10 bg-gray-100 rounded flex-shrink-0"></div>';
+                        const priceStr = this.formatPrice(d.price);
+                        html += '<a href="' + this.esc(d.url) + '"'
+                             +  ' data-ac-row-idx="' + absIdx + '"'
+                             +  ' class="flex items-center gap-3 px-2 py-2 hover:bg-gray-100 rounded">'
+                             +  imgHtml
+                             +  '<div class="flex-1 min-w-0">'
+                             +      '<p class="text-sm font-medium text-gray-800 truncate">' + this.esc(d.name) + '</p>'
+                             +      (priceStr ? '<p class="text-sm text-gray-600">' + this.esc(priceStr) + '</p>' : '')
+                             +  '</div>'
+                             +  '</a>';
+                        absIdx++;
+                    }
+                    html += '</div>';
+                }
+
+                if (this.results.categories.length > 0) {
+                    html += '<div class="p-2">'
+                         +  '<h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 px-2">' + this.esc(T.categories) + '</h4>';
+                    for (let i = 0; i < this.results.categories.length; i++) {
+                        const d = this.results.categories[i].document;
+                        html += '<a href="' + this.esc(d.url) + '"'
+                             +  ' data-ac-row-idx="' + absIdx + '"'
+                             +  ' class="block px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded">'
+                             +  this.esc(d.name)
+                             +  '</a>';
+                        absIdx++;
+                    }
+                    html += '</div>';
+                }
+
+                this._dropdown.classList.remove('hidden');
+                this._dropdown.innerHTML = html;
+                this.updateHighlight();
             },
         };
     }
@@ -201,71 +307,15 @@ $config = $viewModel->getJsonConfig();
 </script>
 <?php $hyvaCsp->registerInlineScript() ?>
 
-<div class="relative max-w-screen-xl mx-auto px-4 py-2" x-data="initTypesenseAutocomplete" @click.outside="close">
+<div class="relative w-full mx-auto px-4 py-2"
+     style="max-width: 1280px;"
+     x-data="initTypesenseAutocomplete">
     <input type="text"
-           :value="query"
-           @keydown.escape="close"
-           @keydown.arrow-down.prevent="moveDown"
-           @keydown.arrow-up.prevent="moveUp"
-           @keydown.enter.prevent="selectCurrent"
-           @focus="openIfReady"
+           data-ac-input
            placeholder="<?= $escaper->escapeHtmlAttr(__('Search entire store here...')) ?>"
            class="form-input w-full"
            autocomplete="off"/>
 
-    <template x-if="isOpen">
-        <div class="absolute z-50 left-4 right-4 bg-white border border-gray-200 rounded-b shadow-lg mt-1 max-h-96 overflow-y-auto">
-
-            <template x-if="hasSuggestions">
-                <div class="p-2 border-b">
-                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $escaper->escapeHtml(__('Suggestions')) ?></h4>
-                    <template x-for="(hit, i) in results.suggestions" :key="hit.document.id">
-                        <button type="button"
-                                @click="selectSuggestion(hit)"
-                                class="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 cursor-pointer rounded"
-                                :class="suggestionClass(i)"
-                                x-text="hit.document.q"></button>
-                    </template>
-                </div>
-            </template>
-
-            <template x-if="hasProducts">
-                <div class="p-2 border-b">
-                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $escaper->escapeHtml(__('Products')) ?></h4>
-                    <template x-for="(hit, i) in results.products" :key="hit.document.id">
-                        <a :href="hit.document.url"
-                           class="flex items-center gap-3 px-2 py-2 hover:bg-gray-100 rounded"
-                           :class="productClass(i)">
-                            <template x-if="hit.document.image_url">
-                                <img :src="hit.document.image_url" :alt="hit.document.name"
-                                     class="w-10 h-10 object-contain flex-shrink-0" loading="lazy"/>
-                            </template>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium truncate" x-text="hit.document.name"></p>
-                                <p class="text-sm text-gray-600" x-text="formatPrice(hit.document.price)"></p>
-                            </div>
-                        </a>
-                    </template>
-                </div>
-            </template>
-
-            <template x-if="hasCategories">
-                <div class="p-2">
-                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-1"><?= $escaper->escapeHtml(__('Categories')) ?></h4>
-                    <template x-for="(hit, i) in results.categories" :key="hit.document.id">
-                        <a :href="hit.document.url"
-                           class="block px-2 py-1 text-sm hover:bg-gray-100 rounded"
-                           :class="categoryClass(i)"
-                           x-text="hit.document.name"></a>
-                    </template>
-                </div>
-            </template>
-
-            <template x-if="showNoResults">
-                <div class="p-4 text-center text-sm text-gray-500">
-                    <?= $escaper->escapeHtml(__('No results found')) ?>
-                </div>
-            </template>
-        </div>
-    </template>
+    <div data-ac-dropdown
+         class="hidden absolute z-50 left-4 right-4 bg-white border border-gray-200 rounded-b shadow-lg mt-1 max-h-96 overflow-y-auto"></div>
 </div>
