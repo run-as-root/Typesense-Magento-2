@@ -158,7 +158,7 @@ Navigate to **Stores > Configuration > TypeSense > TypeSense Search**.
 | Enable Recommendations | No | Show similar products on the product detail page |
 | Number of Products | 8 | Maximum recommended products to display |
 
-> **Note:** Product Recommendations require Conversational Search to be enabled, as they use the same product embeddings for vector similarity search.
+> **Note:** Product Recommendations require Conversational Search to be enabled, as they use the same product embeddings for vector similarity search. The admin UI enforces this: the Product Recommendations fields are hidden until Conversational Search is turned on, keeping the admin state aligned with the backend gate (`isRecommendationsEnabled()`).
 
 ### Admin AI Assistant Settings
 
