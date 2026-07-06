@@ -38,5 +38,23 @@
             "RUN_AS_ROOT_TYPESENSE_QUERY_MERCHANDISING_QUERY_STORE_ID": true,
             "RUN_AS_ROOT_TYPESENSE_QR_MERCHANDISING_STORE_ID_STORE_STORE_ID": true
         }
+    },
+    "run_as_root_typesense_category_virtual_rule": {
+        "column": {
+            "id": true,
+            "category_id": true,
+            "store_id": true,
+            "is_virtual": true,
+            "conditions_serialized": true,
+            "virtual_category_root_id": true,
+            "compiled_filter_cache": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "UNQ_TS_CAT_VIRTUAL_RULE_CAT_STORE": true,
+            "FK_TS_CAT_VIRTUAL_RULE_STORE": true
+        }
     }
 }

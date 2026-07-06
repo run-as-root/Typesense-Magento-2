@@ -57,8 +57,8 @@
         <column xsi:type="int" name="id" unsigned="true" nullable="false" identity="true" comment="ID"/>
         <column xsi:type="int" name="category_id" unsigned="true" nullable="false" comment="Category ID"/>
         <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" comment="Store ID"/>
-        <column xsi:type="boolean" name="is_virtual" nullable="false" default="0" comment="Is Virtual Category"/>
-        <column xsi:type="text" name="conditions_serialized" nullable="true" comment="Serialized Rule Conditions (JSON)"/>
+        <column xsi:type="boolean" name="is_virtual" nullable="false" default="false" comment="Is Virtual Category"/>
+        <column xsi:type="mediumtext" name="conditions_serialized" nullable="true" comment="Serialized Rule Conditions (JSON)"/>
         <column xsi:type="int" name="virtual_category_root_id" unsigned="true" nullable="true" comment="Virtual Category Root ID"/>
         <column xsi:type="text" name="compiled_filter_cache" nullable="true" comment="Cached Compiled Typesense filter_by"/>
         <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
