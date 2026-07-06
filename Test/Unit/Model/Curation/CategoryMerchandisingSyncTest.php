@@ -15,6 +15,7 @@ use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Api\Data\CategoryMerchandisingInterface;
 use RunAsRoot\TypeSense\Model\Curation\CategoryMerchandisingSync;
 use RunAsRoot\TypeSense\Api\OverrideManagerInterface;
+use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleResolver;
 
 final class CategoryMerchandisingSyncTest extends TestCase
 {
@@ -23,6 +24,7 @@ final class CategoryMerchandisingSyncTest extends TestCase
     private CategoryMerchandisingRepositoryInterface&MockObject $repository;
     private SearchCriteriaBuilder&MockObject $searchCriteriaBuilder;
     private LoggerInterface&MockObject $logger;
+    private CategoryVirtualRuleResolver&MockObject $resolver;
     private CategoryMerchandisingSync $sut;
 
     protected function setUp(): void
@@ -32,6 +34,7 @@ final class CategoryMerchandisingSyncTest extends TestCase
         $this->repository = $this->createMock(CategoryMerchandisingRepositoryInterface::class);
         $this->searchCriteriaBuilder = $this->createMock(SearchCriteriaBuilder::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->resolver = $this->createMock(CategoryVirtualRuleResolver::class);
 
         $this->sut = new CategoryMerchandisingSync(
             $this->overrideManager,
@@ -39,6 +42,7 @@ final class CategoryMerchandisingSyncTest extends TestCase
             $this->repository,
             $this->searchCriteriaBuilder,
             $this->logger,
+            $this->resolver,
         );
     }
 
@@ -90,6 +94,8 @@ final class CategoryMerchandisingSyncTest extends TestCase
             ->method('createOverride')
             ->with($collectionName, 'cat_merch_5_1', $expectedPayload);
 
+        $this->resolver->method('resolveFilter')->with($categoryId, $storeId)->willReturn("category_ids:={$categoryId}");
+
         $this->sut->sync($categoryId, $storeId, $storeCode);
     }
 
@@ -117,6 +123,8 @@ final class CategoryMerchandisingSyncTest extends TestCase
         $this->overrideManager->expects(self::once())
             ->method('deleteOverride')
             ->with($collectionName, 'cat_merch_3_2');
+
+        $this->resolver->method('resolveFilter')->with($categoryId, $storeId)->willReturn("category_ids:={$categoryId}");
 
         $this->sut->sync($categoryId, $storeId, $storeCode);
     }
@@ -146,6 +154,8 @@ final class CategoryMerchandisingSyncTest extends TestCase
         $this->overrideManager->expects(self::once())
             ->method('createOverride')
             ->with($collectionName, 'cat_merch_42_7', self::anything());
+
+        $this->resolver->method('resolveFilter')->with($categoryId, $storeId)->willReturn("category_ids:={$categoryId}");
 
         $this->sut->sync($categoryId, $storeId, $storeCode);
     }
@@ -179,6 +189,8 @@ final class CategoryMerchandisingSyncTest extends TestCase
         $this->overrideManager->expects(self::once())
             ->method('createOverride')
             ->with($resolvedCollection, self::anything(), self::anything());
+
+        $this->resolver->method('resolveFilter')->with($categoryId, $storeId)->willReturn("category_ids:={$categoryId}");
 
         $this->sut->sync($categoryId, $storeId, $storeCode);
     }
@@ -221,6 +233,45 @@ final class CategoryMerchandisingSyncTest extends TestCase
                         ['id' => '22', 'position' => 2],
                     ] && $payload['excludes'] === [];
                 }),
+            );
+
+        $this->resolver->method('resolveFilter')->with($categoryId, $storeId)->willReturn("category_ids:={$categoryId}");
+
+        $this->sut->sync($categoryId, $storeId, $storeCode);
+    }
+
+    public function test_sync_uses_resolver_output_as_filter_by_for_virtual_categories(): void
+    {
+        $categoryId = 8;
+        $storeId = 1;
+        $storeCode = 'default';
+        $collectionName = 'rar_products_default';
+
+        $pinRule = $this->createMock(CategoryMerchandisingInterface::class);
+        $pinRule->method('getAction')->willReturn('pin');
+        $pinRule->method('getProductId')->willReturn(1);
+        $pinRule->method('getPosition')->willReturn(1);
+
+        $searchCriteria = $this->createMock(SearchCriteriaInterface::class);
+        $searchResults = $this->createMock(SearchResultsInterface::class);
+        $searchResults->method('getItems')->willReturn([$pinRule]);
+
+        $this->searchCriteriaBuilder->method('addFilter')->willReturnSelf();
+        $this->searchCriteriaBuilder->method('create')->willReturn($searchCriteria);
+        $this->repository->method('getList')->willReturn($searchResults);
+        $this->collectionNameResolver->method('resolve')->willReturn($collectionName);
+
+        $this->resolver->method('resolveFilter')
+            ->with($categoryId, $storeId)
+            ->willReturn('color:=`red` || category_ids:=9');
+
+        $this->overrideManager->expects(self::once())
+            ->method('createOverride')
+            ->with(
+                $collectionName,
+                'cat_merch_8_1',
+                self::callback(fn(array $payload): bool =>
+                    $payload['rule']['filter_by'] === 'color:=`red` || category_ids:=9'),
             );
 
         $this->sut->sync($categoryId, $storeId, $storeCode);
