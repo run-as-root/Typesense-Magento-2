@@ -54,7 +54,9 @@
         "constraint": {
             "PRIMARY": true,
             "UNQ_TS_CAT_VIRTUAL_RULE_CAT_STORE": true,
-            "FK_TS_CAT_VIRTUAL_RULE_STORE": true
+            "FK_TS_CAT_VIRTUAL_RULE_STORE": true,
+            "RUN_AS_ROOT_TYPESENSE_CATEGORY_VIRTUAL_RULE_CATEGORY_ID_STORE_ID": true,
+            "RUN_AS_ROOT_TYPESENSE_CTGR_VIRTUAL_RULE_STORE_ID_STORE_STORE_ID": true
         }
     }
 }
