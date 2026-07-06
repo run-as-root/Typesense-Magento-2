@@ -11,6 +11,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleResolver;
 use RunAsRoot\TypeSense\ViewModel\Frontend\CategorySearchConfigViewModel;
 
 final class CategorySearchConfigViewModelTest extends TestCase
@@ -19,6 +20,7 @@ final class CategorySearchConfigViewModelTest extends TestCase
     private StoreManagerInterface&MockObject $storeManager;
     private CollectionNameResolverInterface&MockObject $collectionNameResolver;
     private Registry&MockObject $registry;
+    private CategoryVirtualRuleResolver&MockObject $virtualRuleResolver;
     private CategorySearchConfigViewModel $sut;
 
     protected function setUp(): void
@@ -27,12 +29,14 @@ final class CategorySearchConfigViewModelTest extends TestCase
         $this->storeManager = $this->createMock(StoreManagerInterface::class);
         $this->collectionNameResolver = $this->createMock(CollectionNameResolverInterface::class);
         $this->registry = $this->createMock(Registry::class);
+        $this->virtualRuleResolver = $this->createMock(CategoryVirtualRuleResolver::class);
 
         $this->sut = new CategorySearchConfigViewModel(
             $this->config,
             $this->storeManager,
             $this->collectionNameResolver,
             $this->registry,
+            $this->virtualRuleResolver,
         );
     }
 
@@ -106,10 +110,37 @@ final class CategorySearchConfigViewModelTest extends TestCase
             ->with('current_category')
             ->willReturn($category);
 
+        $this->virtualRuleResolver->method('resolveFilter')->with(7, 1)->willReturn('category_ids:=7');
+
         $result = $this->sut->getConfig();
 
         self::assertArrayHasKey('categoryId', $result);
         self::assertSame(7, $result['categoryId']);
+        self::assertSame('category_ids:=7', $result['categoryFilterBy']);
+    }
+
+    public function test_get_config_omits_category_filter_when_no_category_in_context(): void
+    {
+        $store = $this->createMock(StoreInterface::class);
+        $store->method('getCode')->willReturn('default');
+        $store->method('getId')->willReturn(1);
+        $this->storeManager->method('getStore')->willReturn($store);
+
+        $this->config->method('getSearchHost')->willReturn('localhost');
+        $this->config->method('getSearchPort')->willReturn(8108);
+        $this->config->method('getSearchProtocol')->willReturn('http');
+        $this->config->method('getSearchOnlyApiKey')->willReturn('xyz');
+        $this->config->method('getProductsPerPage')->willReturn(24);
+        $this->config->method('getEnabledSortOptions')->willReturn([]);
+        $this->config->method('getTileAttributes')->willReturn([]);
+        $this->collectionNameResolver->method('resolve')->willReturn('rar_products_default');
+        $this->registry->method('registry')->willReturn(null);
+
+        $this->virtualRuleResolver->expects(self::never())->method('resolveFilter');
+
+        $result = $this->sut->getConfig();
+
+        self::assertNull($result['categoryFilterBy']);
     }
 
     public function test_get_json_config_returns_valid_json_string(): void

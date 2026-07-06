@@ -41,7 +41,7 @@ function typesenseCategorySearch(config) {
         async search() {
             const perPage = config.productsPerPage || 24;
 
-            const filterParts = [`category_ids:=${config.categoryId}`];
+            const filterParts = [config.categoryFilterBy];
 
             for (const [field, values] of Object.entries(this.filters)) {
                 if (values.length > 0) {

@@ -9,6 +9,7 @@ use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleResolver;
 
 class CategorySearchConfigViewModel implements ArgumentInterface
 {
@@ -17,6 +18,7 @@ class CategorySearchConfigViewModel implements ArgumentInterface
         private readonly StoreManagerInterface $storeManager,
         private readonly CollectionNameResolverInterface $collectionNameResolver,
         private readonly Registry $registry,
+        private readonly CategoryVirtualRuleResolver $virtualRuleResolver,
     ) {
     }
 
@@ -35,6 +37,16 @@ class CategorySearchConfigViewModel implements ArgumentInterface
         return (int) $category->getId() ?: null;
     }
 
+    public function getCategoryFilterBy(): ?string
+    {
+        $categoryId = $this->getCurrentCategoryId();
+        if ($categoryId === null) {
+            return null;
+        }
+
+        return $this->virtualRuleResolver->resolveFilter($categoryId, (int) $this->storeManager->getStore()->getId());
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -51,6 +63,7 @@ class CategorySearchConfigViewModel implements ArgumentInterface
             'typesenseSearchOnlyApiKey' => $this->config->getSearchOnlyApiKey(),
             'productCollection'         => $this->collectionNameResolver->resolve('product', $storeCode, $storeId),
             'categoryId'                => $this->getCurrentCategoryId(),
+            'categoryFilterBy'          => $this->getCategoryFilterBy(),
             'productsPerPage'           => $this->config->getProductsPerPage(),
             'facetAttributes'           => $this->config->getFacetFilters(),
             'sortOptions'               => $this->getSortOptions(),
