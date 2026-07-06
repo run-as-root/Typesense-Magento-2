@@ -50,4 +50,28 @@
                     table="run_as_root_typesense_query_merchandising" column="store_id"
                     referenceTable="store" referenceColumn="store_id" onDelete="CASCADE"/>
     </table>
+
+    <!-- Category Virtual Rule -->
+    <table name="run_as_root_typesense_category_virtual_rule" resource="default" engine="innodb"
+           comment="TypeSense Category Virtual Rules">
+        <column xsi:type="int" name="id" unsigned="true" nullable="false" identity="true" comment="ID"/>
+        <column xsi:type="int" name="category_id" unsigned="true" nullable="false" comment="Category ID"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" comment="Store ID"/>
+        <column xsi:type="boolean" name="is_virtual" nullable="false" default="0" comment="Is Virtual Category"/>
+        <column xsi:type="text" name="conditions_serialized" nullable="true" comment="Serialized Rule Conditions (JSON)"/>
+        <column xsi:type="int" name="virtual_category_root_id" unsigned="true" nullable="true" comment="Virtual Category Root ID"/>
+        <column xsi:type="text" name="compiled_filter_cache" nullable="true" comment="Cached Compiled Typesense filter_by"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="UNQ_TS_CAT_VIRTUAL_RULE_CAT_STORE">
+            <column name="category_id"/>
+            <column name="store_id"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="FK_TS_CAT_VIRTUAL_RULE_STORE"
+                    table="run_as_root_typesense_category_virtual_rule" column="store_id"
+                    referenceTable="store" referenceColumn="store_id" onDelete="CASCADE"/>
+    </table>
 </schema>

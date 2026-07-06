@@ -4,6 +4,7 @@
     <module name="RunAsRoot_TypeSense">
         <sequence>
             <module name="Magento_Catalog"/>
+            <module name="Magento_CatalogRule"/>
             <module name="Magento_Cms"/>
             <module name="Magento_Search"/>
             <module name="Magento_Indexer"/>
