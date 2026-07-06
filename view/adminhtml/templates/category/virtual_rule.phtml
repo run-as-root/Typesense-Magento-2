@@ -1,0 +1,164 @@
+<?php
+
+declare(strict_types=1);
+
+/** @var \RunAsRoot\TypeSense\Block\Adminhtml\Category\VirtualRule $block */
+
+if (!$block->isEnabled()) {
+    return;
+}
+?>
+<style>
+    .ts-vrule-hint {
+        font-size: 12px; color: #888; line-height: 1.5; margin-bottom: 16px;
+        padding: 10px 14px; background: #f8f9fa; border-left: 3px solid #1979c3; border-radius: 0 4px 4px 0;
+    }
+    .ts-vrule-field-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .ts-vrule-field-row label { font-weight: 600; font-size: 13px; min-width: 180px; }
+    .ts-vrule-field-row input[type="number"] { width: 140px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; }
+    .ts-vrule-root-name { font-size: 12px; color: #888; }
+    .ts-vrule-save { padding: 8px 20px; border-radius: 4px; font-size: 13px; font-weight: 600; border: 1px solid #1979c3; background: #1979c3; color: #fff; cursor: pointer; margin-top: 16px; }
+    .ts-vrule-save:hover { background: #1565c0; }
+    .ts-vrule-save:disabled { opacity: 0.6; cursor: wait; }
+    .ts-vrule-status { font-size: 12px; font-weight: 600; margin-left: 12px; }
+    .ts-vrule-status.status-success { color: #79a22e; }
+    .ts-vrule-status.status-error { color: #e02b27; }
+</style>
+
+<?php if (!$block->getCategoryId()): ?>
+<div style="text-align:center; padding:24px; color:#999; font-size:13px;">
+    <?= $block->escapeHtml(__('Save the category first to configure a virtual rule.')) ?>
+</div>
+<?php return; ?>
+<?php endif; ?>
+
+<div id="typesense-category-virtual-rule"
+     data-category-id="<?= (int) $block->getCategoryId() ?>"
+     data-store-id="<?= (int) $block->getStoreId() ?>"
+     data-save-url="<?= $block->escapeUrl($block->getSaveUrl()) ?>"
+     data-new-child-url="<?= $block->escapeUrl($block->getNewChildUrl()) ?>"
+     data-js-object-name="<?= $block->escapeHtmlAttr($block->getJsObjectName()) ?>">
+
+    <div class="ts-vrule-hint">
+        <?= $block->escapeHtml(__(
+            'Turn this category into a virtual (smart) category driven by product attribute rules, '
+            . 'the same rule builder used by Catalog Price Rules. Optionally inherit another '
+            . 'category\'s rule as a base by setting a virtual category root.'
+        )) ?>
+    </div>
+
+    <div class="ts-vrule-field-row">
+        <label for="typesense-vrule-is-virtual">
+            <?= $block->escapeHtml(__('Is Virtual Category')) ?>
+        </label>
+        <input type="checkbox"
+               id="typesense-vrule-is-virtual"
+               name="is_virtual"
+               value="1"
+               <?= $block->isVirtual() ? 'checked="checked"' : '' ?>/>
+    </div>
+
+    <div class="ts-vrule-field-row">
+        <label for="typesense-vrule-root-id">
+            <?= $block->escapeHtml(__('Virtual Category Root ID')) ?>
+        </label>
+        <input type="number"
+               id="typesense-vrule-root-id"
+               name="virtual_category_root_id"
+               min="1"
+               step="1"
+               value="<?= $block->getVirtualCategoryRootId() !== null ? (int) $block->getVirtualCategoryRootId() : '' ?>"/>
+        <span class="ts-vrule-root-name" id="typesense-vrule-root-name">
+            <?= $block->getVirtualCategoryRootName() !== null
+                ? $block->escapeHtml(__('Currently: %1', $block->getVirtualCategoryRootName()))
+                : $block->escapeHtml(__('Optional — leave empty for no inherited root.')) ?>
+        </span>
+    </div>
+
+    <div class="rule-tree">
+        <div id="<?= $block->escapeHtmlAttr($block->getJsObjectName()) ?>"
+             class="rule-tree-wrapper"
+             data-role="virtual-rule-conditions">
+            <?= /* @noEscape */ $block->getConditionsHtml() ?>
+        </div>
+    </div>
+
+    <button type="button" class="ts-vrule-save" id="typesense-vrule-save-btn">
+        <?= $block->escapeHtml(__('Save Virtual Rule')) ?>
+    </button>
+    <span id="typesense-vrule-status" class="ts-vrule-status"></span>
+</div>
+
+<script>
+require(['jquery', 'Magento_Rule/rules', 'prototype'], function ($, VarienRulesForm) {
+    'use strict';
+
+    var $container = $('#typesense-category-virtual-rule');
+    var jsObjectName = $container.data('js-object-name');
+    var newChildUrl = $container.data('new-child-url');
+    var saveUrl = $container.data('save-url');
+    var categoryId = $container.data('category-id');
+    var storeId = $container.data('store-id');
+
+    // Boot Magento's own rule builder JS against our rendered condition tree. Exposed on
+    // `window` under the fieldset id, matching Magento_CatalogRule::promo/fieldset.phtml's own
+    // convention, since rules.js's AJAX "add new condition" flow reads back the FORM_KEY/BASE_URL
+    // globals it expects to already be present on every admin page.
+    window[jsObjectName] = new VarienRulesForm(jsObjectName, newChildUrl);
+
+    function showStatus(msg, type) {
+        var $status = $('#typesense-vrule-status');
+        $status.text(msg)
+            .removeClass('status-success status-error')
+            .addClass(type === 'success' ? 'status-success' : 'status-error');
+        setTimeout(function () { $status.text(''); }, 4000);
+    }
+
+    function saveRule() {
+        var $btn = $('#typesense-vrule-save-btn');
+        $btn.prop('disabled', true);
+
+        // Serializing the individual condition inputs (rather than a <form>) is intentional: this
+        // block is embedded inside the category edit page's own UI-component <form>, and nesting a
+        // second literal <form> element inside it would be invalid HTML. jQuery's .serialize()
+        // works fine against a plain set of matched input/select elements, it does not require
+        // them to be wrapped in a <form> tag.
+        var conditionsData = $('#' + jsObjectName)
+            .find(':input')
+            .serialize();
+
+        var payload = $.param({
+            category_id: categoryId,
+            store_id: storeId,
+            is_virtual: $('#typesense-vrule-is-virtual').is(':checked') ? 1 : 0,
+            virtual_category_root_id: $('#typesense-vrule-root-id').val(),
+            form_key: window.FORM_KEY
+        }) + '&' + conditionsData;
+
+        $.ajax({
+            url: saveUrl,
+            type: 'POST',
+            data: payload,
+            dataType: 'json',
+            success: function (response) {
+                if (response && response.success) {
+                    showStatus('<?= $block->escapeJs(__('Virtual rule saved successfully.')) ?>', 'success');
+                } else {
+                    var msg = (response && response.message)
+                        ? response.message
+                        : '<?= $block->escapeJs(__('An error occurred while saving.')) ?>';
+                    showStatus(msg, 'error');
+                }
+            },
+            error: function () {
+                showStatus('<?= $block->escapeJs(__('Failed to save virtual rule. Please try again.')) ?>', 'error');
+            },
+            complete: function () {
+                $btn.prop('disabled', false);
+            }
+        });
+    }
+
+    $('#typesense-vrule-save-btn').on('click', saveRule);
+});
+</script>
