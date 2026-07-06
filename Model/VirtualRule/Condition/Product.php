@@ -39,7 +39,12 @@ use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
  */
 class Product extends CatalogRuleProduct
 {
-    private const CORE_FILTERABLE_ATTRIBUTES = ['name', 'sku', 'price', 'category_ids'];
+    /**
+     * Public so Controller\Adminhtml\CategoryVirtualRule\Save can enforce the exact same
+     * allowlist server-side that this class already restricts the admin dropdown to — a single
+     * source of truth for "what Typesense can filter on" instead of two lists that could drift.
+     */
+    public const CORE_FILTERABLE_ATTRIBUTES = ['name', 'sku', 'price', 'category_ids'];
 
     /**
      * Attributes from CORE_FILTERABLE_ATTRIBUTES that must be injected unconditionally, bypassing
