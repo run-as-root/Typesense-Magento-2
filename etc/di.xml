@@ -87,6 +87,9 @@
     <preference for="RunAsRoot\TypeSense\Api\CategoryMerchandisingRepositoryInterface"
                 type="RunAsRoot\TypeSense\Model\Merchandising\CategoryMerchandisingRepository"/>
 
+    <preference for="RunAsRoot\TypeSense\Api\CategoryVirtualRuleRepositoryInterface"
+                type="RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleRepository"/>
+
     <preference for="RunAsRoot\TypeSense\Api\QueryMerchandisingRepositoryInterface"
                 type="RunAsRoot\TypeSense\Model\Merchandising\QueryMerchandisingRepository"/>
 
