@@ -71,9 +71,9 @@ The effective filter is compiled once and cached per category+store. Because anc
 
 ### Merchandising (Pin/Hide) Compatibility
 
-`CategoryMerchandisingSync` currently upserts a Typesense override matched by the literal string `category_ids:={$categoryId}`. Once filter strings are compiled/dynamic per virtual category, string-matching the override rule becomes brittle. Plan: switch the override's match rule to an explicit tag (`cat_merch_{categoryId}`) passed explicitly in frontend search params, rather than relying on Typesense inferring the override from `filter_by` content.
+**Revised during planning — simpler than the original design.** `CategoryMerchandisingSync` currently upserts a Typesense override matched by the hardcoded string `category_ids:={$categoryId}`. Rather than depending on an unverified Typesense "override tag" API, `CategoryMerchandisingSync` now asks the `CategoryVirtualRuleResolver` for the category's **current effective filter** and uses that as the override's `rule.filter_by` — the exact same filter the frontend sends, whether the category is static or virtual. No new Typesense capability required.
 
-> **Open technical risk:** Typesense 28's exact override-tag API surface has not been verified against source/docs — this is a concrete spike item for the implementation plan, not an assertion of fact.
+The one thing this requires: whenever `VirtualRuleCacheInvalidator` invalidates a category's compiled filter (rule saved, or a descendant's rule changed), any category in that invalidated set that also has merchandising rules must re-run `CategoryMerchandisingSync::sync()` so its override's `rule.filter_by` stays in lockstep with the resolver's output. This is a plain call, not a new architectural risk.
 
 ## Error Handling
 
