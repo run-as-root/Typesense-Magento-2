@@ -79,6 +79,12 @@ class ConditionsToFilterByCompiler
             throw new LocalizedException(__('Unsupported virtual category operator "%1".', $operator));
         }
 
+        if (!is_scalar($value)) {
+            throw new LocalizedException(
+                __('Virtual category condition value must be scalar for operator "%1".', $operator),
+            );
+        }
+
         return $attribute . self::OPERATOR_MAP[$operator] . $this->formatValue($value);
     }
 
@@ -110,6 +116,12 @@ class ConditionsToFilterByCompiler
             return $stringValue;
         }
 
-        return '`' . str_replace('`', '', $stringValue) . '`';
+        if (str_contains($stringValue, '`')) {
+            throw new LocalizedException(
+                __('Virtual category condition values may not contain a backtick character.'),
+            );
+        }
+
+        return '`' . $stringValue . '`';
     }
 }

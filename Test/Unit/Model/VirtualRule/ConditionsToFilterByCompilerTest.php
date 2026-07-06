@@ -143,4 +143,18 @@ final class ConditionsToFilterByCompilerTest extends TestCase
 
         $this->sut->compile(['attribute' => 'color', 'operator' => '~~', 'value' => 'red']);
     }
+
+    public function test_non_scalar_value_throws_exception_for_scalar_operator(): void
+    {
+        $this->expectException(LocalizedException::class);
+
+        $this->sut->compile(['attribute' => 'price', 'operator' => '==', 'value' => ['a', 'b']]);
+    }
+
+    public function test_value_containing_backtick_throws_exception(): void
+    {
+        $this->expectException(LocalizedException::class);
+
+        $this->sut->compile(['attribute' => 'name', 'operator' => '==', 'value' => 'A`B']);
+    }
 }
