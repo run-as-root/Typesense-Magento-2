@@ -198,6 +198,51 @@ final class SaveTest extends TestCase
         self::assertStringContainsString('not_an_allowed_attribute', $this->jsonPayload['message']);
     }
 
+    public function test_save_rejects_disallowed_attribute_nested_two_levels_deep(): void
+    {
+        $this->params = [
+            'category_id' => 5,
+            'store_id' => 1,
+            'rule' => ['conditions' => $this->flatConditionsPost()],
+        ];
+
+        // combine -> nested combine -> leaf, so a regression that only walks one level of
+        // "conditions" would miss the disallowed attribute and wrongly let the save through.
+        $conditionsArray = [
+            'type' => Combine::class,
+            'aggregator' => 'all',
+            'value' => '1',
+            'conditions' => [
+                [
+                    'type' => Combine::class,
+                    'aggregator' => 'all',
+                    'value' => '1',
+                    'conditions' => [
+                        [
+                            'type' => Product::class,
+                            'attribute' => 'not_an_allowed_attribute',
+                            'operator' => '==',
+                            'value' => 'some-value',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+        $this->stubParsedConditions($conditionsArray);
+        $this->config->method('getAdditionalAttributes')->willReturn(['color']);
+
+        $this->ruleRepository->expects(self::never())->method('findByCategoryAndStore');
+        $this->ruleRepository->expects(self::never())->method('save');
+        $this->cacheInvalidator->expects(self::never())->method('invalidate');
+        $this->merchandisingSync->expects(self::never())->method('sync');
+
+        $this->sut->execute();
+
+        self::assertIsArray($this->jsonPayload);
+        self::assertFalse($this->jsonPayload['success']);
+        self::assertStringContainsString('not_an_allowed_attribute', $this->jsonPayload['message']);
+    }
+
     public function test_save_returns_error_when_conditions_payload_is_invalid(): void
     {
         $this->params = [
