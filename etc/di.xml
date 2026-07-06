@@ -73,6 +73,9 @@
     <preference for="RunAsRoot\TypeSense\Api\Data\CategoryMerchandisingInterface"
                 type="RunAsRoot\TypeSense\Model\Merchandising\CategoryMerchandising"/>
 
+    <preference for="RunAsRoot\TypeSense\Api\Data\CategoryVirtualRuleInterface"
+                type="RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRule"/>
+
     <preference for="RunAsRoot\TypeSense\Api\Data\QueryMerchandisingInterface"
                 type="RunAsRoot\TypeSense\Model\Merchandising\QueryMerchandising"/>
 
