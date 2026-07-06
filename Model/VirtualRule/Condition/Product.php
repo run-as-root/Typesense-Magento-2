@@ -41,6 +41,24 @@ class Product extends CatalogRuleProduct
 {
     private const CORE_FILTERABLE_ATTRIBUTES = ['name', 'sku', 'price', 'category_ids'];
 
+    /**
+     * Attributes from CORE_FILTERABLE_ATTRIBUTES that must be injected unconditionally, bypassing
+     * parent::loadAttributeOptions()'s "is_used_for_promo_rules" EAV filter entirely.
+     *
+     * Confirmed via a live bootstrapped Magento run (see class docblock): "name" and "price" ship
+     * with is_used_for_promo_rules=0 by default, so AbstractProduct::loadAttributeOptions() drops
+     * them before our array_intersect_key ever runs — intersect can only remove keys, it can never
+     * restore ones the parent already dropped. "category_ids" doesn't need this treatment because
+     * AbstractProduct::_addSpecialAttributes() already injects it unconditionally after that same
+     * filter, and "sku" ships with the flag enabled by default. We deliberately do NOT fix this by
+     * flipping is_used_for_promo_rules on the shared EAV attribute, since that flag is also read by
+     * Catalog Price Rule / Cart Price Rule condition dropdowns elsewhere in admin — flipping it
+     * would leak "name"/"price" into those unrelated core screens as a side effect of installing
+     * this extension. Instead we mirror Magento's own _addSpecialAttributes() pattern: inject these
+     * two unconditionally, the same way it unconditionally injects category_ids.
+     */
+    private const UNCONDITIONAL_CORE_ATTRIBUTES = ['name', 'price'];
+
     private readonly TypeSenseConfigInterface $typeSenseConfig;
 
     /**
@@ -96,8 +114,43 @@ class Product extends CatalogRuleProduct
         parent::loadAttributeOptions();
 
         $allowed = array_merge(self::CORE_FILTERABLE_ATTRIBUTES, $this->typeSenseConfig->getAdditionalAttributes());
-        $this->setAttributeOption(array_intersect_key($this->getAttributeOption(), array_flip($allowed)));
+        $filtered = array_intersect_key($this->getAttributeOption(), array_flip($allowed));
+
+        foreach (self::UNCONDITIONAL_CORE_ATTRIBUTES as $code) {
+            if (isset($filtered[$code])) {
+                continue;
+            }
+
+            $label = $this->getUnconditionalAttributeLabel($code);
+            if ($label !== null) {
+                $filtered[$code] = $label;
+            }
+        }
+
+        $this->setAttributeOption($filtered);
 
         return $this;
+    }
+
+    /**
+     * Look up an attribute's frontend label directly from EAV metadata, bypassing the
+     * is_used_for_promo_rules filter parent::loadAttributeOptions() applies.
+     *
+     * Mirrors the try/catch shape AbstractProduct::getAttributeObject() itself uses around the
+     * same \Magento\Eav\Model\Config::getAttribute() call.
+     */
+    private function getUnconditionalAttributeLabel(string $code): ?string
+    {
+        try {
+            $attribute = $this->_config->getAttribute(\Magento\Catalog\Model\Product::ENTITY, $code);
+        } catch (\Exception $e) {
+            return null;
+        }
+
+        if (!$attribute || !$attribute->getId()) {
+            return null;
+        }
+
+        return (string) $attribute->getFrontendLabel();
     }
 }
