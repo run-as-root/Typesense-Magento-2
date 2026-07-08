@@ -42,6 +42,7 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 - Instant search page replacing the default Magento catalog search
 - Category page powered by Typesense with client-side filtering and sorting
 - Visual category merchandiser on the category edit page (Algolia-style sortable product table)
+- Virtual categories with rule-based product membership, resolved at query time with no reindex required
 - Admin query merchandiser for keyword-level product promotion/demotion
 - Admin synonym manager and collection browser
 - CLI commands for reindexing, collection management, and health checks
@@ -294,6 +295,12 @@ On any category's edit page, scroll to the **TypeSense Merchandising** section t
 - Demote or hide specific products
 
 Changes are saved alongside the category and sync to Typesense curation rules on save.
+
+### Virtual Category (Rule-Based Categories)
+
+On any category's edit page, toggle **Virtual Category** and build a rule with Magento's native nested AND/OR condition builder — the same rule engine used by Catalog Price Rules, limited to attributes present in the Typesense product schema. A virtual category's product membership is computed from that rule instead of manual assignment.
+
+Rules resolve at query time: the condition tree compiles into a Typesense `filter_by` clause that swaps in for the category's normal product filter, so there's no reindex after saving a rule. A category can also be set up as a **virtual root**, mirroring another category's matches (optionally narrowed by its own rule), and virtual categories always fold in matches from their own child categories (**anchor bleed-up**). Pinning and hiding products via the Visual Category Merchandiser continues to work on virtual categories exactly as it does on static ones.
 
 ### Query Merchandiser
 
