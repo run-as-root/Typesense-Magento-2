@@ -105,7 +105,7 @@ class CategoryVirtualRuleResolver
     private function getDirectChildIds(int $categoryId): array
     {
         $collection = $this->categoryCollectionFactory->create();
-        $collection->addAttributeToFilter('is_active', 1);
+        $collection->addAttributeToFilter('is_active', ['eq' => 1]);
         $collection->addFieldToFilter('parent_id', $categoryId);
 
         return array_map('intval', $collection->getAllIds());

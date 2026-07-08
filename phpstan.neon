@@ -24,3 +24,35 @@ parameters:
         - '#Comparison operation .* is always true#'
         - '#Unreachable statement#'
         - '#callable\(Magento\\Framework\\Api\\ExtensibleDataInterface\)#'
+        # Magento_Rule/Magento_CatalogRule condition classes are Magento\Framework\DataObject
+        # subclasses: setType()/get|setAttributeOption() are magic __call setters/getters that
+        # PHPStan can't see through inheritance from a Magento\ base class it treats as opaque.
+        -
+            message: '#Call to an undefined method RunAsRoot\\TypeSense\\Model\\VirtualRule\\Condition\\Combine::setType\(\)#'
+            path: Model/VirtualRule/Condition/Combine.php
+        -
+            message: '#Call to an undefined method RunAsRoot\\TypeSense\\Model\\VirtualRule\\Condition\\Product::(get|set)AttributeOption\(\)#'
+            paths:
+                - Model/VirtualRule/Condition/Product.php
+                - Model/VirtualRule/Condition/Combine.php
+        -
+            message: '#Call to an undefined method RunAsRoot\\TypeSense\\Model\\VirtualRule\\Condition\\ConditionsRule::setConditionsSerialized\(\)#'
+            path: Block/Adminhtml/Category/VirtualRule.php
+        # Magento\Rule\Model\Condition\AbstractCondition carries a `@method setFormName()` PHPDoc
+        # annotation with no parameter, even though every core caller (module-sales-rule,
+        # module-catalog-rule, module-page-builder) invokes it with one. Verified against the real
+        # mage-os/module-rule source in the linked Warden Magento project - this is an upstream
+        # annotation defect, not a bug in our call sites.
+        -
+            message: '#Method Magento\\Rule\\Model\\Condition\\AbstractCondition::setFormName\(\) invoked with 1 parameter, 0 required#'
+            paths:
+                - Block/Adminhtml/Category/VirtualRule.php
+                - Controller/Adminhtml/CategoryVirtualRule/NewConditionHtml.php
+        # NewConditionHtml::execute() deliberately mirrors
+        # Magento\CatalogRule\Controller\Adminhtml\Promo\Catalog\NewConditionHtml line for line,
+        # including its lack of a declared return type - it writes the AJAX response body directly
+        # via $this->getResponse()->setBody() rather than returning a Result object, exactly like
+        # the real core controller it mirrors.
+        -
+            message: '#Return type \(void\) of method RunAsRoot\\TypeSense\\Controller\\Adminhtml\\CategoryVirtualRule\\NewConditionHtml::execute\(\) should be compatible with return type#'
+            path: Controller/Adminhtml/CategoryVirtualRule/NewConditionHtml.php

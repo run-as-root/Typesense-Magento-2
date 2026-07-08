@@ -152,7 +152,7 @@ class Product extends CatalogRuleProduct
             return null;
         }
 
-        if (!$attribute || !$attribute->getId()) {
+        if (!$attribute->getId()) {
             return null;
         }
 
