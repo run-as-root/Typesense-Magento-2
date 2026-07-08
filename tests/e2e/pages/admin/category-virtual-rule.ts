@@ -1,4 +1,4 @@
-import { type Page, type Locator } from '@playwright/test';
+import { type Page, type Locator, expect } from '@playwright/test';
 
 /**
  * Page object for the "TypeSense Virtual Category" fieldset on the category edit page.
@@ -35,24 +35,33 @@ export class CategoryVirtualRulePage {
   }
 
   async openCategory(categoryId: number) {
-    // Deliberately no leading slash: the "admin" Playwright project's baseURL is
-    // `${BASE_URL}/backend/admin/` (see playwright.config.ts). A leading-slash path resolves
-    // against the *origin*, discarding that "/backend/admin/" prefix entirely and landing on the
-    // storefront instead of the admin — confirmed live: CategoryMerchandiserPage.gotoCategoryEdit()
-    // has this exact bug (it uses a leading slash) and its own spec's "section visible"/"products
-    // table" assertions fail against a live Warden instance as a result. Not fixed here since it's
-    // pre-existing, unrelated sibling test infra outside this task's scope — just not repeated.
+    // No leading slash: the "admin" Playwright project's baseURL is `${BASE_URL}/backend/` (see
+    // playwright.config.ts). A leading-slash path resolves against the *origin*, discarding that
+    // "/backend/" prefix entirely and landing on the storefront instead of the admin.
     await this.page.goto(`catalog/category/edit/id/${categoryId}`, { waitUntil: 'domcontentloaded' });
     // Fieldset is collapsible/opened=false by default (see view/adminhtml/ui_component/
     // category_form.xml), mirroring CategoryMerchandiserPage.gotoCategoryEdit()'s own
     // click-to-expand pattern for the sibling "TypeSense Merchandising" fieldset.
+    //
+    // Must target the ".admin__collapsible-title" header specifically, not the whole
+    // "[data-index=...]" fieldset wrapper: the wrapper's own bounding box includes the (hidden,
+    // zero-height-when-collapsed) content area, so a plain `.click()` on the wrapper can land
+    // outside the actual clickable title bar and silently fail to expand the section.
+    //
+    // The collapsible's click handler is a KnockoutJS binding that only attaches once the UI
+    // component form finishes initializing client-side (well after "domcontentloaded" fires) —
+    // clicking too early is a silent no-op. Wait for the header to actually be visible/stable
+    // first, then retry the click until the (KO-rendered) container really shows up instead of
+    // trusting a single click + fixed sleep.
     const section = this.page
-      .locator('[data-index="typesense_virtual_category"], :has-text("TypeSense Virtual Category")')
+      .locator('[data-index="typesense_virtual_category"] .admin__collapsible-title')
       .first();
-    if (await section.isVisible()) {
+    await section.waitFor({ state: 'visible', timeout: 15_000 });
+    await expect(async () => {
+      if (await this.container.isVisible()) return;
       await section.click();
-    }
-    await this.page.waitForTimeout(1000);
+      await expect(this.container).toBeVisible({ timeout: 3_000 });
+    }).toPass({ timeout: 15_000 });
   }
 
   async enableVirtual() {
@@ -97,7 +106,11 @@ export class CategoryVirtualRulePage {
     const operatorSelects = this.conditionsContainer.locator('select[id$="__operator"]');
     const rowsBefore = await operatorSelects.count();
 
+    // The "new_child" select is wrapped in the same Magento_Rule "click label to reveal" pattern
+    // as operator/value fields (its visible face is the "+" add-condition button) — it needs the
+    // same reveal() treatment before Playwright's actionability checks will allow selecting it.
     const newChildSelect = this.conditionsContainer.locator('select[id$="__new_child"]').first();
+    await this.reveal(newChildSelect);
     await newChildSelect.selectOption({
       value: `RunAsRoot\\TypeSense\\Model\\VirtualRule\\Condition\\Product|${attribute}`,
     });

@@ -11,15 +11,53 @@ import { CategoryPage } from '../../pages/frontend/category-page';
 const CATEGORY_ID = 6;
 const CATEGORY_URL = '/gear/watches.html';
 
-// A single "sku == 24-MB01" condition compiles down to exactly `sku:=24-MB01`
+// A single "sku == <value>" condition compiles down to exactly `sku:=<value>`
 // (Model\VirtualRule\ConditionsToFilterByCompiler's OPERATOR_MAP maps "==" to ":="), which fully
 // replaces the category's normal `category_ids:=X` filter — see CategoryVirtualRuleResolver. That
 // means the product doesn't need to be assigned to category 6 at all for this to work; the rule
 // alone decides what's in the listing.
+//
+// The condition value/expected name are resolved at runtime (see resolveSampleProduct() below)
+// rather than hardcoded, because this suite doesn't assume any particular catalog fixture: some
+// Warden installs seed classic Magento Luma sample data (fixed SKUs like "24-MB01" / "Joust
+// Duffle Bag"), others seed randomized Faker data via runasroot/module-seeder (SKUs like
+// "SEED-12345" with nonsense Latin names) — hardcoding either shape makes the test fail against
+// the other.
 const CONDITION_ATTRIBUTE = 'sku';
 const CONDITION_OPERATOR = '==';
-const CONDITION_VALUE = '24-MB01';
-const EXPECTED_PRODUCT_NAME = 'Joust Duffle Bag';
+
+const TYPESENSE_SEARCH_URL = process.env.TYPESENSE_SEARCH_URL || 'https://typesense.mage-os-typesense.test';
+const TYPESENSE_SEARCH_API_KEY = process.env.TYPESENSE_SEARCH_API_KEY || 'typesense_dev_key';
+const TYPESENSE_PRODUCT_COLLECTION = process.env.TYPESENSE_PRODUCT_COLLECTION || 'rar_product_default_v63';
+
+/** Picks any real, currently-indexed product to drive the virtual-rule condition/assertion. */
+async function resolveSampleProduct(): Promise<{ sku: string; name: string }> {
+  // Node's fetch (unlike Playwright's browser contexts, which get "ignoreHTTPSErrors: true" from
+  // playwright.config.ts) does strict TLS verification and doesn't trust this Warden install's
+  // local dev CA, so a plain fetch() to the HTTPS Typesense host fails with "unable to verify the
+  // first certificate". Scope the same relaxation Playwright already applies to just this call.
+  const previous = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  let body: any;
+  try {
+    const response = await fetch(
+      `${TYPESENSE_SEARCH_URL}/collections/${TYPESENSE_PRODUCT_COLLECTION}/documents/search?q=*&query_by=name&per_page=1`,
+      { headers: { 'X-TYPESENSE-API-KEY': TYPESENSE_SEARCH_API_KEY } },
+    );
+    body = await response.json();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    } else {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = previous;
+    }
+  }
+  const doc = body?.hits?.[0]?.document;
+  if (!doc?.sku || !doc?.name) {
+    throw new Error(`Could not resolve a sample product from Typesense collection "${TYPESENSE_PRODUCT_COLLECTION}"`);
+  }
+  return { sku: doc.sku, name: doc.name };
+}
 
 test.describe('Admin Category Virtual Rule', () => {
   let virtualRule: CategoryVirtualRulePage;
@@ -47,8 +85,9 @@ test.describe('Admin Category Virtual Rule', () => {
   });
 
   test('saving a simple one-condition rule succeeds', async () => {
+    const product = await resolveSampleProduct();
     await virtualRule.enableVirtual();
-    await virtualRule.addCondition(CONDITION_ATTRIBUTE, CONDITION_OPERATOR, CONDITION_VALUE);
+    await virtualRule.addCondition(CONDITION_ATTRIBUTE, CONDITION_OPERATOR, product.sku);
 
     const response = await virtualRule.save();
 
@@ -57,8 +96,9 @@ test.describe('Admin Category Virtual Rule', () => {
   });
 
   test('frontend: virtual category listing shows only products matching the rule', async ({ page }) => {
+    const product = await resolveSampleProduct();
     await virtualRule.enableVirtual();
-    await virtualRule.addCondition(CONDITION_ATTRIBUTE, CONDITION_OPERATOR, CONDITION_VALUE);
+    await virtualRule.addCondition(CONDITION_ATTRIBUTE, CONDITION_OPERATOR, product.sku);
 
     const response = await virtualRule.save();
     expect(response.success, response.message).toBe(true);
@@ -69,6 +109,6 @@ test.describe('Admin Category Virtual Rule', () => {
     const cards = await categoryPage.getProductCards();
     await expect(cards.first()).toBeVisible({ timeout: 10_000 });
     expect(await cards.count()).toBe(1);
-    await expect(cards.first().locator('h3')).toHaveText(EXPECTED_PRODUCT_NAME);
+    await expect(cards.first().locator('h3')).toHaveText(product.name);
   });
 });
