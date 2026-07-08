@@ -12,6 +12,7 @@ use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
+use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\CategoryVirtualRuleRepositoryInterface;
 use RunAsRoot\TypeSense\Api\Data\CategoryVirtualRuleInterface;
@@ -39,6 +40,7 @@ class Load extends Action implements HttpGetActionInterface
         private readonly CategoryRepositoryInterface $categoryRepository,
         private readonly JsonSerializer $jsonSerializer,
         private readonly LoggerInterface $logger,
+        private readonly StoreManagerInterface $storeManager,
     ) {
         parent::__construct($context);
     }
@@ -49,6 +51,13 @@ class Load extends Action implements HttpGetActionInterface
 
         $categoryId = (int) $this->getRequest()->getParam('category_id', 0);
         $storeId = (int) $this->getRequest()->getParam('store_id', 0);
+
+        // Admin scope (0) → use default store, matching Save's convention (and
+        // Block\Adminhtml\Category\VirtualRule::getStoreId()) — every virtual rule row is
+        // persisted under a real store id, so store_id=0 here would never find a saved rule.
+        if ($storeId === 0) {
+            $storeId = (int) $this->storeManager->getDefaultStoreView()->getId();
+        }
 
         if ($categoryId === 0) {
             return $resultJson->setData($this->emptyState());

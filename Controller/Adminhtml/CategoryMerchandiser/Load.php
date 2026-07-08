@@ -16,6 +16,7 @@ use RunAsRoot\TypeSense\Api\CategoryMerchandisingRepositoryInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Api\TypeSenseClientFactoryInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleResolver;
 
 class Load extends Action implements HttpGetActionInterface
 {
@@ -31,6 +32,7 @@ class Load extends Action implements HttpGetActionInterface
         private readonly StoreManagerInterface $storeManager,
         private readonly TypeSenseConfigInterface $config,
         private readonly LoggerInterface $logger,
+        private readonly CategoryVirtualRuleResolver $virtualRuleResolver,
     ) {
         parent::__construct($context);
     }
@@ -78,10 +80,16 @@ class Load extends Action implements HttpGetActionInterface
         $collectionName = $this->collectionNameResolver->resolve('product', $storeCode, $resolvedStoreId);
         $client         = $this->clientFactory->create($storeId ?: null);
 
+        // Ask the resolver for the category's actual effective filter rather than hardcoding
+        // "category_ids:={$categoryId}" — that hardcoded filter only ever matches statically
+        // assigned categories, so the merchandiser browse-grid always showed "No products found"
+        // for a virtual category even though the storefront listing (which already goes through
+        // the resolver, see CategorySearchConfigViewModel/CategoryMerchandisingSync) found matches
+        // fine. Mirrors Task 10's identical fix to CategoryMerchandisingSync::sync().
         $searchResult = $client->collections[$collectionName]->documents->search([
             'q'         => '*',
             'query_by'  => 'name',
-            'filter_by' => "category_ids:={$categoryId}",
+            'filter_by' => $this->virtualRuleResolver->resolveFilter($categoryId, $resolvedStoreId),
             'per_page'  => 50,
         ]);
 

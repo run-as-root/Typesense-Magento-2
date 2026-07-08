@@ -9,9 +9,11 @@ use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleResolver;
+use RunAsRoot\TypeSense\Model\VirtualRule\ConditionsToFilterByCompiler;
 use RunAsRoot\TypeSense\ViewModel\Frontend\CategorySearchConfigViewModel;
 
 final class CategorySearchConfigViewModelTest extends TestCase
@@ -21,6 +23,7 @@ final class CategorySearchConfigViewModelTest extends TestCase
     private CollectionNameResolverInterface&MockObject $collectionNameResolver;
     private Registry&MockObject $registry;
     private CategoryVirtualRuleResolver&MockObject $virtualRuleResolver;
+    private LoggerInterface&MockObject $logger;
     private CategorySearchConfigViewModel $sut;
 
     protected function setUp(): void
@@ -30,6 +33,7 @@ final class CategorySearchConfigViewModelTest extends TestCase
         $this->collectionNameResolver = $this->createMock(CollectionNameResolverInterface::class);
         $this->registry = $this->createMock(Registry::class);
         $this->virtualRuleResolver = $this->createMock(CategoryVirtualRuleResolver::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->sut = new CategorySearchConfigViewModel(
             $this->config,
@@ -37,6 +41,7 @@ final class CategorySearchConfigViewModelTest extends TestCase
             $this->collectionNameResolver,
             $this->registry,
             $this->virtualRuleResolver,
+            $this->logger,
         );
     }
 
@@ -141,6 +146,65 @@ final class CategorySearchConfigViewModelTest extends TestCase
         $result = $this->sut->getConfig();
 
         self::assertNull($result['categoryFilterBy']);
+    }
+
+    public function test_get_category_filter_by_returns_no_match_filter_and_logs_when_resolver_throws(): void
+    {
+        $store = $this->createMock(StoreInterface::class);
+        $store->method('getId')->willReturn(1);
+        $this->storeManager->method('getStore')->willReturn($store);
+
+        $category = $this->createMock(\Magento\Catalog\Model\Category::class);
+        $category->method('getId')->willReturn('7');
+        $this->registry->method('registry')
+            ->with('current_category')
+            ->willReturn($category);
+
+        $this->virtualRuleResolver->method('resolveFilter')
+            ->with(7, 1)
+            ->willThrowException(new \Magento\Framework\Exception\LocalizedException(__('Corrupted rule.')));
+
+        $this->logger->expects(self::once())->method('error');
+
+        $result = $this->sut->getCategoryFilterBy();
+
+        self::assertSame(ConditionsToFilterByCompiler::NO_MATCH_FILTER, $result);
+    }
+
+    public function test_get_config_returns_no_match_filter_when_resolver_throws(): void
+    {
+        $store = $this->createMock(StoreInterface::class);
+        $store->method('getCode')->willReturn('default');
+        $store->method('getId')->willReturn(1);
+        $this->storeManager->method('getStore')->willReturn($store);
+
+        $this->config->method('getSearchHost')->willReturn('localhost');
+        $this->config->method('getSearchPort')->willReturn(8108);
+        $this->config->method('getSearchProtocol')->willReturn('http');
+        $this->config->method('getSearchOnlyApiKey')->willReturn('xyz');
+        $this->config->method('getProductsPerPage')->willReturn(24);
+        $this->config->method('getEnabledSortOptions')->willReturn([]);
+        $this->config->method('getTileAttributes')->willReturn([]);
+
+        $this->collectionNameResolver->method('resolve')
+            ->with('product', 'default', 1)
+            ->willReturn('rar_products_default');
+
+        $category = $this->createMock(\Magento\Catalog\Model\Category::class);
+        $category->method('getId')->willReturn('7');
+        $this->registry->method('registry')
+            ->with('current_category')
+            ->willReturn($category);
+
+        $this->virtualRuleResolver->method('resolveFilter')
+            ->with(7, 1)
+            ->willThrowException(new \RuntimeException('boom'));
+
+        $this->logger->expects(self::once())->method('error');
+
+        $result = $this->sut->getConfig();
+
+        self::assertSame(ConditionsToFilterByCompiler::NO_MATCH_FILTER, $result['categoryFilterBy']);
     }
 
     public function test_get_json_config_returns_valid_json_string(): void
