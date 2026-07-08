@@ -8,6 +8,7 @@ use Magento\Backend\Block\Template;
 use Magento\Backend\Block\Template\Context;
 use Magento\Catalog\Api\CategoryRepositoryInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Store\Model\StoreManagerInterface;
 use RunAsRoot\TypeSense\Api\CategoryVirtualRuleRepositoryInterface;
 use RunAsRoot\TypeSense\Api\Data\CategoryVirtualRuleInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
@@ -55,6 +56,7 @@ class VirtualRule extends Template
         private readonly CategoryVirtualRuleRepositoryInterface $ruleRepository,
         private readonly ConditionsRuleFactory $conditionsRuleFactory,
         private readonly CategoryRepositoryInterface $categoryRepository,
+        private readonly StoreManagerInterface $storeManager,
         array $data = [],
     ) {
         parent::__construct($context, $data);
@@ -65,9 +67,25 @@ class VirtualRule extends Template
         return $this->config->isEnabled();
     }
 
+    /**
+     * The category edit page's default landing scope is "All Store Views" (no "store" request
+     * param at all, i.e. admin scope 0). Every virtual rule row is persisted under a real store id
+     * — Controller\Adminhtml\CategoryVirtualRule\Save falls back to the default store view whenever
+     * it receives store_id=0 (mirroring CategoryMerchandiser\Load's identical fallback) — so this
+     * must resolve admin scope the same way, or every method below that keys off getStoreId()
+     * (getRule(), isVirtual(), getVirtualCategoryRootId(), getVirtualCategoryRootName(),
+     * getConditionsHtml()) silently looks up store_id=0, finds no row, and renders the fieldset as
+     * if the category were never made virtual at all — even immediately after saving it.
+     */
     public function getStoreId(): int
     {
-        return (int) $this->getRequest()->getParam('store', 0);
+        $storeId = (int) $this->getRequest()->getParam('store', 0);
+
+        if ($storeId === 0) {
+            $storeId = (int) $this->storeManager->getDefaultStoreView()->getId();
+        }
+
+        return $storeId;
     }
 
     public function getCategoryId(): ?int
