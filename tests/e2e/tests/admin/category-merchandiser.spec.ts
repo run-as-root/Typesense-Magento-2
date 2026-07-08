@@ -29,7 +29,7 @@ test.describe('Admin Category Merchandiser', () => {
     if (await merchandiser.productSearch.isVisible()) {
       await merchandiser.productSearch.fill('bag');
       await page.waitForTimeout(1000);
-      const firstResult = page.locator('.ts-search-result, [data-role="product-result"]').first();
+      const firstResult = merchandiser.searchResults.first();
       if (await firstResult.isVisible({ timeout: 3000 }).catch(() => false)) {
         await firstResult.click();
         await page.waitForTimeout(500);

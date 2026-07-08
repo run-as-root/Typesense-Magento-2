@@ -22,9 +22,11 @@ export class SynonymsPage {
   }
 
   async goto(collection?: string) {
+    // No leading slash: see playwright.config.ts's ADMIN_URL comment — a leading slash would
+    // resolve against the origin, discarding the "/backend/" prefix and 404ing on the storefront.
     const url = collection
-      ? `/typesense/synonym/index?collection=${encodeURIComponent(collection)}`
-      : '/typesense/synonym/index';
+      ? `typesense/synonym/index?collection=${encodeURIComponent(collection)}`
+      : 'typesense/synonym/index';
     await this.page.goto(url, { waitUntil: 'domcontentloaded' });
   }
 

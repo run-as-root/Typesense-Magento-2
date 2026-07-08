@@ -24,7 +24,9 @@ export class DashboardPage {
   }
 
   async goto() {
-    await this.page.goto('/typesense/dashboard/index', { waitUntil: 'domcontentloaded' });
+    // No leading slash: see playwright.config.ts's ADMIN_URL comment — a leading slash would
+    // resolve against the origin, discarding the "/backend/" prefix and 404ing on the storefront.
+    await this.page.goto('typesense/dashboard/index', { waitUntil: 'domcontentloaded' });
   }
 
   async testConnection() {

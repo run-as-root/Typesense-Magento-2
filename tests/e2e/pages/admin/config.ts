@@ -8,7 +8,9 @@ export class ConfigPage {
   }
 
   async goto() {
-    await this.page.goto('/system_config/edit/section/run_as_root_typesense/', { waitUntil: 'domcontentloaded' });
+    // No leading slash: see playwright.config.ts's ADMIN_URL comment — a leading slash would
+    // resolve against the origin, discarding the "/backend/" prefix and 404ing on the storefront.
+    await this.page.goto('system_config/edit/section/run_as_root_typesense/', { waitUntil: 'domcontentloaded' });
   }
 
   group(id: string) {
