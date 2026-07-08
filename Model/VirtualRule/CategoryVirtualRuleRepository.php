@@ -87,4 +87,14 @@ class CategoryVirtualRuleRepository implements CategoryVirtualRuleRepositoryInte
 
         return $items[0] ?? null;
     }
+
+    public function findRulesByVirtualCategoryRootId(int $rootCategoryId, int $storeId): array
+    {
+        $searchCriteria = $this->searchCriteriaBuilder
+            ->addFilter('virtual_category_root_id', $rootCategoryId)
+            ->addFilter('store_id', $storeId)
+            ->create();
+
+        return array_values($this->getList($searchCriteria)->getItems());
+    }
 }

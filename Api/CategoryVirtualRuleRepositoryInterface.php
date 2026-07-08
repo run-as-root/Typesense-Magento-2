@@ -34,4 +34,13 @@ interface CategoryVirtualRuleRepositoryInterface
      * Convenience lookup used by the resolver and cache invalidator.
      */
     public function findByCategoryAndStore(int $categoryId, int $storeId): ?CategoryVirtualRuleInterface;
+
+    /**
+     * Reverse lookup for VirtualRuleCacheInvalidator: every rule row at this store whose
+     * virtual_category_root_id points at the given category (i.e. every category that mirrors
+     * $rootCategoryId), so a change to $rootCategoryId can cascade to its mirrors.
+     *
+     * @return CategoryVirtualRuleInterface[]
+     */
+    public function findRulesByVirtualCategoryRootId(int $rootCategoryId, int $storeId): array;
 }

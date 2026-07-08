@@ -171,4 +171,41 @@ final class CategoryVirtualRuleRepositoryTest extends TestCase
 
         self::assertNull($this->sut->findByCategoryAndStore(10, 1));
     }
+
+    public function test_find_rules_by_virtual_category_root_id_returns_mirrors(): void
+    {
+        $mirrorRule = $this->createMock(CategoryVirtualRuleInterface::class);
+        $searchCriteria = $this->createMock(SearchCriteriaInterface::class);
+        $collection = $this->createMock(Collection::class);
+        $searchResults = $this->createMock(SearchResultsInterface::class);
+
+        $this->searchCriteriaBuilder->method('addFilter')->willReturnSelf();
+        $this->searchCriteriaBuilder->method('create')->willReturn($searchCriteria);
+
+        $this->collectionFactory->method('create')->willReturn($collection);
+        $collection->method('getItems')->willReturn([$mirrorRule]);
+        $collection->method('getSize')->willReturn(1);
+        $this->searchResultsFactory->method('create')->willReturn($searchResults);
+        $searchResults->method('getItems')->willReturn([$mirrorRule]);
+
+        self::assertSame([$mirrorRule], $this->sut->findRulesByVirtualCategoryRootId(30, 1));
+    }
+
+    public function test_find_rules_by_virtual_category_root_id_returns_empty_array_when_no_mirrors(): void
+    {
+        $searchCriteria = $this->createMock(SearchCriteriaInterface::class);
+        $collection = $this->createMock(Collection::class);
+        $searchResults = $this->createMock(SearchResultsInterface::class);
+
+        $this->searchCriteriaBuilder->method('addFilter')->willReturnSelf();
+        $this->searchCriteriaBuilder->method('create')->willReturn($searchCriteria);
+
+        $this->collectionFactory->method('create')->willReturn($collection);
+        $collection->method('getItems')->willReturn([]);
+        $collection->method('getSize')->willReturn(0);
+        $this->searchResultsFactory->method('create')->willReturn($searchResults);
+        $searchResults->method('getItems')->willReturn([]);
+
+        self::assertSame([], $this->sut->findRulesByVirtualCategoryRootId(30, 1));
+    }
 }
