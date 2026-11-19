@@ -238,7 +238,7 @@
                        sortOrder="126" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Infix Search Mode</label>
                     <source_model>RunAsRoot\TypeSense\Model\Config\Source\InfixMode</source_model>
-                    <comment>"Fallback" only uses infix matching when the exact search finds nothing; "Always" combines both. Requires a full reindex.</comment>
+                    <comment>"Fallback" only uses infix matching when the exact search finds nothing; "Always" combines both. Takes effect without reindexing.</comment>
                     <depends>
                         <field id="infix_enabled">1</field>
                     </depends>
