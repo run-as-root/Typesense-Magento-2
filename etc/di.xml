@@ -166,6 +166,7 @@
                 <item name="typesense_reindex" xsi:type="object">RunAsRoot\TypeSense\Console\Command\ReindexCommand</item>
                 <item name="typesense_collection_list" xsi:type="object">RunAsRoot\TypeSense\Console\Command\CollectionListCommand</item>
                 <item name="typesense_collection_delete" xsi:type="object">RunAsRoot\TypeSense\Console\Command\CollectionDeleteCommand</item>
+                <item name="typesense_collection_rollback" xsi:type="object">RunAsRoot\TypeSense\Console\Command\CollectionRollbackCommand</item>
                 <item name="typesense_health" xsi:type="object">RunAsRoot\TypeSense\Console\Command\HealthCheckCommand</item>
             </argument>
         </arguments>

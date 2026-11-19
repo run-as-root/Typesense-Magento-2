@@ -46,6 +46,12 @@ class ZeroDowntimeService
         // Synonyms and overrides live on the collection, so the new one must carry them before it goes live.
         $this->runAppliers($entityType, $storeCode, $collectionName, $storeId);
 
+        // A plain collection squatting on the alias name blocks alias creation (pre-versioning installs).
+        if ($this->collectionManager->collectionExists($aliasName) && !$this->aliasManager->aliasExists($aliasName)) {
+            $this->collectionManager->deleteCollection($aliasName);
+            $this->logger->info("One-time migration: deleted plain collection {$aliasName} to make way for the alias");
+        }
+
         $this->aliasManager->upsertAlias($aliasName, $collectionName);
         $this->logger->info("Swapped alias {$aliasName} → {$collectionName}");
 
@@ -73,32 +79,90 @@ class ZeroDowntimeService
         }
     }
 
+    public function rollback(string $entityType, string $storeCode, ?int $storeId = null): string
+    {
+        $aliasName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
+        $alias = $this->aliasManager->getAlias($aliasName);
+        $currentVersion = $this->parseVersion($aliasName, $alias['collection_name']);
+        $versions = $this->listVersions($aliasName);
+
+        $previous = null;
+        foreach ($versions as $version => $name) {
+            if ($currentVersion !== null && $version < $currentVersion && ($previous === null || $version > $previous)) {
+                $previous = $version;
+            }
+        }
+
+        if ($previous === null) {
+            throw new \RuntimeException('No previous version to roll back to');
+        }
+
+        $this->aliasManager->upsertAlias($aliasName, $versions[$previous]);
+        $this->logger->info("Rolled back alias {$aliasName} → {$versions[$previous]}");
+
+        return $versions[$previous];
+    }
+
     private function getNextVersion(string $aliasName): int
     {
+        $highest = 0;
         try {
             $alias = $this->aliasManager->getAlias($aliasName);
-            $currentCollection = $alias['collection_name'];
-            if (preg_match('/_v(\d+)$/', $currentCollection, $matches)) {
-                return (int) $matches[1] + 1;
-            }
+            $highest = $this->parseVersion($aliasName, $alias['collection_name']) ?? 0;
         } catch (ObjectNotFound) {
             // Alias doesn't exist yet — start at version 1
         }
 
-        return 1;
+        // After a rollback the alias is behind the newest collection; reusing its number would collide.
+        $existing = array_keys($this->listVersions($aliasName));
+
+        return max([$highest, ...$existing]) + 1;
     }
 
     private function cleanupOldVersions(string $aliasName, string $currentCollection): void
     {
-        $collections = $this->collectionManager->listCollections();
-        $prefix = preg_replace('/_v\d+$/', '', $currentCollection) . '_v';
+        $currentVersion = $this->parseVersion($aliasName, $currentCollection);
+        $versions = $this->listVersions($aliasName);
 
-        foreach ($collections as $collection) {
-            $name = $collection['name'];
-            if (str_starts_with($name, $prefix) && $name !== $currentCollection) {
+        // Keep the current and the highest lower version so a rollback target always exists.
+        $keep = null;
+        foreach ($versions as $version => $name) {
+            if ($currentVersion !== null && $version < $currentVersion && ($keep === null || $version > $keep)) {
+                $keep = $version;
+            }
+        }
+
+        foreach ($versions as $version => $name) {
+            if ($version !== $currentVersion && $version !== $keep) {
                 $this->collectionManager->deleteCollection($name);
                 $this->logger->info("Deleted old collection: {$name}");
             }
         }
+    }
+
+    /**
+     * @return array<int, string> version number => collection name
+     */
+    private function listVersions(string $aliasName): array
+    {
+        $collections = $this->collectionManager->listCollections();
+        $versions = [];
+        foreach ($collections as $collection) {
+            $version = $this->parseVersion($aliasName, $collection['name']);
+            if ($version !== null) {
+                $versions[$version] = $collection['name'];
+            }
+        }
+
+        return $versions;
+    }
+
+    private function parseVersion(string $aliasName, string $collectionName): ?int
+    {
+        if (preg_match('/^' . preg_quote($aliasName, '/') . '_v(\d+)$/', $collectionName, $matches)) {
+            return (int) $matches[1];
+        }
+
+        return null;
     }
 }
