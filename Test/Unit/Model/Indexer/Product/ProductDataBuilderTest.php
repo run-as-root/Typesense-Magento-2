@@ -324,7 +324,6 @@ final class ProductDataBuilderTest extends TestCase
         $collection->method('addAttributeToSelect');
         $collection->method('addUrlRewrite');
         $collection->method('addAttributeToFilter');
-        $collection->method('setVisibility');
 
         $this->sut->getProductCollection([], 5);
     }
@@ -340,7 +339,6 @@ final class ProductDataBuilderTest extends TestCase
             ->with('*');
         $collection->method('addUrlRewrite');
         $collection->method('addAttributeToFilter');
-        $collection->method('setVisibility');
 
         $this->sut->getProductCollection([], 1);
     }
@@ -355,7 +353,6 @@ final class ProductDataBuilderTest extends TestCase
         $collection->expects(self::once())
             ->method('addUrlRewrite');
         $collection->method('addAttributeToFilter');
-        $collection->method('setVisibility');
 
         $this->sut->getProductCollection([], 1);
     }
@@ -368,12 +365,18 @@ final class ProductDataBuilderTest extends TestCase
         $collection->method('setStoreId');
         $collection->method('addAttributeToSelect');
         $collection->method('addUrlRewrite');
-        $collection->expects(self::once())
-            ->method('addAttributeToFilter')
-            ->with('status', Status::STATUS_ENABLED);
-        $collection->method('setVisibility');
+        $filters = [];
+        $collection->method('addAttributeToFilter')->willReturnCallback(
+            function (string $attribute, mixed $condition) use (&$filters, $collection): ProductCollection {
+                $filters[$attribute] = $condition;
+
+                return $collection;
+            },
+        );
 
         $this->sut->getProductCollection([], 1);
+
+        self::assertSame(Status::STATUS_ENABLED, $filters['status'] ?? null);
     }
 
     public function test_product_collection_includes_catalog_only_visibility(): void
@@ -384,14 +387,29 @@ final class ProductDataBuilderTest extends TestCase
         $collection->method('setStoreId');
         $collection->method('addAttributeToSelect');
         $collection->method('addUrlRewrite');
-        $collection->method('addAttributeToFilter');
-        $collection->expects(self::once())
-            ->method('setVisibility')
-            ->with([
-                Visibility::VISIBILITY_IN_CATALOG,
-                Visibility::VISIBILITY_IN_SEARCH,
-                Visibility::VISIBILITY_BOTH,
-            ]);
+        $filters = [];
+        $collection->method('addAttributeToFilter')->willReturnCallback(
+            function (string $attribute, mixed $condition) use (&$filters, $collection): ProductCollection {
+                $filters[$attribute] = $condition;
+
+                return $collection;
+            },
+        );
+
+        $this->sut->getProductCollection([], 1);
+
+        self::assertSame(
+            ['in' => [Visibility::VISIBILITY_IN_CATALOG, Visibility::VISIBILITY_IN_SEARCH, Visibility::VISIBILITY_BOTH]],
+            $filters['visibility'] ?? null,
+        );
+    }
+
+    public function test_product_collection_does_not_depend_on_category_product_index_for_visibility(): void
+    {
+        $collection = $this->createMock(ProductCollection::class);
+        $this->collectionFactory->method('create')->willReturn($collection);
+
+        $collection->expects(self::never())->method('setVisibility');
 
         $this->sut->getProductCollection([], 1);
     }
@@ -405,7 +423,6 @@ final class ProductDataBuilderTest extends TestCase
         $collection->method('addAttributeToSelect');
         $collection->method('addUrlRewrite');
         $collection->method('addAttributeToFilter');
-        $collection->method('setVisibility');
         $collection->expects(self::once())
             ->method('addFieldToFilter')
             ->with('entity_id', ['in' => [1, 2, 3]]);
@@ -422,7 +439,6 @@ final class ProductDataBuilderTest extends TestCase
         $collection->method('addAttributeToSelect');
         $collection->method('addUrlRewrite');
         $collection->method('addAttributeToFilter');
-        $collection->method('setVisibility');
         $collection->expects(self::never())
             ->method('addFieldToFilter');
 
