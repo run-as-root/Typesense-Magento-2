@@ -46,6 +46,7 @@ function typesenseAutocomplete(config) {
                                 collection: config.productCollection,
                                 q: this.query,
                                 query_by: 'name,sku,description',
+                                filter_by: 'visibility:[3,4]',
                                 per_page: config.productCount || 6,
                             },
                             {

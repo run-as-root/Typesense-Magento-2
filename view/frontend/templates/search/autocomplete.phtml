@@ -127,7 +127,7 @@ $labelNoResults   = $escaper->escapeJs(__('No results found'));
                 try {
                     const response = await this.client.multiSearch.perform({
                         searches: [
-                            { collection: config.productCollection,    q: this.query, query_by: 'name,sku,description', per_page: config.productCount || 6 },
+                            { collection: config.productCollection,    q: this.query, query_by: 'name,sku,description', filter_by: 'visibility:[3,4]', per_page: config.productCount || 6 },
                             { collection: config.categoryCollection,   q: this.query, query_by: 'name',                 per_page: 4 },
                             { collection: config.suggestionCollection, q: this.query, query_by: 'q',                    per_page: 5 },
                         ],

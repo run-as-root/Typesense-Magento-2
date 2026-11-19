@@ -9,6 +9,7 @@ use Magento\Catalog\Model\Product\Attribute\Source\Status;
 use Magento\Catalog\Model\Product\Visibility;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
+use Magento\Store\Model\StoreManagerInterface;
 
 class ProductDataBuilder
 {
@@ -22,6 +23,7 @@ class ProductDataBuilder
         private readonly ProductCollectionFactory $collectionFactory,
         private readonly SalesCountResolverInterface $salesCountResolver,
         private readonly ReviewResolverInterface $reviewResolver,
+        private readonly StoreManagerInterface $storeManager,
     ) {
     }
 
@@ -95,7 +97,10 @@ class ProductDataBuilder
         $collection->addAttributeToSelect('*');
         $collection->addUrlRewrite();
         $collection->addAttributeToFilter('status', Status::STATUS_ENABLED);
+        $collection->addWebsiteFilter((int) $this->storeManager->getStore($storeId)->getWebsiteId());
+        // Catalog-only products are indexed too so category listings can show them; search filters them out.
         $collection->setVisibility([
+            Visibility::VISIBILITY_IN_CATALOG,
             Visibility::VISIBILITY_IN_SEARCH,
             Visibility::VISIBILITY_BOTH,
         ]);

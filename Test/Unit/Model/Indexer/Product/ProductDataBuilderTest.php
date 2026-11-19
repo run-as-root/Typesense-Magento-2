@@ -9,6 +9,8 @@ use Magento\Catalog\Model\Product\Attribute\Source\Status;
 use Magento\Catalog\Model\Product\Visibility;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
+use Magento\Store\Api\Data\StoreInterface;
+use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Model\Indexer\Product\AttributeResolverInterface;
@@ -32,6 +34,7 @@ final class ProductDataBuilderTest extends TestCase
     private ProductCollectionFactory&MockObject $collectionFactory;
     private SalesCountResolverInterface&MockObject $salesCountResolver;
     private ReviewResolverInterface&MockObject $reviewResolver;
+    private StoreManagerInterface&MockObject $storeManager;
     private ProductDataBuilder $sut;
 
     protected function setUp(): void
@@ -50,6 +53,11 @@ final class ProductDataBuilderTest extends TestCase
         $this->reviewResolver->method('getRatingSummary')->willReturn(0);
         $this->reviewResolver->method('getReviewCount')->willReturn(0);
 
+        $store = $this->createMock(StoreInterface::class);
+        $store->method('getWebsiteId')->willReturn(1);
+        $this->storeManager = $this->createMock(StoreManagerInterface::class);
+        $this->storeManager->method('getStore')->willReturn($store);
+
         $this->sut = new ProductDataBuilder(
             $this->attributeResolver,
             $this->priceCalculator,
@@ -60,6 +68,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->collectionFactory,
             $this->salesCountResolver,
             $this->reviewResolver,
+            $this->storeManager,
         );
     }
 
@@ -272,6 +281,37 @@ final class ProductDataBuilderTest extends TestCase
         self::assertSame('Quick summary  here.', $document['short_description']);
     }
 
+    public function test_product_collection_filters_by_store_website(): void
+    {
+        $store = $this->createMock(StoreInterface::class);
+        $store->method('getWebsiteId')->willReturn(7);
+        $this->storeManager = $this->createMock(StoreManagerInterface::class);
+        $this->storeManager->expects(self::once())->method('getStore')->with(3)->willReturn($store);
+        $this->sut = $this->buildSutWithStoreManager();
+
+        $collection = $this->createMock(ProductCollection::class);
+        $this->collectionFactory->method('create')->willReturn($collection);
+        $collection->expects(self::once())->method('addWebsiteFilter')->with(7);
+
+        $this->sut->getProductCollection([], 3);
+    }
+
+    private function buildSutWithStoreManager(): ProductDataBuilder
+    {
+        return new ProductDataBuilder(
+            $this->attributeResolver,
+            $this->priceCalculator,
+            $this->imageResolver,
+            $this->stockResolver,
+            $this->categoryResolver,
+            $this->urlResolver,
+            $this->collectionFactory,
+            $this->salesCountResolver,
+            $this->reviewResolver,
+            $this->storeManager,
+        );
+    }
+
     public function test_get_product_collection_sets_store_id(): void
     {
         $collection = $this->createMock(ProductCollection::class);
@@ -336,7 +376,7 @@ final class ProductDataBuilderTest extends TestCase
         $this->sut->getProductCollection([], 1);
     }
 
-    public function test_get_product_collection_filters_searchable_visibility(): void
+    public function test_product_collection_includes_catalog_only_visibility(): void
     {
         $collection = $this->createMock(ProductCollection::class);
         $this->collectionFactory->method('create')->willReturn($collection);
@@ -348,6 +388,7 @@ final class ProductDataBuilderTest extends TestCase
         $collection->expects(self::once())
             ->method('setVisibility')
             ->with([
+                Visibility::VISIBILITY_IN_CATALOG,
                 Visibility::VISIBILITY_IN_SEARCH,
                 Visibility::VISIBILITY_BOTH,
             ]);
@@ -421,6 +462,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->collectionFactory,
             $salesCountResolver,
             $reviewResolver,
+            $this->storeManager,
         );
 
         $document = $sut->build($product, 1);
@@ -461,6 +503,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->collectionFactory,
             $salesCountResolver,
             $reviewResolver,
+            $this->storeManager,
         );
 
         $document = $sut->build($product, 2);
@@ -501,6 +544,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->collectionFactory,
             $salesCountResolver,
             $reviewResolver,
+            $this->storeManager,
         );
 
         $document = $sut->build($product, 2);

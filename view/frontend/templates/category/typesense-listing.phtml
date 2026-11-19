@@ -87,7 +87,7 @@ $sortOptions = $viewModel->getSortOptions();
                     per_page: perPage,
                     page: this.page,
                     facet_by: config.facetAttributes.join(','),
-                    filter_by: filterParts.join(' && '),
+                    filter_by: [...filterParts, 'visibility:[2,4]'].join(' && '),
                     max_facet_values: 20,
                 };
                 if (this.sortBy) searchParams.sort_by = this.sortBy;

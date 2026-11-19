@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Indexer;
 
+use Magento\Framework\App\Area;
 use Magento\Store\Api\StoreRepositoryInterface;
+use Magento\Store\Model\App\Emulation;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\AliasManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
@@ -27,6 +29,7 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         private readonly CollectionManagerInterface $collectionManager,
         private readonly DocumentDeleter $documentDeleter,
         private readonly LoggerInterface $logger,
+        private readonly Emulation $emulation,
     ) {
     }
 
@@ -54,6 +57,11 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
                 continue;
             }
 
+            if (!$store->getIsActive() || !$this->config->isEnabled($storeId)) {
+                $this->logger->info("Skipping {$entityType} for store {$storeCode}: inactive or TypeSense disabled");
+                continue;
+            }
+
             $this->reindexStore($indexer, $entityType, $storeCode, $storeId, $entityIds);
         }
     }
@@ -77,12 +85,18 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
     ): void {
         $this->logger->info("Reindexing {$entityType} for store {$storeCode} (ID: {$storeId})");
 
-        if ($entityIds === []) {
-            $this->reindexStoreFull($indexer, $entityType, $storeCode, $storeId);
-            return;
-        }
+        // Documents are generated lazily, so building, importing and deleting must all happen inside emulation.
+        $this->emulation->startEnvironmentEmulation($storeId, Area::AREA_FRONTEND, true);
+        try {
+            if ($entityIds === []) {
+                $this->reindexStoreFull($indexer, $entityType, $storeCode, $storeId);
+                return;
+            }
 
-        $this->reindexStorePartial($indexer, $entityType, $storeCode, $storeId, $entityIds);
+            $this->reindexStorePartial($indexer, $entityType, $storeCode, $storeId, $entityIds);
+        } finally {
+            $this->emulation->stopEnvironmentEmulation();
+        }
     }
 
     private function reindexStoreFull(

@@ -60,9 +60,7 @@ function typesenseInstantSearch(config) {
                     filterParts.push(`${field}:[${values.join(',')}]`);
                 }
             }
-            if (filterParts.length > 0) {
-                searchParams.filter_by = filterParts.join(' && ');
-            }
+            searchParams.filter_by = ['visibility:[3,4]', ...filterParts].join(' && ');
 
             const filterStr = searchParams.filter_by || '';
 

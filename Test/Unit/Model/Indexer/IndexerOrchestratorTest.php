@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Test\Unit\Model\Indexer;
 
+use Magento\Framework\App\Area;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Api\StoreRepositoryInterface;
+use Magento\Store\Model\App\Emulation;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -32,6 +34,7 @@ final class IndexerOrchestratorTest extends TestCase
     private CollectionManagerInterface&MockObject $collectionManager;
     private DocumentDeleter&MockObject $documentDeleter;
     private LoggerInterface&MockObject $logger;
+    private Emulation&MockObject $emulation;
     private IndexerOrchestrator $sut;
 
     protected function setUp(): void
@@ -49,9 +52,7 @@ final class IndexerOrchestratorTest extends TestCase
         $this->config = $this->createMock(TypeSenseConfigInterface::class);
         $this->config->method('isEnabled')->willReturn(true);
 
-        $store = $this->createMock(StoreInterface::class);
-        $store->method('getId')->willReturn(3);
-        $store->method('getCode')->willReturn('de');
+        $store = $this->createStore(3, 'de', true);
         $this->storeRepository = $this->createMock(StoreRepositoryInterface::class);
         $this->storeRepository->method('getList')->willReturn([$store]);
 
@@ -59,6 +60,7 @@ final class IndexerOrchestratorTest extends TestCase
         $this->collectionManager = $this->createMock(CollectionManagerInterface::class);
         $this->documentDeleter = $this->createMock(DocumentDeleter::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->emulation = $this->createMock(Emulation::class);
 
         $this->sut = new IndexerOrchestrator(
             new EntityIndexerPool(['product' => $this->indexer]),
@@ -71,6 +73,7 @@ final class IndexerOrchestratorTest extends TestCase
             $this->collectionManager,
             $this->documentDeleter,
             $this->logger,
+            $this->emulation,
         );
     }
 
@@ -227,6 +230,85 @@ final class IndexerOrchestratorTest extends TestCase
         $this->sut->reindex('product');
     }
 
+    public function test_reindex_skips_inactive_and_disabled_stores(): void
+    {
+        $this->storeRepository = $this->createMock(StoreRepositoryInterface::class);
+        $this->storeRepository->method('getList')->willReturn([
+            $this->createStore(0, 'admin', true),
+            $this->createStore(3, 'de', true),
+            $this->createStore(4, 'fr', false),
+            $this->createStore(5, 'nl', true),
+        ]);
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->config->method('isEnabled')->willReturnCallback(
+            static fn (?int $storeId = null): bool => $storeId !== 5,
+        );
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
+        $this->sut = $this->buildSut();
+
+        $this->collectionManager->method('collectionExists')->willReturn(true);
+        $this->batchImportService->expects(self::once())
+            ->method('import')
+            ->with('rar_product_de', self::anything(), 3)
+            ->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_reindex_emulates_store_and_stops_on_exception(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
+        $this->collectionManager->method('collectionExists')->willReturn(true);
+        $this->emulation->expects(self::once())
+            ->method('startEnvironmentEmulation')
+            ->with(3, Area::AREA_FRONTEND, true);
+        $this->emulation->expects(self::once())->method('stopEnvironmentEmulation');
+        $this->batchImportService->method('import')->willThrowException(new \RuntimeException('boom'));
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_partial_reindex_deletes_product_removed_from_store_website(): void
+    {
+        $store = $this->createStore(8, 'nl', true);
+        $this->storeRepository = $this->createMock(StoreRepositoryInterface::class);
+        $this->storeRepository->method('getList')->willReturn([$store]);
+        $this->nameResolver = $this->createMock(CollectionNameResolver::class);
+        $this->nameResolver->method('resolve')->willReturn('rar_product_nl');
+        $this->indexer = $this->createMock(EntityIndexerInterface::class);
+        $this->indexer->method('buildDocuments')->willReturn([]);
+        $this->indexer->method('getDocumentId')->willReturnCallback(static fn (int $id): string => (string) $id);
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->aliasManager->method('aliasExists')->willReturn(true);
+        $this->batchImportService->method('import')->willReturnCallback(
+            static function (string $name, iterable $documents): array {
+                foreach ($documents as $document) {
+                    unset($document);
+                }
+                return ['success' => 0, 'failed' => 0, 'total' => 0];
+            },
+        );
+        $this->sut = $this->buildSut();
+
+        $this->documentDeleter->expects(self::once())
+            ->method('deleteByIds')
+            ->with('rar_product_nl', ['9'], 8);
+
+        $this->sut->reindex('product', [9]);
+    }
+
+    private function createStore(int $id, string $code, bool $active): StoreInterface&MockObject
+    {
+        $store = $this->createMock(StoreInterface::class);
+        $store->method('getId')->willReturn($id);
+        $store->method('getCode')->willReturn($code);
+        $store->method('getIsActive')->willReturn($active);
+
+        return $store;
+    }
+
     private function buildSut(): IndexerOrchestrator
     {
         return new IndexerOrchestrator(
@@ -240,6 +322,7 @@ final class IndexerOrchestratorTest extends TestCase
             $this->collectionManager,
             $this->documentDeleter,
             $this->logger,
+            $this->emulation,
         );
     }
 }
