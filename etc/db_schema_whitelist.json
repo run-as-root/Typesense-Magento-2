@@ -58,5 +58,22 @@
             "RUN_AS_ROOT_TYPESENSE_CATEGORY_VIRTUAL_RULE_CATEGORY_ID_STORE_ID": true,
             "RUN_AS_ROOT_TYPESENSE_CTGR_VIRTUAL_RULE_STORE_ID_STORE_STORE_ID": true
         }
+    },
+    "run_as_root_typesense_synonym": {
+        "column": {
+            "synonym_id": true,
+            "collection": true,
+            "typesense_id": true,
+            "type": true,
+            "root": true,
+            "synonyms": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "UNQ_TS_SYNONYM_COLLECTION_TYPESENSE_ID": true,
+            "RUN_AS_ROOT_TYPESENSE_SYNONYM_COLLECTION_TYPESENSE_ID": true
+        }
     }
 }

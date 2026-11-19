@@ -93,6 +93,13 @@
     <preference for="RunAsRoot\TypeSense\Api\QueryMerchandisingRepositoryInterface"
                 type="RunAsRoot\TypeSense\Model\Merchandising\QueryMerchandisingRepository"/>
 
+    <!-- Synonyms -->
+    <preference for="RunAsRoot\TypeSense\Api\Data\SynonymInterface"
+                type="RunAsRoot\TypeSense\Model\Synonym\Synonym"/>
+
+    <preference for="RunAsRoot\TypeSense\Api\SynonymRepositoryInterface"
+                type="RunAsRoot\TypeSense\Model\Synonym\SynonymRepository"/>
+
     <!-- Entity indexer pool: register all entity indexers -->
     <type name="RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool">
         <arguments>
