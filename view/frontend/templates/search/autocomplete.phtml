@@ -133,15 +133,20 @@ $labelNoResults   = $escaper->escapeJs(__('No results found'));
                 if (config.relevanceSortBy) productSearch.sort_by = config.relevanceSortBy;
 
                 try {
-                    const response = await this.client.multiSearch.perform({
-                        searches: [
-                            productSearch,
-                            { collection: config.categoryCollection,   q: this.query, query_by: 'name',  per_page: 4 },
-                            { collection: config.suggestionCollection, q: this.query, query_by: 'query', per_page: 5 },
-                        ],
-                    }, config.cacheParams);
+                    const searches = [
+                        productSearch,
+                        { collection: config.categoryCollection,   q: this.query, query_by: 'name',  per_page: 4 },
+                        { collection: config.suggestionCollection, q: this.query, query_by: 'query', per_page: 5 },
+                    ];
+                    if (config.directMatchesFirst) {
+                        searches.push(Object.assign({}, productSearch, { enable_synonyms: false, page: 1 }));
+                    }
+                    const response = await this.client.multiSearch.perform({ searches }, config.cacheParams);
 
-                    this.results.products    = response.results[0]?.hits || [];
+                    const products = config.directMatchesFirst
+                        ? window.runAsRootTypesense.reorderByDirectMatches(response.results[0], response.results[3], 1)
+                        : response.results[0];
+                    this.results.products    = products?.hits || [];
                     this.results.categories  = response.results[1]?.hits || [];
                     this.results.suggestions = response.results[2]?.hits || [];
                     this.isOpen = true;

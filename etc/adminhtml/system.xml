@@ -249,6 +249,12 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Match word variants (e.g. "running" finds "run"). Requires a full reindex.</comment>
                 </field>
+                <field id="direct_matches_first" translate="label comment" type="select"
+                       sortOrder="129" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Show Direct Matches First</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Rank products that match the query itself above products found only through synonyms, on the search page and in autocomplete. Costs one extra search request per query.</comment>
+                </field>
                 <field id="use_cache" translate="label comment" type="select"
                        sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Enable Server-Side Search Cache</label>

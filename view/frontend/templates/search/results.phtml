@@ -135,14 +135,19 @@ $sortOptions = $viewModel->getSortOptions();
                 }
 
                 try {
-                    // documents().search() takes client-side options as its second argument, so the
-                    // server-side cache params have to travel with the search params.
-                    const result = await this.client.collections(config.productCollection).documents()
-                        .search(Object.assign({}, searchParams, config.cacheParams));
+                    const searches = [Object.assign({ collection: config.productCollection }, searchParams)];
+                    if (config.directMatchesFirst) {
+                        searches.push(Object.assign({}, searches[0], { enable_synonyms: false, page: 1 }));
+                    }
+                    const response = await this.client.multiSearch.perform({ searches }, config.cacheParams);
+                    const main = response.results[0];
+                    const result = config.directMatchesFirst
+                        ? window.runAsRootTypesense.reorderByDirectMatches(main, response.results[1], this.page)
+                        : main;
                     this.hits = result.hits || [];
-                    this.facets = result.facet_counts || [];
-                    this.totalPages = Math.ceil((result.found || 0) / perPage);
-                    this.stats = (result.found || 0) + ' results found in ' + result.search_time_ms + 'ms';
+                    this.facets = main.facet_counts || [];
+                    this.totalPages = Math.ceil((main.found || 0) / perPage);
+                    this.stats = (main.found || 0) + ' results found in ' + main.search_time_ms + 'ms';
                     this.aiAnswer = '';
                 } catch (error) {
                     console.error('Typesense instant search error:', error);

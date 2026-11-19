@@ -49,6 +49,7 @@ class InstantSearchConfigViewModel implements ArgumentInterface
             'sortOptions'               => $this->getSortOptions(),
             'tileAttributes'            => $this->config->getTileAttributes(),
             'requestParams'             => $this->requestParamsBuilder->build(SearchRequestParamsBuilder::CONTEXT_SEARCH, $storeId),
+            'directMatchesFirst'        => $this->config->isDirectMatchesFirstEnabled($storeId),
             'cacheParams'               => $this->searchParametersProvider->getCacheParameters($storeId),
             'relevanceSortBy'           => $this->requestParamsBuilder->getRelevanceSortBy(SearchRequestParamsBuilder::CONTEXT_SEARCH, $storeId),
             'conversationalSearch'      => [

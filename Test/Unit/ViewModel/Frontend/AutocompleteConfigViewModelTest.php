@@ -146,4 +146,14 @@ final class AutocompleteConfigViewModelTest extends TestCase
         self::assertArrayHasKey('relevanceSortBy', $result);
         self::assertNull($result['relevanceSortBy']);
     }
+
+    public function test_view_models_expose_direct_matches_flag(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $this->config->method('isDirectMatchesFirstEnabled')->with(1)->willReturn(true);
+
+        $result = $this->sut->getConfig();
+
+        self::assertTrue($result['directMatchesFirst']);
+    }
 }

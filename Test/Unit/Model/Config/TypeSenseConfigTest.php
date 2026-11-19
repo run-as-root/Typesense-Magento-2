@@ -362,4 +362,13 @@ final class TypeSenseConfigTest extends TestCase
 
         self::assertSame([], $this->sut->getSearchableAttributes());
     }
+
+    public function test_direct_matches_first_reads_search_group_per_store(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/search/direct_matches_first', ScopeInterface::SCOPE_STORE, 3)
+            ->willReturn(true);
+
+        self::assertTrue($this->sut->isDirectMatchesFirstEnabled(3));
+    }
 }

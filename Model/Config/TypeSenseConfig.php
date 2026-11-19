@@ -161,6 +161,11 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return $this->getValue('search/infix_mode', $storeId) === 'fallback' ? 'fallback' : 'always';
     }
 
+    public function isDirectMatchesFirstEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/direct_matches_first', $storeId);
+    }
+
     public function isStemEnabled(?int $storeId = null): bool
     {
         return $this->getFlag('search/stem_enabled', $storeId);

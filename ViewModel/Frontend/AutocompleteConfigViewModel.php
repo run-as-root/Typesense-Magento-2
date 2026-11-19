@@ -46,6 +46,7 @@ class AutocompleteConfigViewModel implements ArgumentInterface
             'suggestionCollection'      => $this->collectionNameResolver->resolve('suggestion', $storeCode, $storeId),
             'productCount'              => $this->config->getAutocompleteProductCount(),
             'requestParams'             => $this->requestParamsBuilder->build(SearchRequestParamsBuilder::CONTEXT_AUTOCOMPLETE, $storeId),
+            'directMatchesFirst'        => $this->config->isDirectMatchesFirstEnabled($storeId),
             'cacheParams'               => $this->searchParametersProvider->getCacheParameters($storeId),
             'relevanceSortBy'           => $this->requestParamsBuilder->getRelevanceSortBy(SearchRequestParamsBuilder::CONTEXT_AUTOCOMPLETE, $storeId),
         ];

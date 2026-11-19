@@ -63,6 +63,8 @@ interface TypeSenseConfigInterface
 
     public function isStemEnabled(?int $storeId = null): bool;
 
+    public function isDirectMatchesFirstEnabled(?int $storeId = null): bool;
+
     public function isGermanDecompoundingEnabled(?int $storeId = null): bool;
 
     public function getDecompoundSkipAttribute(?int $storeId = null): string;
