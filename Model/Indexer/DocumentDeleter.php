@@ -30,7 +30,9 @@ class DocumentDeleter
         $client = $this->clientFactory->create($storeId);
         $deleted = 0;
 
-        foreach (array_chunk(array_values($ids), self::CHUNK_SIZE) as $chunk) {
+        $chunks = array_chunk(array_values($ids), self::CHUNK_SIZE);
+
+        foreach ($chunks as $chunk) {
             $filter = 'id:[' . implode(',', $chunk) . ']';
 
             try {

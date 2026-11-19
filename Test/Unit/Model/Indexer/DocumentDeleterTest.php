@@ -67,6 +67,9 @@ final class DocumentDeleterTest extends TestCase
         $documents = $this->createMock(Documents::class);
         $documents->method('delete')->willThrowException(new ObjectNotFound('not found'));
         $this->stubCollection('rar_product_de', $documents);
+        $this->logger->expects(self::never())->method('info');
+        $this->logger->expects(self::never())->method('warning');
+        $this->logger->expects(self::never())->method('error');
 
         self::assertSame(0, $this->sut->deleteByIds('rar_product_de', ['1'], 3));
     }
