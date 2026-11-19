@@ -150,11 +150,6 @@
                     <label>Enable Typo Tolerance</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
-                <field id="typo_tolerance_min_word_length" translate="label comment" type="text"
-                       sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>Minimum Word Length for Typo Tolerance</label>
-                    <validate>validate-digits</validate>
-                </field>
                 <field id="highlight_enabled" translate="label" type="select"
                        sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Enable Highlighting</label>
@@ -164,6 +159,71 @@
                        sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Enable Query Suggestions</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="text_match_type" translate="label comment" type="select"
+                       sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Text Match Type</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\TextMatchType</source_model>
+                    <comment>How the text-match score is combined across the searched fields (Typesense text_match_type).</comment>
+                </field>
+                <field id="drop_tokens_threshold" translate="label comment" type="text"
+                       sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Drop Tokens Threshold</label>
+                    <validate>validate-digits</validate>
+                    <comment>If a query returns fewer results than this, words are dropped from the query to find more. 0 disables dropping.</comment>
+                </field>
+                <field id="typo_tokens_threshold" translate="label comment" type="text"
+                       sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Typo Tokens Threshold</label>
+                    <validate>validate-digits</validate>
+                    <comment>Typo-corrected matches are only searched when exact matches return fewer results than this.</comment>
+                </field>
+                <field id="min_len_1typo" translate="label" type="text"
+                       sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Minimum Word Length for 1 Typo</label>
+                    <validate>validate-digits</validate>
+                    <depends>
+                        <field id="typo_tolerance_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="min_len_2typo" translate="label" type="text"
+                       sortOrder="90" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Minimum Word Length for 2 Typos</label>
+                    <validate>validate-digits</validate>
+                    <depends>
+                        <field id="typo_tolerance_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="prioritize_exact_match" translate="label" type="select"
+                       sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Prioritize Exact Matches</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="split_join_tokens" translate="label comment" type="select"
+                       sortOrder="110" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Split/Join Words</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\SplitJoinTokens</source_model>
+                    <comment>Also match "smart watch" against "smartwatch" and vice versa.</comment>
+                </field>
+                <field id="prefix_search" translate="label comment" type="select"
+                       sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Prefix Search</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Match the last word of the query as a prefix (search-as-you-type).</comment>
+                </field>
+                <field id="use_cache" translate="label comment" type="select"
+                       sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Server-Side Search Cache</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Typesense caches identical search requests in memory.</comment>
+                </field>
+                <field id="cache_ttl" translate="label" type="text"
+                       sortOrder="140" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Search Cache TTL (seconds)</label>
+                    <validate>validate-digits</validate>
+                    <depends>
+                        <field id="use_cache">1</field>
+                    </depends>
                 </field>
             </group>
 

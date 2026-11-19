@@ -137,6 +137,58 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return $this->getFlag('search/highlight_enabled', $storeId);
     }
 
+    public function getTextMatchType(?int $storeId = null): string
+    {
+        return (string) ($this->getValue('search/text_match_type', $storeId) ?: 'max_weight');
+    }
+
+    public function getDropTokensThreshold(?int $storeId = null): int
+    {
+        return $this->getIntOrDefault('search/drop_tokens_threshold', 0, $storeId);
+    }
+
+    public function getTypoTokensThreshold(?int $storeId = null): int
+    {
+        return $this->getIntOrDefault('search/typo_tokens_threshold', 1, $storeId);
+    }
+
+    public function getMinLen1Typo(?int $storeId = null): int
+    {
+        return $this->getIntOrDefault('search/min_len_1typo', 5, $storeId);
+    }
+
+    public function getMinLen2Typo(?int $storeId = null): int
+    {
+        return $this->getIntOrDefault('search/min_len_2typo', 8, $storeId);
+    }
+
+    public function isPrioritizeExactMatch(?int $storeId = null): bool
+    {
+        $value = $this->getValue('search/prioritize_exact_match', $storeId);
+
+        return $value === null || $value === '' || (bool) $value;
+    }
+
+    public function getSplitJoinTokens(?int $storeId = null): string
+    {
+        return (string) ($this->getValue('search/split_join_tokens', $storeId) ?: 'fallback');
+    }
+
+    public function isPrefixSearchEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/prefix_search', $storeId);
+    }
+
+    public function isSearchCacheEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/use_cache', $storeId);
+    }
+
+    public function getSearchCacheTtl(?int $storeId = null): int
+    {
+        return $this->getIntOrDefault('search/cache_ttl', 300, $storeId);
+    }
+
     // Instant Search
     public function isInstantSearchEnabled(?int $storeId = null): bool
     {
@@ -327,6 +379,14 @@ class TypeSenseConfig implements TypeSenseConfigInterface
             ScopeInterface::SCOPE_STORE,
             $storeId,
         );
+    }
+
+    // Only an unset/empty field falls back; an explicit 0 is a valid threshold.
+    private function getIntOrDefault(string $path, int $default, ?int $storeId = null): int
+    {
+        $value = $this->getValue($path, $storeId);
+
+        return $value === null || $value === '' ? $default : (int) $value;
     }
 
     private function getFlag(string $path, ?int $storeId = null): bool

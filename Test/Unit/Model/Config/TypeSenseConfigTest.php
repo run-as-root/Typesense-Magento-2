@@ -245,4 +245,54 @@ final class TypeSenseConfigTest extends TestCase
 
         self::assertSame(86400, $this->sut->getAdminAssistantConversationTtl());
     }
+
+    public function test_search_parameter_getters_cast_configured_values(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/search/text_match_type', ScopeInterface::SCOPE_STORE, 2, 'sum_score'],
+                ['run_as_root_typesense/search/drop_tokens_threshold', ScopeInterface::SCOPE_STORE, 2, '3'],
+                ['run_as_root_typesense/search/typo_tokens_threshold', ScopeInterface::SCOPE_STORE, 2, '0'],
+                ['run_as_root_typesense/search/min_len_1typo', ScopeInterface::SCOPE_STORE, 2, '4'],
+                ['run_as_root_typesense/search/min_len_2typo', ScopeInterface::SCOPE_STORE, 2, '7'],
+                ['run_as_root_typesense/search/prioritize_exact_match', ScopeInterface::SCOPE_STORE, 2, '0'],
+                ['run_as_root_typesense/search/split_join_tokens', ScopeInterface::SCOPE_STORE, 2, 'off'],
+                ['run_as_root_typesense/search/cache_ttl', ScopeInterface::SCOPE_STORE, 2, '600'],
+            ]);
+
+        self::assertSame('sum_score', $this->sut->getTextMatchType(2));
+        self::assertSame(3, $this->sut->getDropTokensThreshold(2));
+        self::assertSame(0, $this->sut->getTypoTokensThreshold(2));
+        self::assertSame(4, $this->sut->getMinLen1Typo(2));
+        self::assertSame(7, $this->sut->getMinLen2Typo(2));
+        self::assertFalse($this->sut->isPrioritizeExactMatch(2));
+        self::assertSame('off', $this->sut->getSplitJoinTokens(2));
+        self::assertSame(600, $this->sut->getSearchCacheTtl(2));
+    }
+
+    public function test_search_parameter_getters_fall_back_to_defaults_when_empty(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertSame('max_weight', $this->sut->getTextMatchType());
+        self::assertSame(0, $this->sut->getDropTokensThreshold());
+        self::assertSame(1, $this->sut->getTypoTokensThreshold());
+        self::assertSame(5, $this->sut->getMinLen1Typo());
+        self::assertSame(8, $this->sut->getMinLen2Typo());
+        self::assertTrue($this->sut->isPrioritizeExactMatch());
+        self::assertSame('fallback', $this->sut->getSplitJoinTokens());
+        self::assertSame(300, $this->sut->getSearchCacheTtl());
+    }
+
+    public function test_prefix_search_and_cache_flags_read_search_group(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->willReturnMap([
+                ['run_as_root_typesense/search/prefix_search', ScopeInterface::SCOPE_STORE, 1, true],
+                ['run_as_root_typesense/search/use_cache', ScopeInterface::SCOPE_STORE, 1, false],
+            ]);
+
+        self::assertTrue($this->sut->isPrefixSearchEnabled(1));
+        self::assertFalse($this->sut->isSearchCacheEnabled(1));
+    }
 }

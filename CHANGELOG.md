@@ -25,6 +25,7 @@ All notable changes to this project are documented in this file.
 - `run_as_root_typesense_synonym` table; admin synonyms are persisted in Magento and pushed to Typesense.
 - `typesense:collection:rollback --entity=<type> --store=<code>` points an alias back to the previous collection version.
 - Partial product reindexes go through the `typesense.reindex` message queue when queue reindex is enabled (message carries `entity_ids`).
+- Search settings for text match type, drop/typo token thresholds, minimum word lengths for 1/2 typos, exact-match priority, split/join words, prefix search and the Typesense server-side search cache (`run_as_root_typesense/search/*`, store scope; defaults `max_weight`, 0, 1, 5, 8, yes, `fallback`, yes, cache on with 300 s TTL). The search page, autocomplete products and category listings send them from one `SearchRequestParamsBuilder`; "Enable Typo Tolerance" now sets `num_typos` (2 or 0).
 
 ### Changed
 
@@ -34,6 +35,9 @@ All notable changes to this project are documented in this file.
 - A plain (non-versioned) collection that has the alias name is replaced by a versioned collection + alias on the next full reindex.
 - `typesense_product` mview batch size is 200; the reindex consumer processes up to 100 messages per run.
 - `EntityIndexerInterface` has a new method `getDocumentId(int $entityId): string` — custom indexers must implement it.
+- Removed the unused "Minimum Word Length for Typo Tolerance" setting (`search/typo_tolerance_min_word_length`); use the new per-typo minimum word lengths.
+- Removed the unused `view/frontend/web/js/instant-search.js` and `autocomplete.js` (the templates carry their own inline scripts).
+- `TypeSenseConfigInterface` has new search-parameter getters, and the instant search, autocomplete and category search ViewModels take `SearchRequestParamsBuilder` and `SearchParametersProvider` as new constructor arguments — custom implementations or subclasses must be updated.
 
 ### Upgrade notes
 

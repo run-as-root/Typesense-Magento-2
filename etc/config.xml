@@ -27,9 +27,18 @@
             </indexing>
             <search>
                 <typo_tolerance_enabled>1</typo_tolerance_enabled>
-                <typo_tolerance_min_word_length>4</typo_tolerance_min_word_length>
                 <highlight_enabled>1</highlight_enabled>
                 <query_suggestions_enabled>1</query_suggestions_enabled>
+                <text_match_type>max_weight</text_match_type>
+                <drop_tokens_threshold>0</drop_tokens_threshold>
+                <typo_tokens_threshold>1</typo_tokens_threshold>
+                <min_len_1typo>5</min_len_1typo>
+                <min_len_2typo>8</min_len_2typo>
+                <prioritize_exact_match>1</prioritize_exact_match>
+                <split_join_tokens>fallback</split_join_tokens>
+                <prefix_search>1</prefix_search>
+                <use_cache>1</use_cache>
+                <cache_ttl>300</cache_ttl>
             </search>
             <instant_search>
                 <enabled>1</enabled>

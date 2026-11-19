@@ -124,14 +124,22 @@ $labelNoResults   = $escaper->escapeJs(__('No results found'));
                     return;
                 }
 
+                const productSearch = Object.assign({}, config.requestParams, {
+                    collection: config.productCollection,
+                    q: this.query,
+                    filter_by: 'visibility:[3,4]',
+                    per_page: config.productCount || 6,
+                });
+                if (config.relevanceSortBy) productSearch.sort_by = config.relevanceSortBy;
+
                 try {
                     const response = await this.client.multiSearch.perform({
                         searches: [
-                            { collection: config.productCollection,    q: this.query, query_by: 'name,sku,description', filter_by: 'visibility:[3,4]', per_page: config.productCount || 6 },
-                            { collection: config.categoryCollection,   q: this.query, query_by: 'name',                 per_page: 4 },
-                            { collection: config.suggestionCollection, q: this.query, query_by: 'query',                    per_page: 5 },
+                            productSearch,
+                            { collection: config.categoryCollection,   q: this.query, query_by: 'name',  per_page: 4 },
+                            { collection: config.suggestionCollection, q: this.query, query_by: 'query', per_page: 5 },
                         ],
-                    }, {});
+                    }, config.cacheParams);
 
                     this.results.products    = response.results[0]?.hits || [];
                     this.results.categories  = response.results[1]?.hits || [];

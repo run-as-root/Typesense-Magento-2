@@ -52,6 +52,26 @@ interface TypeSenseConfigInterface
 
     public function isHighlightEnabled(?int $storeId = null): bool;
 
+    public function getTextMatchType(?int $storeId = null): string;
+
+    public function getDropTokensThreshold(?int $storeId = null): int;
+
+    public function getTypoTokensThreshold(?int $storeId = null): int;
+
+    public function getMinLen1Typo(?int $storeId = null): int;
+
+    public function getMinLen2Typo(?int $storeId = null): int;
+
+    public function isPrioritizeExactMatch(?int $storeId = null): bool;
+
+    public function getSplitJoinTokens(?int $storeId = null): string;
+
+    public function isPrefixSearchEnabled(?int $storeId = null): bool;
+
+    public function isSearchCacheEnabled(?int $storeId = null): bool;
+
+    public function getSearchCacheTtl(?int $storeId = null): int;
+
     public function isInstantSearchEnabled(?int $storeId = null): bool;
 
     public function getProductsPerPage(?int $storeId = null): int;

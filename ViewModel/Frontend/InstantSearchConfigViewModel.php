@@ -9,6 +9,8 @@ use Magento\Store\Model\StoreManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
+use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
+use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 
 class InstantSearchConfigViewModel implements ArgumentInterface
 {
@@ -17,6 +19,8 @@ class InstantSearchConfigViewModel implements ArgumentInterface
         private readonly StoreManagerInterface $storeManager,
         private readonly CollectionNameResolverInterface $collectionNameResolver,
         private readonly ConversationModelManager $conversationModelManager,
+        private readonly SearchRequestParamsBuilder $requestParamsBuilder,
+        private readonly SearchParametersProvider $searchParametersProvider,
     ) {
     }
 
@@ -44,6 +48,9 @@ class InstantSearchConfigViewModel implements ArgumentInterface
             'facetAttributes'           => $this->getFacetAttributes(),
             'sortOptions'               => $this->getSortOptions(),
             'tileAttributes'            => $this->config->getTileAttributes(),
+            'requestParams'             => $this->requestParamsBuilder->build(SearchRequestParamsBuilder::CONTEXT_SEARCH, $storeId),
+            'cacheParams'               => $this->searchParametersProvider->getCacheParameters($storeId),
+            'relevanceSortBy'           => $this->requestParamsBuilder->getRelevanceSortBy(SearchRequestParamsBuilder::CONTEXT_SEARCH, $storeId),
             'conversationalSearch'      => [
                 'enabled' => $this->config->isConversationalSearchEnabled(),
                 'modelId' => $this->conversationModelManager->getModelId(),

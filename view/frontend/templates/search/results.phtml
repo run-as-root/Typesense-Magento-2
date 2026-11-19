@@ -74,15 +74,15 @@ $sortOptions = $viewModel->getSortOptions();
 
             async search() {
                 const perPage = config.productsPerPage || 24;
-                const searchParams = {
+                const searchParams = Object.assign({}, config.requestParams, {
                     q: this.query || '*',
-                    query_by: 'name,sku,description',
                     per_page: perPage,
                     page: this.page,
                     facet_by: config.facetAttributes.join(','),
                     max_facet_values: 20,
-                };
-                if (this.sortBy) searchParams.sort_by = this.sortBy;
+                });
+                const sortBy = this.sortBy || config.relevanceSortBy;
+                if (sortBy) searchParams.sort_by = sortBy;
 
                 const filterParts = [];
                 for (const [field, values] of Object.entries(this.filters)) {
@@ -135,7 +135,10 @@ $sortOptions = $viewModel->getSortOptions();
                 }
 
                 try {
-                    const result = await this.client.collections(config.productCollection).documents().search(searchParams);
+                    // documents().search() takes client-side options as its second argument, so the
+                    // server-side cache params have to travel with the search params.
+                    const result = await this.client.collections(config.productCollection).documents()
+                        .search(Object.assign({}, searchParams, config.cacheParams));
                     this.hits = result.hits || [];
                     this.facets = result.facet_counts || [];
                     this.totalPages = Math.ceil((result.found || 0) / perPage);

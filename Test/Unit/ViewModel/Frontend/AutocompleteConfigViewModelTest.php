@@ -10,6 +10,8 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
+use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 use RunAsRoot\TypeSense\ViewModel\Frontend\AutocompleteConfigViewModel;
 
 final class AutocompleteConfigViewModelTest extends TestCase
@@ -18,6 +20,8 @@ final class AutocompleteConfigViewModelTest extends TestCase
     private StoreManagerInterface&MockObject $storeManager;
     private CollectionNameResolverInterface&MockObject $collectionNameResolver;
     private StoreInterface&MockObject $store;
+    private SearchRequestParamsBuilder&MockObject $requestParamsBuilder;
+    private SearchParametersProvider&MockObject $searchParametersProvider;
     private AutocompleteConfigViewModel $sut;
 
     protected function setUp(): void
@@ -31,10 +35,15 @@ final class AutocompleteConfigViewModelTest extends TestCase
         $this->store->method('getId')->willReturn(1);
         $this->storeManager->method('getStore')->willReturn($this->store);
 
+        $this->requestParamsBuilder = $this->createMock(SearchRequestParamsBuilder::class);
+        $this->searchParametersProvider = $this->createMock(SearchParametersProvider::class);
+
         $this->sut = new AutocompleteConfigViewModel(
             $this->config,
             $this->storeManager,
             $this->collectionNameResolver,
+            $this->requestParamsBuilder,
+            $this->searchParametersProvider,
         );
     }
 
@@ -115,5 +124,26 @@ final class AutocompleteConfigViewModelTest extends TestCase
         $decoded = json_decode($json, true);
         self::assertIsArray($decoded);
         self::assertArrayHasKey('typesenseHost', $decoded);
+    }
+
+    public function test_config_contains_request_and_cache_params(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $this->requestParamsBuilder->method('build')
+            ->with(SearchRequestParamsBuilder::CONTEXT_AUTOCOMPLETE, 1)
+            ->willReturn(['query_by' => 'name,sku,description', 'num_typos' => 2]);
+        $this->requestParamsBuilder->method('getRelevanceSortBy')
+            ->with(SearchRequestParamsBuilder::CONTEXT_AUTOCOMPLETE, 1)
+            ->willReturn(null);
+        $this->searchParametersProvider->method('getCacheParameters')
+            ->with(1)
+            ->willReturn(['use_cache' => true, 'cache_ttl' => 300]);
+
+        $result = $this->sut->getConfig();
+
+        self::assertSame(['query_by' => 'name,sku,description', 'num_typos' => 2], $result['requestParams']);
+        self::assertSame(['use_cache' => true, 'cache_ttl' => 300], $result['cacheParams']);
+        self::assertArrayHasKey('relevanceSortBy', $result);
+        self::assertNull($result['relevanceSortBy']);
     }
 }

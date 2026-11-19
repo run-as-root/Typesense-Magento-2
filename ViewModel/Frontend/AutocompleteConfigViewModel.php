@@ -8,6 +8,8 @@ use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
+use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 
 class AutocompleteConfigViewModel implements ArgumentInterface
 {
@@ -15,6 +17,8 @@ class AutocompleteConfigViewModel implements ArgumentInterface
         private readonly TypeSenseConfigInterface $config,
         private readonly StoreManagerInterface $storeManager,
         private readonly CollectionNameResolverInterface $collectionNameResolver,
+        private readonly SearchRequestParamsBuilder $requestParamsBuilder,
+        private readonly SearchParametersProvider $searchParametersProvider,
     ) {
     }
 
@@ -41,6 +45,9 @@ class AutocompleteConfigViewModel implements ArgumentInterface
             'categoryCollection'        => $this->collectionNameResolver->resolve('category', $storeCode, $storeId),
             'suggestionCollection'      => $this->collectionNameResolver->resolve('suggestion', $storeCode, $storeId),
             'productCount'              => $this->config->getAutocompleteProductCount(),
+            'requestParams'             => $this->requestParamsBuilder->build(SearchRequestParamsBuilder::CONTEXT_AUTOCOMPLETE, $storeId),
+            'cacheParams'               => $this->searchParametersProvider->getCacheParameters($storeId),
+            'relevanceSortBy'           => $this->requestParamsBuilder->getRelevanceSortBy(SearchRequestParamsBuilder::CONTEXT_AUTOCOMPLETE, $storeId),
         ];
     }
 

@@ -1,0 +1,55 @@
+<?php
+
+declare(strict_types=1);
+
+namespace RunAsRoot\TypeSense\Test\Unit\Model\Search;
+
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
+use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
+use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
+
+final class SearchRequestParamsBuilderTest extends TestCase
+{
+    private SearchParametersProvider&MockObject $searchParametersProvider;
+    private SearchRequestParamsBuilder $sut;
+
+    protected function setUp(): void
+    {
+        $this->searchParametersProvider = $this->createMock(SearchParametersProvider::class);
+        $this->sut = new SearchRequestParamsBuilder($this->searchParametersProvider);
+    }
+
+    public function test_build_merges_search_parameters_and_query_by(): void
+    {
+        $this->searchParametersProvider->method('getParameters')
+            ->with(4)
+            ->willReturn(['text_match_type' => 'max_weight', 'num_typos' => 2, 'prefix' => true]);
+
+        self::assertSame(
+            [
+                'text_match_type' => 'max_weight',
+                'num_typos' => 2,
+                'prefix' => true,
+                'query_by' => 'name,sku,description',
+            ],
+            $this->sut->build(SearchRequestParamsBuilder::CONTEXT_SEARCH, 4),
+        );
+    }
+
+    public function test_build_returns_same_parameters_for_every_context(): void
+    {
+        $this->searchParametersProvider->method('getParameters')->willReturn(['num_typos' => 0]);
+
+        $search = $this->sut->build(SearchRequestParamsBuilder::CONTEXT_SEARCH);
+
+        self::assertSame($search, $this->sut->build(SearchRequestParamsBuilder::CONTEXT_AUTOCOMPLETE));
+        self::assertSame($search, $this->sut->build(SearchRequestParamsBuilder::CONTEXT_CATEGORY));
+    }
+
+    public function test_relevance_sort_by_is_null_without_boost_rules(): void
+    {
+        self::assertNull($this->sut->getRelevanceSortBy(SearchRequestParamsBuilder::CONTEXT_SEARCH, 1));
+        self::assertNull($this->sut->getRelevanceSortBy(SearchRequestParamsBuilder::CONTEXT_CATEGORY));
+    }
+}
