@@ -6,9 +6,15 @@ namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\NameDecompounder;
+use RunAsRoot\TypeSense\Model\Search\SearchableAttributesProvider;
 
 class ProductSchemaProvider implements ProductSchemaProviderInterface
 {
+    // Typesense stems the indexed tokens, so filter_by on a stemmed field also matches variants
+    // (type_id:=simples finds "simple"). Identifiers and facet values (sku, additional attributes,
+    // category paths) must stay exact for facets, virtual categories and boosting rules.
+    private const array UNSTEMMED_SEARCHABLE_FIELDS = ['sku'];
+
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
     ) {
@@ -18,7 +24,9 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
     public function getFields(): array
     {
         $infixFields = $this->config->isInfixEnabled() ? $this->config->getInfixFields() : [];
-        $stem = $this->config->isStemEnabled();
+        $stemFields = $this->config->isStemEnabled()
+            ? array_diff(array_keys(SearchableAttributesProvider::CORE_FIELDS), self::UNSTEMMED_SEARCHABLE_FIELDS)
+            : [];
 
         $fields = [
             ['name' => 'id', 'type' => 'string'],
@@ -57,7 +65,10 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             $fields[] = ['name' => NameDecompounder::FIELD, 'type' => 'string', 'optional' => true];
         }
 
-        $fields = array_map(fn(array $field): array => $this->applyTextFlags($field, $infixFields, $stem), $fields);
+        $fields = array_map(
+            fn(array $field): array => $this->applyTextFlags($field, $infixFields, $stemFields),
+            $fields,
+        );
 
         // Auto-embedding for conversational/semantic search
         if ($this->config->isConversationalSearchEnabled()) {
@@ -79,16 +90,16 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
     /**
      * @param array<string, mixed> $field
      * @param string[] $infixFields
+     * @param string[] $stemFields
      * @return array<string, mixed>
      */
-    private function applyTextFlags(array $field, array $infixFields, bool $stem): array
+    private function applyTextFlags(array $field, array $infixFields, array $stemFields): array
     {
         if (!in_array($field['type'], ['string', 'string[]'], true)) {
             return $field;
         }
 
-        // The document id is an opaque key, not text to stem.
-        if ($stem && $field['name'] !== 'id') {
+        if (in_array($field['name'], $stemFields, true)) {
             $field['stem'] = true;
         }
 

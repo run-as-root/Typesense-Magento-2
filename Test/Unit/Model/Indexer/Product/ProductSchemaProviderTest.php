@@ -281,17 +281,22 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertNotContains('embedding', $fieldNames);
     }
 
-    public function test_string_fields_get_stem_flag_when_enabled(): void
+    public function test_only_full_text_searchable_fields_get_stem_flag_when_enabled(): void
     {
         $config = $this->createMock(TypeSenseConfigInterface::class);
         $config->method('getAdditionalAttributes')->willReturn(['color']);
         $config->method('isStemEnabled')->willReturn(true);
+        $config->method('isGermanDecompoundingEnabled')->willReturn(true);
         $fields = (new ProductSchemaProvider($config))->getFields();
 
-        foreach (['name', 'sku', 'categories', 'categories.lvl0', 'color', 'categories_text'] as $name) {
-            self::assertTrue($this->findField($fields, $name)['stem'], "{$name} should stem");
+        $stemmed = ['name', 'description', 'short_description', 'categories_text', 'name_decompounded'];
+        foreach ($stemmed as $name) {
+            self::assertTrue($this->findField($fields, $name)['stem'] ?? false, "{$name} should stem");
         }
-        foreach (['id', 'price', 'product_id', 'category_ids', 'in_stock'] as $name) {
+
+        $exact = ['id', 'sku', 'url', 'image_url', 'type_id', 'categories', 'categories.lvl0', 'categories.lvl1',
+            'categories.lvl2', 'color', 'price', 'product_id', 'category_ids', 'in_stock'];
+        foreach ($exact as $name) {
             self::assertArrayNotHasKey('stem', $this->findField($fields, $name), "{$name} should not stem");
         }
     }

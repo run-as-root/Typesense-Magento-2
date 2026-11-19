@@ -247,7 +247,7 @@
                        sortOrder="128" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Enable Stemming</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Match word variants (e.g. "running" finds "run"). Requires a full reindex.</comment>
+                    <comment>Match word variants (e.g. "running" finds "run") in name, description, short description, categories and "Name (decompounded)". SKU and filter attributes are never stemmed. Requires a full reindex.</comment>
                 </field>
                 <field id="direct_matches_first" translate="label comment" type="select"
                        sortOrder="129" showInDefault="1" showInWebsite="1" showInStore="1">

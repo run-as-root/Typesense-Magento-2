@@ -148,7 +148,7 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | Enable Infix Search | No | Match query words inside other words. Reindex |
 | Infix Search Fields | name | Fields that get the infix flag; the `infix` request parameter is `off` for every other `query_by` field. Reindex |
 | Infix Search Mode | Fallback | `fallback` uses infix matching only when the normal search finds nothing; `always` combines both |
-| Enable Stemming | Yes | `stem` flag on every string field, so word variants match. Reindex |
+| Enable Stemming | Yes | `stem` flag on the full-text fields (name, description, short description, categories text, "Name (decompounded)"), so word variants match. SKU, category paths, type and additional (facet) attributes are never stemmed, so their filters stay exact. Reindex |
 | Show Direct Matches First | Yes | Products matching the query itself rank above synonym-only matches (search page and autocomplete, relevance sort only). Costs one extra search per query |
 | Enable Server-Side Search Cache | Yes | Typesense caches identical search requests in memory (`use_cache`) |
 | Search Cache TTL (seconds) | 300 | `cache_ttl` |

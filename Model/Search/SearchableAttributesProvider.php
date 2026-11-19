@@ -11,7 +11,7 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\NameDecompounder;
 
 class SearchableAttributesProvider
 {
-    private const array CORE_FIELDS = [
+    public const array CORE_FIELDS = [
         'name' => 'Name',
         'sku' => 'SKU',
         'description' => 'Description',
