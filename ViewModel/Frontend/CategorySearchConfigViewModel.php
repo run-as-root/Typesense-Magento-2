@@ -10,6 +10,8 @@ use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
+use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\ConditionsToFilterByCompiler;
 
@@ -22,6 +24,8 @@ class CategorySearchConfigViewModel implements ArgumentInterface
         private readonly Registry $registry,
         private readonly CategoryListingFilterBuilder $listingFilterBuilder,
         private readonly LoggerInterface $logger,
+        private readonly SearchRequestParamsBuilder $requestParamsBuilder,
+        private readonly SearchParametersProvider $searchParametersProvider,
     ) {
     }
 
@@ -85,12 +89,18 @@ class CategorySearchConfigViewModel implements ArgumentInterface
             'facetAttributes'           => $this->config->getFacetFilters(),
             'sortOptions'               => $this->getSortOptions(),
             'tileAttributes'            => $this->config->getTileAttributes(),
+            'requestParams'             => $this->requestParamsBuilder->build(SearchRequestParamsBuilder::CONTEXT_CATEGORY, $storeId),
+            'cacheParams'               => $this->searchParametersProvider->getCacheParameters($storeId),
+            'relevanceSortBy'           => $this->requestParamsBuilder->getRelevanceSortBy(SearchRequestParamsBuilder::CONTEXT_CATEGORY, $storeId),
         ];
     }
 
     public function getJsonConfig(): string
     {
-        return (string) json_encode($this->getConfig());
+        return (string) json_encode(
+            $this->getConfig(),
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
+        );
     }
 
     /**

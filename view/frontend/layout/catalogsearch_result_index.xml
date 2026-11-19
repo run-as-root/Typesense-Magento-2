@@ -13,6 +13,10 @@
 
         <referenceContainer name="content">
             <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.direct.matches.search"
+                   template="RunAsRoot_TypeSense::search/direct-matches.phtml"
+                   before="typesense.instant.search"/>
+            <block class="Magento\Framework\View\Element\Template"
                    name="typesense.instant.search"
                    template="RunAsRoot_TypeSense::search/results.phtml"
                    before="-">

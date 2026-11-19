@@ -1,0 +1,134 @@
+<?xml version="1.0"?>
+<listing xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <argument name="data" xsi:type="array">
+        <item name="js_config" xsi:type="array">
+            <item name="provider" xsi:type="string">typesense_boost_rule_listing.typesense_boost_rule_listing_data_source</item>
+        </item>
+    </argument>
+    <settings>
+        <buttons>
+            <button name="add">
+                <url path="*/*/edit"/>
+                <class>primary</class>
+                <label translate="true">Add New Boosting Rule</label>
+            </button>
+        </buttons>
+        <spinner>typesense_boost_rule_listing_columns</spinner>
+        <deps>
+            <dep>typesense_boost_rule_listing.typesense_boost_rule_listing_data_source</dep>
+        </deps>
+    </settings>
+    <dataSource name="typesense_boost_rule_listing_data_source" component="Magento_Ui/js/grid/provider">
+        <settings>
+            <storageConfig>
+                <param name="indexField" xsi:type="string">rule_id</param>
+            </storageConfig>
+            <updateUrl path="mui/index/render"/>
+        </settings>
+        <aclResource>RunAsRoot_TypeSense::boost_rules</aclResource>
+        <dataProvider class="RunAsRoot\TypeSense\Ui\Component\Listing\DataProvider\BoostRuleDataProvider"
+                      name="typesense_boost_rule_listing_data_source">
+            <settings>
+                <requestFieldName>id</requestFieldName>
+                <primaryFieldName>rule_id</primaryFieldName>
+            </settings>
+        </dataProvider>
+    </dataSource>
+    <listingToolbar name="listing_top">
+        <settings>
+            <sticky>true</sticky>
+        </settings>
+        <bookmark name="bookmarks"/>
+        <columnsControls name="columns_controls"/>
+        <filters name="listing_filters"/>
+        <paging name="listing_paging"/>
+    </listingToolbar>
+    <columns name="typesense_boost_rule_listing_columns">
+        <settings>
+            <childDefaults>
+                <param name="fieldAction" xsi:type="array">
+                    <item name="provider" xsi:type="string">typesense_boost_rule_listing.typesense_boost_rule_listing.typesense_boost_rule_listing_columns.actions</item>
+                    <item name="target" xsi:type="string">applyAction</item>
+                    <item name="params" xsi:type="array">
+                        <item name="0" xsi:type="string">edit</item>
+                        <item name="1" xsi:type="string">${ $.$data.rowIndex }</item>
+                    </item>
+                </param>
+            </childDefaults>
+        </settings>
+        <column name="rule_id">
+            <settings>
+                <filter>textRange</filter>
+                <label translate="true">ID</label>
+                <sorting>asc</sorting>
+            </settings>
+        </column>
+        <column name="name">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Name</label>
+            </settings>
+        </column>
+        <column name="store_id" class="Magento\Store\Ui\Component\Listing\Column\Store">
+            <settings>
+                <label translate="true">Store View</label>
+                <bodyTmpl>ui/grid/cells/html</bodyTmpl>
+                <sortable>false</sortable>
+            </settings>
+        </column>
+        <column name="weight">
+            <settings>
+                <filter>textRange</filter>
+                <label translate="true">Weight</label>
+            </settings>
+        </column>
+        <column name="is_active" component="Magento_Ui/js/grid/columns/select">
+            <settings>
+                <options class="Magento\Config\Model\Config\Source\Yesno"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Is Active</label>
+            </settings>
+        </column>
+        <column name="apply_to_search" component="Magento_Ui/js/grid/columns/select">
+            <settings>
+                <options class="Magento\Config\Model\Config\Source\Yesno"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Search</label>
+            </settings>
+        </column>
+        <column name="apply_to_category" component="Magento_Ui/js/grid/columns/select">
+            <settings>
+                <options class="Magento\Config\Model\Config\Source\Yesno"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Category Listings</label>
+            </settings>
+        </column>
+        <column name="from_date" class="Magento\Ui\Component\Listing\Columns\Date" component="Magento_Ui/js/grid/columns/date">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">From</label>
+                <dateFormat>MMM d, y</dateFormat>
+                <timezone>false</timezone>
+            </settings>
+        </column>
+        <column name="to_date" class="Magento\Ui\Component\Listing\Columns\Date" component="Magento_Ui/js/grid/columns/date">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">To</label>
+                <dateFormat>MMM d, y</dateFormat>
+                <timezone>false</timezone>
+            </settings>
+        </column>
+        <actionsColumn name="actions" class="RunAsRoot\TypeSense\Ui\Component\Listing\Column\BoostRuleActions">
+            <settings>
+                <indexField>rule_id</indexField>
+            </settings>
+        </actionsColumn>
+    </columns>
+</listing>

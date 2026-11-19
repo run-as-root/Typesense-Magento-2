@@ -1,0 +1,85 @@
+<?php
+
+declare(strict_types=1);
+
+namespace RunAsRoot\TypeSense\Model\Search;
+
+use Magento\Store\Model\StoreManagerInterface;
+use RunAsRoot\TypeSense\Model\Boost\BoostSortBuilder;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+
+class SearchRequestParamsBuilder
+{
+    public const string CONTEXT_SEARCH = 'search';
+    public const string CONTEXT_AUTOCOMPLETE = 'autocomplete';
+    public const string CONTEXT_CATEGORY = 'category';
+
+    public function __construct(
+        private readonly SearchParametersProvider $searchParametersProvider,
+        private readonly SearchableAttributesProvider $searchableAttributesProvider,
+        private readonly TypeSenseConfigInterface $config,
+        private readonly BoostSortBuilder $boostSortBuilder,
+        private readonly StoreManagerInterface $storeManager,
+    ) {
+    }
+
+    /**
+     * Typesense parameters for a product search in the given context; templates merge their
+     * per-request q/page/filter_by/facet_by on top of this.
+     *
+     * @return array<string, mixed>
+     */
+    public function build(string $context, ?int $storeId = null): array
+    {
+        $fields = $this->searchableAttributesProvider->getWeightedFields($storeId);
+
+        return array_merge(
+            $this->searchParametersProvider->getParameters($storeId),
+            [
+                'query_by' => implode(',', array_keys($fields)),
+                'query_by_weights' => implode(',', $fields),
+                'infix' => $this->buildInfix(array_keys($fields), $storeId),
+            ],
+        );
+    }
+
+    /**
+     * sort_by for "relevance" ordering; null lets Typesense use its default text-match sort.
+     * Text match is bucketed so boosting rules reorder products of similar relevance without
+     * lifting a weak match above a strong one.
+     */
+    public function getRelevanceSortBy(string $context, ?int $storeId = null): ?string
+    {
+        $storeId ??= (int) $this->storeManager->getStore()->getId();
+        $evalClause = $this->boostSortBuilder->buildEvalClause($context, $storeId);
+
+        if ($evalClause === null) {
+            return null;
+        }
+
+        return sprintf(
+            '_text_match(buckets: %d):desc,%s:desc',
+            $this->config->getBoostTextMatchBuckets($storeId),
+            $evalClause,
+        );
+    }
+
+    /** @param string[] $queryBy */
+    private function buildInfix(array $queryBy, ?int $storeId): string
+    {
+        if (!$this->config->isInfixEnabled($storeId)) {
+            return 'off';
+        }
+
+        $infixFields = $this->config->getInfixFields($storeId);
+        $mode = $this->config->getInfixMode($storeId);
+
+        // One entry per query_by field, in order, or Typesense rejects the request.
+        $perField = array_map(
+            static fn(string $field): string => in_array($field, $infixFields, true) ? $mode : 'off',
+            $queryBy,
+        );
+
+        return implode(',', $perField);
+    }
+}

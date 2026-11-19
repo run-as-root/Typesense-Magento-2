@@ -74,15 +74,15 @@ $sortOptions = $viewModel->getSortOptions();
 
             async search() {
                 const perPage = config.productsPerPage || 24;
-                const searchParams = {
+                const searchParams = Object.assign({}, config.requestParams, {
                     q: this.query || '*',
-                    query_by: 'name,sku,description',
                     per_page: perPage,
                     page: this.page,
                     facet_by: config.facetAttributes.join(','),
                     max_facet_values: 20,
-                };
-                if (this.sortBy) searchParams.sort_by = this.sortBy;
+                });
+                const sortBy = this.sortBy || config.relevanceSortBy;
+                if (sortBy) searchParams.sort_by = sortBy;
 
                 const filterParts = [];
                 for (const [field, values] of Object.entries(this.filters)) {
@@ -135,11 +135,27 @@ $sortOptions = $viewModel->getSortOptions();
                 }
 
                 try {
-                    const result = await this.client.collections(config.productCollection).documents().search(searchParams);
+                    // Page 1 of a relevance sort only: any other sort order must stay globally ordered, and
+                    // later pages have no direct-match search to merge.
+                    const reorder = config.directMatchesFirst && this.page <= 1
+                        && (!this.sortBy || this.sortBy === config.relevanceSortBy);
+                    const searches = [Object.assign({ collection: config.productCollection }, searchParams)];
+                    if (reorder) {
+                        searches.push(Object.assign({}, searches[0], { enable_synonyms: false, page: 1 }));
+                    }
+                    const response = await this.client.multiSearch.perform({ searches }, config.cacheParams);
+                    const main = response.results[0];
+                    // multi_search reports a failed search as a result object instead of rejecting.
+                    if (main.error || (main.code && !main.hits)) {
+                        throw new Error(main.error || 'Typesense search failed with code ' + main.code);
+                    }
+                    const result = reorder
+                        ? window.runAsRootTypesense.reorderByDirectMatches(main, response.results[1], this.page)
+                        : main;
                     this.hits = result.hits || [];
-                    this.facets = result.facet_counts || [];
-                    this.totalPages = Math.ceil((result.found || 0) / perPage);
-                    this.stats = (result.found || 0) + ' results found in ' + result.search_time_ms + 'ms';
+                    this.facets = main.facet_counts || [];
+                    this.totalPages = Math.ceil((main.found || 0) / perPage);
+                    this.stats = (main.found || 0) + ' results found in ' + main.search_time_ms + 'ms';
                     this.aiAnswer = '';
                 } catch (error) {
                     console.error('Typesense instant search error:', error);

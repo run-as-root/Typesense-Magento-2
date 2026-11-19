@@ -281,6 +281,87 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertNotContains('embedding', $fieldNames);
     }
 
+    public function test_only_full_text_searchable_fields_get_stem_flag_when_enabled(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn(['color']);
+        $config->method('isStemEnabled')->willReturn(true);
+        $config->method('isGermanDecompoundingEnabled')->willReturn(true);
+        $fields = (new ProductSchemaProvider($config))->getFields();
+
+        $stemmed = ['name', 'description', 'short_description', 'categories_text', 'name_decompounded'];
+        foreach ($stemmed as $name) {
+            self::assertTrue($this->findField($fields, $name)['stem'] ?? false, "{$name} should stem");
+        }
+
+        $exact = ['id', 'sku', 'url', 'image_url', 'type_id', 'categories', 'categories.lvl0', 'categories.lvl1',
+            'categories.lvl2', 'color', 'price', 'product_id', 'category_ids', 'in_stock'];
+        foreach ($exact as $name) {
+            self::assertArrayNotHasKey('stem', $this->findField($fields, $name), "{$name} should not stem");
+        }
+    }
+
+    public function test_stem_flag_absent_when_disabled(): void
+    {
+        $fields = $this->sut->getFields();
+
+        self::assertArrayNotHasKey('stem', $this->findField($fields, 'name'));
+    }
+
+    public function test_infix_flag_only_on_configured_fields(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn([]);
+        $config->method('isInfixEnabled')->willReturn(true);
+        $config->method('getInfixFields')->willReturn(['name', 'price']);
+        $fields = (new ProductSchemaProvider($config))->getFields();
+
+        self::assertTrue($this->findField($fields, 'name')['infix']);
+        self::assertArrayNotHasKey('infix', $this->findField($fields, 'sku'));
+        self::assertArrayNotHasKey('infix', $this->findField($fields, 'price'));
+    }
+
+    public function test_infix_flag_absent_when_disabled(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn([]);
+        $config->method('isInfixEnabled')->willReturn(false);
+        $config->method('getInfixFields')->willReturn(['name']);
+        $fields = (new ProductSchemaProvider($config))->getFields();
+
+        self::assertArrayNotHasKey('infix', $this->findField($fields, 'name'));
+    }
+
+    public function test_schema_has_name_decompounded_only_when_enabled(): void
+    {
+        self::assertNotContains('name_decompounded', array_column($this->sut->getFields(), 'name'));
+
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn([]);
+        $config->method('isGermanDecompoundingEnabled')->willReturn(true);
+        $fields = (new ProductSchemaProvider($config))->getFields();
+
+        self::assertSame(
+            ['name' => 'name_decompounded', 'type' => 'string', 'optional' => true],
+            $this->findField($fields, 'name_decompounded'),
+        );
+    }
+
+    public function test_name_decompounded_gets_stem_and_infix_flags(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn([]);
+        $config->method('isGermanDecompoundingEnabled')->willReturn(true);
+        $config->method('isStemEnabled')->willReturn(true);
+        $config->method('isInfixEnabled')->willReturn(true);
+        $config->method('getInfixFields')->willReturn(['name_decompounded']);
+
+        $field = $this->findField((new ProductSchemaProvider($config))->getFields(), 'name_decompounded');
+
+        self::assertTrue($field['stem']);
+        self::assertTrue($field['infix']);
+    }
+
     /** @param array<int, array<string, mixed>> $fields */
     private function findField(array $fields, string $name): array
     {

@@ -6,6 +6,7 @@ namespace RunAsRoot\TypeSense\Model\Config;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Store\Model\ScopeInterface;
 
 class TypeSenseConfig implements TypeSenseConfigInterface
@@ -15,6 +16,7 @@ class TypeSenseConfig implements TypeSenseConfigInterface
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
         private readonly EncryptorInterface $encryptor,
+        private readonly SerializerInterface $serializer,
     ) {
     }
 
@@ -137,6 +139,102 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return $this->getFlag('search/highlight_enabled', $storeId);
     }
 
+    public function getTextMatchType(?int $storeId = null): string
+    {
+        return (string) ($this->getValue('search/text_match_type', $storeId) ?: 'max_weight');
+    }
+
+    public function isInfixEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/infix_enabled', $storeId);
+    }
+
+    public function getInfixFields(?int $storeId = null): array
+    {
+        $value = (string) $this->getValue('search/infix_fields', $storeId);
+
+        return $value === '' ? [] : explode(',', $value);
+    }
+
+    public function getInfixMode(?int $storeId = null): string
+    {
+        return $this->getValue('search/infix_mode', $storeId) === 'fallback' ? 'fallback' : 'always';
+    }
+
+    public function isDirectMatchesFirstEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/direct_matches_first', $storeId);
+    }
+
+    public function isStemEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/stem_enabled', $storeId);
+    }
+
+    public function isGermanDecompoundingEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/german_decompounding', $storeId);
+    }
+
+    public function getDecompoundSkipAttribute(?int $storeId = null): string
+    {
+        return (string) $this->getValue('search/decompound_skip_attribute', $storeId);
+    }
+
+    public function getDropTokensThreshold(?int $storeId = null): int
+    {
+        return $this->getIntOrDefault('search/drop_tokens_threshold', 0, $storeId);
+    }
+
+    public function getTypoTokensThreshold(?int $storeId = null): int
+    {
+        return $this->getIntOrDefault('search/typo_tokens_threshold', 1, $storeId);
+    }
+
+    public function getMinLen1Typo(?int $storeId = null): int
+    {
+        return $this->getIntOrDefault('search/min_len_1typo', 5, $storeId);
+    }
+
+    public function getMinLen2Typo(?int $storeId = null): int
+    {
+        return $this->getIntOrDefault('search/min_len_2typo', 8, $storeId);
+    }
+
+    public function isPrioritizeExactMatch(?int $storeId = null): bool
+    {
+        $value = $this->getValue('search/prioritize_exact_match', $storeId);
+
+        return $value === null || $value === '' || (bool) $value;
+    }
+
+    public function getSplitJoinTokens(?int $storeId = null): string
+    {
+        return (string) ($this->getValue('search/split_join_tokens', $storeId) ?: 'fallback');
+    }
+
+    public function isPrefixSearchEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/prefix_search', $storeId);
+    }
+
+    public function isSearchCacheEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/use_cache', $storeId);
+    }
+
+    public function getSearchCacheTtl(?int $storeId = null): int
+    {
+        return $this->getIntOrDefault('search/cache_ttl', 300, $storeId);
+    }
+
+    public function getBoostTextMatchBuckets(?int $storeId = null): int
+    {
+        $buckets = $this->getIntOrDefault('search/boost_text_match_buckets', 10, $storeId);
+
+        return $buckets > 0 ? $buckets : 10;
+    }
+
     // Instant Search
     public function isInstantSearchEnabled(?int $storeId = null): bool
     {
@@ -184,6 +282,27 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         }
 
         return explode(',', $value);
+    }
+
+    public function getSearchableAttributes(?int $storeId = null): array
+    {
+        $value = (string) $this->getValue('search/searchable_attributes', $storeId);
+        $rows = $value === '' ? null : $this->serializer->unserialize($value);
+
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $attributes = [];
+        foreach ($rows as $row) {
+            if (!is_array($row) || ($row['attribute'] ?? '') === '') {
+                continue;
+            }
+
+            $attributes[] = ['attribute' => (string) $row['attribute'], 'weight' => max(1, (int) ($row['weight'] ?? 1))];
+        }
+
+        return $attributes;
     }
 
     public function getTileAttributes(?int $storeId = null): array
@@ -327,6 +446,14 @@ class TypeSenseConfig implements TypeSenseConfigInterface
             ScopeInterface::SCOPE_STORE,
             $storeId,
         );
+    }
+
+    // Only an unset/empty field falls back; an explicit 0 is a valid threshold.
+    private function getIntOrDefault(string $path, int $default, ?int $storeId = null): int
+    {
+        $value = $this->getValue($path, $storeId);
+
+        return $value === null || $value === '' ? $default : (int) $value;
     }
 
     private function getFlag(string $path, ?int $storeId = null): bool

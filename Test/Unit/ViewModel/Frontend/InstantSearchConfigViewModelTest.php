@@ -11,6 +11,8 @@ use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
+use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
+use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 use RunAsRoot\TypeSense\ViewModel\Frontend\InstantSearchConfigViewModel;
 
 final class InstantSearchConfigViewModelTest extends TestCase
@@ -20,6 +22,8 @@ final class InstantSearchConfigViewModelTest extends TestCase
     private CollectionNameResolverInterface&MockObject $collectionNameResolver;
     private ConversationModelManager&MockObject $conversationModelManager;
     private StoreInterface&MockObject $store;
+    private SearchRequestParamsBuilder&MockObject $requestParamsBuilder;
+    private SearchParametersProvider&MockObject $searchParametersProvider;
     private InstantSearchConfigViewModel $sut;
 
     protected function setUp(): void
@@ -35,11 +39,16 @@ final class InstantSearchConfigViewModelTest extends TestCase
         $this->store->method('getId')->willReturn(1);
         $this->storeManager->method('getStore')->willReturn($this->store);
 
+        $this->requestParamsBuilder = $this->createMock(SearchRequestParamsBuilder::class);
+        $this->searchParametersProvider = $this->createMock(SearchParametersProvider::class);
+
         $this->sut = new InstantSearchConfigViewModel(
             $this->config,
             $this->storeManager,
             $this->collectionNameResolver,
             $this->conversationModelManager,
+            $this->requestParamsBuilder,
+            $this->searchParametersProvider,
         );
     }
 
@@ -143,5 +152,50 @@ final class InstantSearchConfigViewModelTest extends TestCase
         self::assertArrayHasKey('conversationalSearch', $result);
         self::assertTrue($result['conversationalSearch']['enabled']);
         self::assertSame('rar-product-assistant', $result['conversationalSearch']['modelId']);
+    }
+
+    public function test_config_contains_request_and_cache_params(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $this->requestParamsBuilder->method('build')
+            ->with(SearchRequestParamsBuilder::CONTEXT_SEARCH, 1)
+            ->willReturn(['query_by' => 'name,sku,description', 'num_typos' => 2]);
+        $this->requestParamsBuilder->method('getRelevanceSortBy')
+            ->with(SearchRequestParamsBuilder::CONTEXT_SEARCH, 1)
+            ->willReturn(null);
+        $this->searchParametersProvider->method('getCacheParameters')
+            ->with(1)
+            ->willReturn(['use_cache' => true, 'cache_ttl' => 300]);
+
+        $result = $this->sut->getConfig();
+
+        self::assertSame(['query_by' => 'name,sku,description', 'num_typos' => 2], $result['requestParams']);
+        self::assertSame(['use_cache' => true, 'cache_ttl' => 300], $result['cacheParams']);
+        self::assertArrayHasKey('relevanceSortBy', $result);
+        self::assertNull($result['relevanceSortBy']);
+    }
+
+    public function test_view_models_expose_direct_matches_flag(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $this->config->method('isDirectMatchesFirstEnabled')->with(1)->willReturn(true);
+
+        $result = $this->sut->getConfig();
+
+        self::assertTrue($result['directMatchesFirst']);
+    }
+
+    public function test_json_config_escapes_markup_in_admin_supplied_values(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $sortBy = "_eval([(name:=`</script><!--<script>a & 'b' \"c\"`):5]):desc";
+        $this->requestParamsBuilder->method('getRelevanceSortBy')->willReturn($sortBy);
+
+        $json = $this->sut->getJsonConfig();
+
+        foreach (['<', '>', '&', "'"] as $character) {
+            self::assertStringNotContainsString($character, $json);
+        }
+        self::assertSame($sortBy, json_decode($json, true)['relevanceSortBy']);
     }
 }

@@ -44,6 +44,8 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 - Visual category merchandiser on the category edit page (Algolia-style sortable product table)
 - Virtual categories with rule-based product membership, resolved at query time with no reindex required
 - Admin query merchandiser for keyword-level product promotion/demotion
+- Boosting rules that raise or lower products matching admin-built conditions in the relevance order
+- Relevance tuning: weighted searchable attributes, typo/prefix/split-join parameters, infix search, stemming, German decompounding and direct matches ranked above synonym matches
 - Admin synonym manager and collection browser
 - CLI commands for reindexing, collection management, and health checks
 - Cron-based and message-queue-based background reindexing
@@ -64,10 +66,18 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 | Typesense | 27+ |
 | Hyva Theme | 1.3+ |
 | typesense/typesense-php | ^6.0 |
+| run-as-root/german-compound-splitter | ^1.0 |
 
 ---
 
 ## Installation
+
+Until both packages are published on Packagist, add their GitHub repositories to your project first:
+
+```bash
+composer config repositories.magento2-typesense vcs https://github.com/run-as-root/Typesense-Magento-2
+composer config repositories.german-compound-splitter vcs https://github.com/run-as-root/german-compound-splitter
+```
 
 ```bash
 composer require run-as-root/magento2-typesense
@@ -118,6 +128,33 @@ Navigate to **Stores > Configuration > TypeSense > TypeSense Search**.
 | Enable Cron Reindex | No | Schedule automatic reindexing |
 | Cron Schedule | `0 2 * * *` | Cron expression for scheduled reindex |
 | Enable Queue Reindex | No | Use message queue for async reindexing |
+
+### Search Settings
+
+Store-view scope. These drive the search page, autocomplete product results and (with "Replace Category Pages") category listings. Settings marked "Reindex" change the collection schema: run `bin/magento typesense:reindex --entity=product` after changing them. Searches can fail until that reindex has finished. Schema changes (infix, stemming, decompounding) only take effect with Zero-Downtime Reindex enabled, which builds a new collection; without it the existing collection is reused, so delete it first (`typesense:collection:delete`). Flush the full page cache after the reindex, because cached pages still send the old search parameters.
+
+| Setting | Default | Description |
+|---|---|---|
+| Enable Typo Tolerance | Yes | `num_typos` 2 when on, 0 when off |
+| Text Match Type | Max Weight | How the text-match score is combined across fields (`text_match_type`: `max_weight`, `max_score`, `sum_score`) |
+| Searchable Attributes | name 10, sku 9, description 1 | Rows of attribute + weight; become `query_by` / `query_by_weights` in weight order. Options are name, SKU, description, short description, categories, "Name (decompounded)" and every additional indexed attribute. Attributes that are not indexed are dropped; an empty list falls back to `name` |
+| Drop Tokens Threshold | 0 | Drop query words when fewer results than this are found (0 disables) |
+| Typo Tokens Threshold | 1 | Search typo-corrected matches only when exact matches return fewer results than this |
+| Minimum Word Length for 1 Typo | 5 | `min_len_1typo` (shown when typo tolerance is on) |
+| Minimum Word Length for 2 Typos | 8 | `min_len_2typo` (shown when typo tolerance is on) |
+| Prioritize Exact Matches | Yes | `prioritize_exact_match` |
+| Split/Join Words | Fallback | Match "smart watch" against "smartwatch" (`split_join_tokens`: `fallback`, `always`, `off`) |
+| Enable Prefix Search | Yes | Match the last query word as a prefix |
+| Enable Infix Search | No | Match query words inside other words. Reindex |
+| Infix Search Fields | name | Fields that get the infix flag; the `infix` request parameter is `off` for every other `query_by` field. Reindex |
+| Infix Search Mode | Fallback | `fallback` uses infix matching only when the normal search finds nothing; `always` combines both |
+| Enable Stemming | Yes | `stem` flag on the full-text fields (name, description, short description, categories text, "Name (decompounded)"), so word variants match. SKU, category paths, type and additional (facet) attributes are never stemmed, so their filters stay exact. Reindex |
+| Show Direct Matches First | Yes | Products matching the query itself rank above synonym-only matches (search page and autocomplete, relevance sort only). Costs one extra search per query |
+| Enable Server-Side Search Cache | Yes | Typesense caches identical search requests in memory (`use_cache`) |
+| Search Cache TTL (seconds) | 300 | `cache_ttl` |
+| Boosting Rule Text Match Buckets | 10 | `_text_match(buckets: N)` used with boosting rules (see [Boosting Rules](#boosting-rules)) |
+| German Decompounding | No | Index the product name plus the tails of its German compound words ("Treppensackkarre" → "Treppensackkarre Sackkarre Karre") in `name_decompounded`. Add "Name (decompounded)" to Searchable Attributes to search it, but only after the full reindex has finished: a row added earlier makes every search in the store fail. Reindex |
+| Never Split Words Of | — | Product attribute whose words (e.g. a product line name) are never split. Reindex |
 
 ### Instant Search Settings
 
@@ -307,6 +344,24 @@ Rules resolve at query time: the condition tree compiles into a Typesense `filte
 Navigate to **Content > TypeSense > Query Merchandiser**.
 
 Promote or bury products for specific search queries. Each rule targets a keyword and specifies pinned (top positions) or hidden product IDs.
+
+### Boosting Rules
+
+Navigate to **Stores > TypeSense > Boosting Rules**.
+
+A boosting rule moves every product matching its conditions up or down the relevance order, for all queries. Conditions use the same condition builder and attributes as virtual categories. Each rule has:
+
+- **Weight**: a non-zero whole number. A positive weight boosts matching products, a negative weight demotes them; the larger the number, the stronger the effect.
+- **Store View**: one store view, or "All Store Views" (store 0), which applies the rule in every store view alongside that store's own rules.
+- **Apply to Search Results** (search page and autocomplete) and **Apply to Category Listings** (Typesense category pages, needs "Replace Category Pages").
+- **From / To**: an optional date window, inclusive and in the store's timezone. An empty date leaves that side open.
+
+The store's active rules for the context are compiled into the relevance sort: `_text_match(buckets: N):desc,_eval([(<rule filter>):<weight>, …]):desc`. They apply only while the customer keeps the relevance sort; choosing another sort option ignores them. Rules reorder products only within the same text-match bucket, so a boosted product never jumps above much better matches. "Boosting Rule Text Match Buckets" (Search Settings, default 10) sets N: fewer buckets give rules more influence. With few results, each bucket holds one or two products and a rule barely moves anything.
+
+Limitations:
+
+- Typesense's `_eval` parser cannot read parentheses inside condition values (e.g. SKU is `Birne (alt)`): such a rule would break every search, so it is skipped and logged as a warning, and saving it shows a warning. Rules without conditions, or whose conditions do not compile, are skipped the same way.
+- Saving or deleting a rule cleans the full page cache, since the sort is rendered into the page. A date window starting or ending later only takes effect once cached pages expire.
 
 ---
 

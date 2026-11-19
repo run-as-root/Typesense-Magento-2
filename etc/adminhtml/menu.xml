@@ -36,6 +36,13 @@
              action="typesense/querymerchandiser/index"
              resource="RunAsRoot_TypeSense::query_merchandiser"
              sortOrder="60"/>
+        <add id="RunAsRoot_TypeSense::boost_rules"
+             title="Boosting Rules"
+             module="RunAsRoot_TypeSense"
+             parent="RunAsRoot_TypeSense::typesense"
+             action="typesense/boostrule/index"
+             resource="RunAsRoot_TypeSense::boost_rules"
+             sortOrder="65"/>
 <add id="RunAsRoot_TypeSense::configuration"
              title="Configuration"
              module="RunAsRoot_TypeSense"

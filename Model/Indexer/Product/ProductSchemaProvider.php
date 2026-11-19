@@ -5,9 +5,16 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\NameDecompounder;
+use RunAsRoot\TypeSense\Model\Search\SearchableAttributesProvider;
 
 class ProductSchemaProvider implements ProductSchemaProviderInterface
 {
+    // Typesense stems the indexed tokens, so filter_by on a stemmed field also matches variants
+    // (type_id:=simples finds "simple"). Identifiers and facet values (sku, additional attributes,
+    // category paths) must stay exact for facets, virtual categories and boosting rules.
+    private const array UNSTEMMED_SEARCHABLE_FIELDS = ['sku'];
+
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
     ) {
@@ -16,6 +23,11 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
     /** @return array<int, array<string, mixed>> */
     public function getFields(): array
     {
+        $infixFields = $this->config->isInfixEnabled() ? $this->config->getInfixFields() : [];
+        $stemFields = $this->config->isStemEnabled()
+            ? array_diff(array_keys(SearchableAttributesProvider::CORE_FIELDS), self::UNSTEMMED_SEARCHABLE_FIELDS)
+            : [];
+
         $fields = [
             ['name' => 'id', 'type' => 'string'],
             ['name' => 'product_id', 'type' => 'int32'],
@@ -49,6 +61,15 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
         // Text representation of categories for embedding
         $fields[] = ['name' => 'categories_text', 'type' => 'string', 'optional' => true];
 
+        if ($this->config->isGermanDecompoundingEnabled()) {
+            $fields[] = ['name' => NameDecompounder::FIELD, 'type' => 'string', 'optional' => true];
+        }
+
+        $fields = array_map(
+            fn(array $field): array => $this->applyTextFlags($field, $infixFields, $stemFields),
+            $fields,
+        );
+
         // Auto-embedding for conversational/semantic search
         if ($this->config->isConversationalSearchEnabled()) {
             $fields[] = [
@@ -64,5 +85,28 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
         }
 
         return $fields;
+    }
+
+    /**
+     * @param array<string, mixed> $field
+     * @param string[] $infixFields
+     * @param string[] $stemFields
+     * @return array<string, mixed>
+     */
+    private function applyTextFlags(array $field, array $infixFields, array $stemFields): array
+    {
+        if (!in_array($field['type'], ['string', 'string[]'], true)) {
+            return $field;
+        }
+
+        if (in_array($field['name'], $stemFields, true)) {
+            $field['stem'] = true;
+        }
+
+        if (in_array($field['name'], $infixFields, true)) {
+            $field['infix'] = true;
+        }
+
+        return $field;
     }
 }

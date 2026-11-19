@@ -93,6 +93,13 @@
     <preference for="RunAsRoot\TypeSense\Api\QueryMerchandisingRepositoryInterface"
                 type="RunAsRoot\TypeSense\Model\Merchandising\QueryMerchandisingRepository"/>
 
+    <!-- Boosting rules -->
+    <preference for="RunAsRoot\TypeSense\Api\Data\BoostRuleInterface"
+                type="RunAsRoot\TypeSense\Model\Boost\BoostRule"/>
+
+    <preference for="RunAsRoot\TypeSense\Api\BoostRuleRepositoryInterface"
+                type="RunAsRoot\TypeSense\Model\Boost\BoostRuleRepository"/>
+
     <!-- Synonyms -->
     <preference for="RunAsRoot\TypeSense\Api\Data\SynonymInterface"
                 type="RunAsRoot\TypeSense\Model\Synonym\Synonym"/>

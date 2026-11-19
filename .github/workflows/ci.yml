@@ -49,6 +49,7 @@ jobs:
         working-directory: ${{ steps.setup.outputs.path }}
         run: |
           composer config repositories.local path $GITHUB_WORKSPACE
+          composer config repositories.german-compound-splitter vcs https://github.com/run-as-root/german-compound-splitter
           composer require run-as-root/magento2-typesense:@dev --no-interaction
       - name: Run PHPStan
         working-directory: ${{ steps.setup.outputs.path }}

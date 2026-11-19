@@ -4,8 +4,18 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Active boosting rules now apply to relevance sorting on the search page, in autocomplete and on Typesense category listings: `sort_by` becomes `_text_match(buckets: N):desc,_eval([(<rule filter>):<weight>, …]):desc`, with the store's active, in-window rules for that context. Rules reorder products only within a text-match bucket; "Boosting Rule Text Match Buckets" (Stores > Configuration > TypeSense > Search, default 10) sets N. A rule whose conditions fail to compile, whose condition values contain parentheses (Typesense's `_eval` parser cannot read them), or whose conditions use an attribute not in the store's Additional Attributes (Typesense rejects unknown fields in `_eval`, failing every search) is skipped and logged as a warning. Saving a rule with parentheses in a condition value shows a warning; saving one on an attribute that is not indexed is rejected. Saving or deleting a rule cleans the full page cache.
+- Boosting rules (Stores > TypeSense > Boosting Rules): per store view or all store views, with a non-zero weight (positive boosts, negative demotes), an optional date window, search and/or category listing scope, and product conditions built with the virtual-category condition builder (limited to the same Typesense-filterable attributes). Upgrade note: run `setup:upgrade` for the new `run_as_root_typesense_boost_rule` table and grant the new "Boosting Rules" ACL resource to restricted admin roles.
+- "Show Direct Matches First" (Stores > Configuration > TypeSense > Search, on by default): products matching the query itself are ranked above synonym-only matches on the search page and in autocomplete, via a second search with synonyms disabled in the same multi-search request. `found`, facets and pagination still come from the synonym-enabled search. The search page now uses `multiSearch.perform()`, so the server-side cache parameters are sent as request options instead of being merged into the search parameters.
+- German decompounding (Stores > Configuration > TypeSense > Search, per store): products get a `name_decompounded` field with the tails of German compound words ("Treppensackkarre" -> "Treppensackkarre Sackkarre Karre"), searchable once it is given a weight under Searchable Attributes (add that row only after the full reindex has finished). Words of an optional "never split" product attribute (e.g. a product line) are kept whole. Upgrade note: the module now requires `run-as-root/german-compound-splitter` (add its VCS repository until it is on Packagist, see README); run a full reindex after enabling.
+- Configurable infix search (fields and `always`/`fallback` mode) and stemming under Stores > Configuration > TypeSense > Search; the `infix` request parameter is aligned with `query_by`. Stemming applies only to the full-text fields (name, description, short description, categories text, `name_decompounded`); SKU, URLs, `type_id`, category paths and additional (facet) attributes stay unstemmed so their filters match exactly. Upgrade note: both are schema flags, so run a full reindex after changing them (stemming is on by default, so existing installs need one after upgrading).
+- Admin-configurable weighted searchable attributes (Stores > Configuration > TypeSense > Search); they drive `query_by` and `query_by_weights` for storefront product searches. Defaults: name (10), SKU (9), description (1).
+
 ### Fixed
 
+- The search page, autocomplete and category listing configs are JSON-encoded with `JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT`, so admin-entered values (e.g. boosting rule conditions containing `</script>` or `<!--`) cannot break the inline script.
 - Partial reindexes (mview/`executeList`) no longer build a new collection and swap the alias to it; they upsert into the live alias and skip with a log when no index exists yet.
 - Partial reindexes delete documents for entities that are disabled, removed from the store's website, not visible, or deleted; document ids are mapped per entity type (`EntityIndexerInterface::getDocumentId()`), so prefixed ids (customers, orders, stores, config) are removed too.
 - Changing a child product re-syncs its parent products (configurable, grouped, bundle) via `catalog_product_relation`.
@@ -25,6 +35,7 @@ All notable changes to this project are documented in this file.
 - `run_as_root_typesense_synonym` table; admin synonyms are persisted in Magento and pushed to Typesense.
 - `typesense:collection:rollback --entity=<type> --store=<code>` points an alias back to the previous collection version.
 - Partial product reindexes go through the `typesense.reindex` message queue when queue reindex is enabled (message carries `entity_ids`).
+- Search settings for text match type, drop/typo token thresholds, minimum word lengths for 1/2 typos, exact-match priority, split/join words, prefix search and the Typesense server-side search cache (`run_as_root_typesense/search/*`, store scope; defaults `max_weight`, 0, 1, 5, 8, yes, `fallback`, yes, cache on with 300 s TTL). The search page, autocomplete products and category listings send them from one `SearchRequestParamsBuilder`; "Enable Typo Tolerance" now sets `num_typos` (2 or 0).
 
 ### Changed
 
@@ -34,6 +45,9 @@ All notable changes to this project are documented in this file.
 - A plain (non-versioned) collection that has the alias name is replaced by a versioned collection + alias on the next full reindex.
 - `typesense_product` mview batch size is 200; the reindex consumer processes up to 100 messages per run.
 - `EntityIndexerInterface` has a new method `getDocumentId(int $entityId): string` — custom indexers must implement it.
+- Removed the unused "Minimum Word Length for Typo Tolerance" setting (`search/typo_tolerance_min_word_length`); use the new per-typo minimum word lengths.
+- Removed the unused `view/frontend/web/js/instant-search.js` and `autocomplete.js` (the templates carry their own inline scripts).
+- `TypeSenseConfigInterface` has new search-parameter getters, and the instant search, autocomplete and category search ViewModels take `SearchRequestParamsBuilder` and `SearchParametersProvider` as new constructor arguments — custom implementations or subclasses must be updated.
 
 ### Upgrade notes
 
@@ -48,6 +62,8 @@ All notable changes to this project are documented in this file.
 - An inactive store, or one with TypeSense disabled, keeps its old collection; it is neither updated nor deleted.
 - With zero-downtime disabled, stored synonyms are not pushed when a collection is (re)created; re-save them in the admin or use zero-downtime mode.
 - Installs without zero-downtime reindex must re-save each category's merchandising once after upgrading so stored overrides get the new listing filter (zero-downtime installs refresh them on the required full reindex).
+- **Full reindex required** after changing Enable Stemming, Enable Infix Search, Infix Search Fields, German Decompounding or Never Split Words Of: they change the collection schema or the indexed documents. Stemming is on by default, so upgrading installs need one anyway. Until then, storefront searches fail when the request names something the live schema lacks (a weighted `name_decompounded` row, or infix on a field not yet flagged), so enable German Decompounding, reindex, and only then add the "Name (decompounded)" Searchable Attributes row. These schema changes only take effect with Zero-Downtime Reindex enabled (without it the existing collection is reused; delete it with `typesense:collection:delete` first). Flush the full page cache after the reindex, because cached pages keep sending the old search parameters.
+- `run-as-root/german-compound-splitter` is a new dependency. Until it and this module are on Packagist, add both VCS repositories before `composer require` (see README, Installation).
 
 ## [0.2.0]
 

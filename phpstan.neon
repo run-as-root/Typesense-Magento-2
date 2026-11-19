@@ -37,7 +37,9 @@ parameters:
                 - Model/VirtualRule/Condition/Combine.php
         -
             message: '#Call to an undefined method RunAsRoot\\TypeSense\\Model\\VirtualRule\\Condition\\ConditionsRule::setConditionsSerialized\(\)#'
-            path: Block/Adminhtml/Category/VirtualRule.php
+            paths:
+                - Block/Adminhtml/Category/VirtualRule.php
+                - Block/Adminhtml/BoostRule/Conditions.php
         # Magento\Rule\Model\Condition\AbstractCondition carries a `@method setFormName()` PHPDoc
         # annotation with no parameter, even though every core caller (module-sales-rule,
         # module-catalog-rule, module-page-builder) invokes it with one. Verified against the real
@@ -47,12 +49,21 @@ parameters:
             message: '#Method Magento\\Rule\\Model\\Condition\\AbstractCondition::setFormName\(\) invoked with 1 parameter, 0 required#'
             paths:
                 - Block/Adminhtml/Category/VirtualRule.php
+                - Block/Adminhtml/BoostRule/Conditions.php
                 - Controller/Adminhtml/CategoryVirtualRule/NewConditionHtml.php
+                - Controller/Adminhtml/BoostRule/NewConditionHtml.php
         # NewConditionHtml::execute() deliberately mirrors
         # Magento\CatalogRule\Controller\Adminhtml\Promo\Catalog\NewConditionHtml line for line,
         # including its lack of a declared return type - it writes the AJAX response body directly
         # via $this->getResponse()->setBody() rather than returning a Result object, exactly like
         # the real core controller it mirrors.
         -
-            message: '#Return type \(void\) of method RunAsRoot\\TypeSense\\Controller\\Adminhtml\\CategoryVirtualRule\\NewConditionHtml::execute\(\) should be compatible with return type#'
-            path: Controller/Adminhtml/CategoryVirtualRule/NewConditionHtml.php
+            message: '#Return type \(void\) of method RunAsRoot\\TypeSense\\Controller\\Adminhtml\\(CategoryVirtualRule|BoostRule)\\NewConditionHtml::execute\(\) should be compatible with return type#'
+            paths:
+                - Controller/Adminhtml/CategoryVirtualRule/NewConditionHtml.php
+                - Controller/Adminhtml/BoostRule/NewConditionHtml.php
+        # Magento's SearchResultsInterface is typed for extensible data objects; our AbstractModel
+        # entities are not. Same defect as the older repositories' getList() (part of the baseline).
+        -
+            message: '#Parameter \#1 \$items of method Magento\\Framework\\Api\\SearchResultsInterface::setItems\(\) expects#'
+            path: Model/Boost/BoostRuleRepository.php

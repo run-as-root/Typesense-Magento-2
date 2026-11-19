@@ -94,4 +94,31 @@
             <column name="typesense_id"/>
         </constraint>
     </table>
+
+    <!-- Boosting rules: products matching the conditions rank above equally relevant ones -->
+    <table name="run_as_root_typesense_boost_rule" resource="default" engine="innodb"
+           comment="TypeSense Boosting Rules">
+        <column xsi:type="int" name="rule_id" unsigned="true" nullable="false" identity="true" comment="Rule ID"/>
+        <column xsi:type="varchar" name="name" nullable="false" length="255" comment="Name"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" default="0" comment="Store ID (0 = all store views)"/>
+        <column xsi:type="boolean" name="is_active" nullable="false" default="true" comment="Is Active"/>
+        <column xsi:type="int" name="weight" unsigned="false" nullable="false" comment="Weight"/>
+        <column xsi:type="boolean" name="apply_to_search" nullable="false" default="true" comment="Apply To Search"/>
+        <column xsi:type="boolean" name="apply_to_category" nullable="false" default="false" comment="Apply To Category Listings"/>
+        <column xsi:type="date" name="from_date" nullable="true" comment="Active From (inclusive)"/>
+        <column xsi:type="date" name="to_date" nullable="true" comment="Active To (inclusive)"/>
+        <column xsi:type="mediumtext" name="conditions_serialized" nullable="true" comment="Serialized Rule Conditions (JSON)"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="rule_id"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="FK_TS_BOOST_RULE_STORE"
+                    table="run_as_root_typesense_boost_rule" column="store_id"
+                    referenceTable="store" referenceColumn="store_id" onDelete="CASCADE"/>
+        <index referenceId="IDX_TS_BOOST_RULE_STORE_ACTIVE" indexType="btree">
+            <column name="store_id"/>
+            <column name="is_active"/>
+        </index>
+    </table>
 </schema>

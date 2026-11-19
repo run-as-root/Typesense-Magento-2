@@ -12,6 +12,8 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
+use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleResolver;
 use RunAsRoot\TypeSense\Model\VirtualRule\ConditionsToFilterByCompiler;
@@ -25,6 +27,8 @@ final class CategorySearchConfigViewModelTest extends TestCase
     private Registry&MockObject $registry;
     private CategoryVirtualRuleResolver&MockObject $virtualRuleResolver;
     private LoggerInterface&MockObject $logger;
+    private SearchRequestParamsBuilder&MockObject $requestParamsBuilder;
+    private SearchParametersProvider&MockObject $searchParametersProvider;
     private CategorySearchConfigViewModel $sut;
 
     protected function setUp(): void
@@ -36,6 +40,9 @@ final class CategorySearchConfigViewModelTest extends TestCase
         $this->virtualRuleResolver = $this->createMock(CategoryVirtualRuleResolver::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
+        $this->requestParamsBuilder = $this->createMock(SearchRequestParamsBuilder::class);
+        $this->searchParametersProvider = $this->createMock(SearchParametersProvider::class);
+
         $this->sut = new CategorySearchConfigViewModel(
             $this->config,
             $this->storeManager,
@@ -43,6 +50,8 @@ final class CategorySearchConfigViewModelTest extends TestCase
             $this->registry,
             new CategoryListingFilterBuilder($this->virtualRuleResolver),
             $this->logger,
+            $this->requestParamsBuilder,
+            $this->searchParametersProvider,
         );
     }
 
@@ -232,5 +241,48 @@ final class CategorySearchConfigViewModelTest extends TestCase
         $decoded = json_decode($json, true);
         self::assertIsArray($decoded);
         self::assertArrayHasKey('categoryId', $decoded);
+    }
+
+    public function test_config_contains_request_and_cache_params(): void
+    {
+        $store = $this->createMock(StoreInterface::class);
+        $store->method('getCode')->willReturn('default');
+        $store->method('getId')->willReturn(1);
+        $this->storeManager->method('getStore')->willReturn($store);
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $this->requestParamsBuilder->method('build')
+            ->with(SearchRequestParamsBuilder::CONTEXT_CATEGORY, 1)
+            ->willReturn(['query_by' => 'name,sku,description', 'num_typos' => 2]);
+        $this->requestParamsBuilder->method('getRelevanceSortBy')
+            ->with(SearchRequestParamsBuilder::CONTEXT_CATEGORY, 1)
+            ->willReturn(null);
+        $this->searchParametersProvider->method('getCacheParameters')
+            ->with(1)
+            ->willReturn(['use_cache' => true, 'cache_ttl' => 300]);
+
+        $result = $this->sut->getConfig();
+
+        self::assertSame(['query_by' => 'name,sku,description', 'num_typos' => 2], $result['requestParams']);
+        self::assertSame(['use_cache' => true, 'cache_ttl' => 300], $result['cacheParams']);
+        self::assertArrayHasKey('relevanceSortBy', $result);
+        self::assertNull($result['relevanceSortBy']);
+    }
+
+    public function test_json_config_escapes_markup_in_admin_supplied_values(): void
+    {
+        $store = $this->createMock(StoreInterface::class);
+        $store->method('getCode')->willReturn('default');
+        $store->method('getId')->willReturn(1);
+        $this->storeManager->method('getStore')->willReturn($store);
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $sortBy = "_eval([(name:=`</script><!--<script>a & 'b' \"c\"`):5]):desc";
+        $this->requestParamsBuilder->method('getRelevanceSortBy')->willReturn($sortBy);
+
+        $json = $this->sut->getJsonConfig();
+
+        foreach (['<', '>', '&', "'"] as $character) {
+            self::assertStringNotContainsString($character, $json);
+        }
+        self::assertSame($sortBy, json_decode($json, true)['relevanceSortBy']);
     }
 }

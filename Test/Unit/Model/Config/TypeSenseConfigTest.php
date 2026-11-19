@@ -6,7 +6,9 @@ namespace RunAsRoot\TypeSense\Test\Unit\Model\Config;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Store\Model\ScopeInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfig;
@@ -21,7 +23,7 @@ final class TypeSenseConfigTest extends TestCase
     {
         $this->scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $this->encryptor = $this->createMock(EncryptorInterface::class);
-        $this->sut = new TypeSenseConfig($this->scopeConfig, $this->encryptor);
+        $this->sut = new TypeSenseConfig($this->scopeConfig, $this->encryptor, new Json());
     }
 
     public function test_is_enabled_returns_true_when_config_is_set(): void
@@ -244,5 +246,156 @@ final class TypeSenseConfigTest extends TestCase
             ]);
 
         self::assertSame(86400, $this->sut->getAdminAssistantConversationTtl());
+    }
+
+    public function test_search_parameter_getters_cast_configured_values(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/search/text_match_type', ScopeInterface::SCOPE_STORE, 2, 'sum_score'],
+                ['run_as_root_typesense/search/drop_tokens_threshold', ScopeInterface::SCOPE_STORE, 2, '3'],
+                ['run_as_root_typesense/search/typo_tokens_threshold', ScopeInterface::SCOPE_STORE, 2, '0'],
+                ['run_as_root_typesense/search/min_len_1typo', ScopeInterface::SCOPE_STORE, 2, '4'],
+                ['run_as_root_typesense/search/min_len_2typo', ScopeInterface::SCOPE_STORE, 2, '7'],
+                ['run_as_root_typesense/search/prioritize_exact_match', ScopeInterface::SCOPE_STORE, 2, '0'],
+                ['run_as_root_typesense/search/split_join_tokens', ScopeInterface::SCOPE_STORE, 2, 'off'],
+                ['run_as_root_typesense/search/cache_ttl', ScopeInterface::SCOPE_STORE, 2, '600'],
+            ]);
+
+        self::assertSame('sum_score', $this->sut->getTextMatchType(2));
+        self::assertSame(3, $this->sut->getDropTokensThreshold(2));
+        self::assertSame(0, $this->sut->getTypoTokensThreshold(2));
+        self::assertSame(4, $this->sut->getMinLen1Typo(2));
+        self::assertSame(7, $this->sut->getMinLen2Typo(2));
+        self::assertFalse($this->sut->isPrioritizeExactMatch(2));
+        self::assertSame('off', $this->sut->getSplitJoinTokens(2));
+        self::assertSame(600, $this->sut->getSearchCacheTtl(2));
+    }
+
+    public function test_search_parameter_getters_fall_back_to_defaults_when_empty(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertSame('max_weight', $this->sut->getTextMatchType());
+        self::assertSame(0, $this->sut->getDropTokensThreshold());
+        self::assertSame(1, $this->sut->getTypoTokensThreshold());
+        self::assertSame(5, $this->sut->getMinLen1Typo());
+        self::assertSame(8, $this->sut->getMinLen2Typo());
+        self::assertTrue($this->sut->isPrioritizeExactMatch());
+        self::assertSame('fallback', $this->sut->getSplitJoinTokens());
+        self::assertSame(300, $this->sut->getSearchCacheTtl());
+    }
+
+    public function test_boost_text_match_buckets_reads_search_group(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/search/boost_text_match_buckets', ScopeInterface::SCOPE_STORE, 2, '4'],
+            ]);
+
+        self::assertSame(4, $this->sut->getBoostTextMatchBuckets(2));
+    }
+
+    #[DataProvider('invalidBucketsProvider')]
+    public function test_boost_text_match_buckets_falls_back_to_ten(?string $value): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn($value);
+
+        self::assertSame(10, $this->sut->getBoostTextMatchBuckets());
+    }
+
+    /**
+     * @return array<string, array{?string}>
+     */
+    public static function invalidBucketsProvider(): array
+    {
+        return ['unset' => [null], 'empty' => [''], 'zero' => ['0'], 'negative' => ['-3']];
+    }
+
+    public function test_prefix_search_and_cache_flags_read_search_group(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->willReturnMap([
+                ['run_as_root_typesense/search/prefix_search', ScopeInterface::SCOPE_STORE, 1, true],
+                ['run_as_root_typesense/search/use_cache', ScopeInterface::SCOPE_STORE, 1, false],
+            ]);
+
+        self::assertTrue($this->sut->isPrefixSearchEnabled(1));
+        self::assertFalse($this->sut->isSearchCacheEnabled(1));
+    }
+
+    public function test_infix_and_stem_getters_read_search_group(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->willReturnMap([
+                ['run_as_root_typesense/search/infix_enabled', ScopeInterface::SCOPE_STORE, 1, true],
+                ['run_as_root_typesense/search/stem_enabled', ScopeInterface::SCOPE_STORE, 1, false],
+            ]);
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/search/infix_fields', ScopeInterface::SCOPE_STORE, 1, 'name,sku'],
+                ['run_as_root_typesense/search/infix_mode', ScopeInterface::SCOPE_STORE, 1, 'fallback'],
+            ]);
+
+        self::assertTrue($this->sut->isInfixEnabled(1));
+        self::assertFalse($this->sut->isStemEnabled(1));
+        self::assertSame(['name', 'sku'], $this->sut->getInfixFields(1));
+        self::assertSame('fallback', $this->sut->getInfixMode(1));
+    }
+
+    public function test_infix_fields_empty_and_mode_defaults_to_always(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertSame([], $this->sut->getInfixFields());
+        self::assertSame('always', $this->sut->getInfixMode());
+    }
+
+    public function test_decompounding_getters_read_search_group_per_store(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/search/german_decompounding', ScopeInterface::SCOPE_STORE, 4)
+            ->willReturn(true);
+        $this->scopeConfig->method('getValue')
+            ->with('run_as_root_typesense/search/decompound_skip_attribute', ScopeInterface::SCOPE_STORE, 4)
+            ->willReturn('brand_line');
+
+        self::assertTrue($this->sut->isGermanDecompoundingEnabled(4));
+        self::assertSame('brand_line', $this->sut->getDecompoundSkipAttribute(4));
+    }
+
+    public function test_decompound_skip_attribute_is_empty_when_unset(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertSame('', $this->sut->getDecompoundSkipAttribute());
+    }
+
+    public function test_get_searchable_attributes_decodes_rows_in_saved_order(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->with('run_as_root_typesense/search/searchable_attributes', ScopeInterface::SCOPE_STORE, 3)
+            ->willReturn('{"_1":{"attribute":"name","weight":"10"},"_2":{"attribute":"","weight":"5"},"_3":{"attribute":"sku"}}');
+
+        self::assertSame(
+            [['attribute' => 'name', 'weight' => 10], ['attribute' => 'sku', 'weight' => 1]],
+            $this->sut->getSearchableAttributes(3),
+        );
+    }
+
+    public function test_get_searchable_attributes_is_empty_when_unset(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertSame([], $this->sut->getSearchableAttributes());
+    }
+
+    public function test_direct_matches_first_reads_search_group_per_store(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/search/direct_matches_first', ScopeInterface::SCOPE_STORE, 3)
+            ->willReturn(true);
+
+        self::assertTrue($this->sut->isDirectMatchesFirstEnabled(3));
     }
 }
