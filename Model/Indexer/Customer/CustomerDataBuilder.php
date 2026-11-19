@@ -37,7 +37,7 @@ class CustomerDataBuilder
         [$orderCount, $lifetimeValue, $lastOrderDate] = $this->resolveOrderStats($customerId);
 
         $document = [
-            'id' => 'customer_' . $customerId,
+            'id' => $this->getDocumentId($customerId),
             'customer_id' => $customerId,
             'email' => (string) $customer->getEmail(),
             'firstname' => (string) $customer->getFirstname(),
@@ -187,5 +187,10 @@ class CustomerDataBuilder
         $ts = strtotime($dateString);
 
         return $ts !== false ? $ts : 0;
+    }
+
+    public function getDocumentId(int $entityId): string
+    {
+        return 'customer_' . $entityId;
     }
 }

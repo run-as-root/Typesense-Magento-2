@@ -51,6 +51,11 @@ final class SystemConfigDataBuilderTest extends TestCase
     // isSensitivePath unit tests
     // -----------------------------------------------------------------
 
+    public function test_get_document_id_prefixes_config_id(): void
+    {
+        self::assertSame('config_5', $this->sut->getDocumentId(5));
+    }
+
     public function test_sensitive_path_password_is_detected(): void
     {
         self::assertTrue($this->sut->isSensitivePathPublic('payment/paypal/api_password'));

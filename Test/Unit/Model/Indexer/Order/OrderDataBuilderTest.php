@@ -34,6 +34,11 @@ final class OrderDataBuilderTest extends TestCase
         );
     }
 
+    public function test_get_document_id_prefixes_order_id(): void
+    {
+        self::assertSame('order_5', $this->sut->getDocumentId(5));
+    }
+
     public function test_build_returns_complete_document(): void
     {
         $order = $this->createOrderMock();

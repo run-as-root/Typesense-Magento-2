@@ -39,4 +39,9 @@ class ProductEntityIndexer implements EntityIndexerInterface
             yield $this->dataBuilder->build($product, $storeId);
         }
     }
+
+    public function getDocumentId(int $entityId): string
+    {
+        return (string) $entityId;
+    }
 }

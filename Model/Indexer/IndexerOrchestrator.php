@@ -146,7 +146,7 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         $stats = $this->batchImportService->import($collectionName, $documents, $storeId);
 
         // Entities the indexer no longer yields (deleted, disabled, out of scope) must not linger in the live index.
-        $staleIds = array_values(array_diff(array_map('strval', $entityIds), $yieldedIds));
+        $staleIds = array_values(array_diff(array_map($indexer->getDocumentId(...), $entityIds), $yieldedIds));
         if ($staleIds !== []) {
             $this->documentDeleter->deleteByIds($collectionName, $staleIds, $storeId);
         }

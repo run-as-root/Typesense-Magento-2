@@ -34,4 +34,9 @@ class SystemConfigEntityIndexer implements EntityIndexerInterface
     {
         return $this->dataBuilder->buildDocuments($storeId);
     }
+
+    public function getDocumentId(int $entityId): string
+    {
+        return $this->dataBuilder->getDocumentId($entityId);
+    }
 }

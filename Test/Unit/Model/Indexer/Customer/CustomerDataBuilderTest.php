@@ -38,6 +38,11 @@ final class CustomerDataBuilderTest extends TestCase
         );
     }
 
+    public function test_get_document_id_prefixes_customer_id(): void
+    {
+        self::assertSame('customer_5', $this->sut->getDocumentId(5));
+    }
+
     public function test_build_returns_complete_document(): void
     {
         $customer = $this->createCustomerMock();

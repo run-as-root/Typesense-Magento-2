@@ -32,7 +32,7 @@ class OrderDataBuilder
         $payment = $order->getPayment();
 
         $document = [
-            'id' => 'order_' . $orderId,
+            'id' => $this->getDocumentId($orderId),
             'order_id' => $orderId,
             'increment_id' => (string) $order->getIncrementId(),
             'status' => (string) $order->getStatus(),
@@ -128,5 +128,10 @@ class OrderDataBuilder
         $ts = strtotime($dateString);
 
         return $ts !== false ? $ts : 0;
+    }
+
+    public function getDocumentId(int $entityId): string
+    {
+        return 'order_' . $entityId;
     }
 }

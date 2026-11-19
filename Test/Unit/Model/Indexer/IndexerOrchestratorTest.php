@@ -39,6 +39,7 @@ final class IndexerOrchestratorTest extends TestCase
         $this->indexer = $this->createMock(EntityIndexerInterface::class);
         $this->indexer->method('getSchemaFields')->willReturn([['name' => 'title', 'type' => 'string']]);
         $this->indexer->method('buildDocuments')->willReturn([['id' => '5']]);
+        $this->indexer->method('getDocumentId')->willReturnCallback(static fn (int $id): string => (string) $id);
 
         $this->zeroDowntimeService = $this->createMock(ZeroDowntimeService::class);
         $this->batchImportService = $this->createMock(BatchImportService::class);
@@ -150,6 +151,31 @@ final class IndexerOrchestratorTest extends TestCase
         $this->documentDeleter->expects(self::never())->method('deleteByIds');
 
         $this->sut->reindex('product', [5]);
+    }
+
+    public function test_partial_reindex_maps_entity_ids_to_document_ids_before_diffing(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->aliasManager->method('aliasExists')->willReturn(true);
+        $this->indexer = $this->createMock(EntityIndexerInterface::class);
+        $this->indexer->method('getDocumentId')
+            ->willReturnCallback(static fn (int $id): string => 'customer_' . $id);
+        $this->indexer->method('buildDocuments')->willReturn([['id' => 'customer_5']]);
+        $this->batchImportService->method('import')->willReturnCallback(
+            static function (string $name, iterable $documents): array {
+                foreach ($documents as $document) {
+                    unset($document);
+                }
+                return ['success' => 1, 'failed' => 0, 'total' => 1];
+            },
+        );
+        $this->sut = $this->buildSut();
+
+        $this->documentDeleter->expects(self::once())
+            ->method('deleteByIds')
+            ->with('rar_product_de', ['customer_6'], 3);
+
+        $this->sut->reindex('product', [5, 6]);
     }
 
     public function test_full_reindex_never_deletes_documents(): void
