@@ -86,12 +86,7 @@ class ZeroDowntimeService
         $currentVersion = $this->parseVersion($aliasName, $alias['collection_name']);
         $versions = $this->listVersions($aliasName);
 
-        $previous = null;
-        foreach ($versions as $version => $name) {
-            if ($currentVersion !== null && $version < $currentVersion && ($previous === null || $version > $previous)) {
-                $previous = $version;
-            }
-        }
+        $previous = $this->findPreviousVersion($versions, $currentVersion);
 
         if ($previous === null) {
             throw new \RuntimeException('No previous version to roll back to');
@@ -125,12 +120,7 @@ class ZeroDowntimeService
         $versions = $this->listVersions($aliasName);
 
         // Keep the current and the highest lower version so a rollback target always exists.
-        $keep = null;
-        foreach ($versions as $version => $name) {
-            if ($currentVersion !== null && $version < $currentVersion && ($keep === null || $version > $keep)) {
-                $keep = $version;
-            }
-        }
+        $keep = $this->findPreviousVersion($versions, $currentVersion);
 
         foreach ($versions as $version => $name) {
             if ($version !== $currentVersion && $version !== $keep) {
@@ -138,6 +128,21 @@ class ZeroDowntimeService
                 $this->logger->info("Deleted old collection: {$name}");
             }
         }
+    }
+
+    /**
+     * @param array<int, string> $versions
+     */
+    private function findPreviousVersion(array $versions, ?int $currentVersion): ?int
+    {
+        $previous = null;
+        foreach ($versions as $version => $name) {
+            if ($currentVersion !== null && $version < $currentVersion && ($previous === null || $version > $previous)) {
+                $previous = $version;
+            }
+        }
+
+        return $previous;
     }
 
     /**
