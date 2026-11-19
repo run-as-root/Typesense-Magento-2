@@ -95,6 +95,16 @@ final class ReindexConsumerTest extends TestCase
         $this->consumer->process($message);
     }
 
+    public function test_partial_error_republishes_with_next_attempt_instead_of_escaping(): void
+    {
+        $message = json_encode(['entity_type' => 'product', 'store_id' => 2, 'entity_ids' => [7, 9]]);
+
+        $this->orchestrator->method('reindex')->willThrowException(new \TypeError('bad document'));
+        $this->publisher->expects(self::once())->method('publish')->with('product', 2, [7, 9], 1);
+
+        $this->consumer->process($message);
+    }
+
     public function test_partial_failure_increments_existing_attempt(): void
     {
         $message = json_encode(['entity_type' => 'product', 'entity_ids' => [7], 'attempt' => 2]);

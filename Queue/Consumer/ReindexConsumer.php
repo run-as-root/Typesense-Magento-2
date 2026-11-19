@@ -34,7 +34,7 @@ class ReindexConsumer
             } else {
                 $this->orchestrator->reindexAll();
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->logger->error('TypeSense queue reindex failed: ' . $e->getMessage(), [
                 'message' => $message,
             ]);

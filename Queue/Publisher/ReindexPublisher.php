@@ -23,8 +23,7 @@ class ReindexPublisher
         ?int $storeId = null,
         array $entityIds = [],
         int $attempt = 0,
-    ): void
-    {
+    ): void {
         $message = json_encode([
             'entity_type' => $entityType,
             'store_id' => $storeId,
