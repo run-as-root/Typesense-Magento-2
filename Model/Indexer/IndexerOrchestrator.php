@@ -25,6 +25,7 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         private readonly StoreRepositoryInterface $storeRepository,
         private readonly AliasManagerInterface $aliasManager,
         private readonly CollectionManagerInterface $collectionManager,
+        private readonly DocumentDeleter $documentDeleter,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -140,10 +141,30 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
             return;
         }
 
-        $documents = $indexer->buildDocuments($entityIds, $storeId);
+        $yieldedIds = [];
+        $documents = $this->collectYieldedIds($indexer->buildDocuments($entityIds, $storeId), $yieldedIds);
         $stats = $this->batchImportService->import($collectionName, $documents, $storeId);
 
+        // Entities the indexer no longer yields (deleted, disabled, out of scope) must not linger in the live index.
+        $staleIds = array_values(array_diff(array_map('strval', $entityIds), $yieldedIds));
+        if ($staleIds !== []) {
+            $this->documentDeleter->deleteByIds($collectionName, $staleIds, $storeId);
+        }
+
         $this->logComplete($entityType, $storeCode, $stats);
+    }
+
+    /**
+     * @param iterable<array<string, mixed>> $documents
+     * @param string[] $yieldedIds
+     * @return \Generator<int, array<string, mixed>>
+     */
+    private function collectYieldedIds(iterable $documents, array &$yieldedIds): \Generator
+    {
+        foreach ($documents as $document) {
+            $yieldedIds[] = (string) $document['id'];
+            yield $document;
+        }
     }
 
     private function logComplete(string $entityType, string $storeCode, array $stats): void

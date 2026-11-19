@@ -12,6 +12,7 @@ class ProductIndexer implements ActionInterface, MviewActionInterface
 {
     public function __construct(
         private readonly IndexerOrchestrator $orchestrator,
+        private readonly ParentIdResolver $parentIdResolver,
     ) {
     }
 
@@ -22,16 +23,27 @@ class ProductIndexer implements ActionInterface, MviewActionInterface
 
     public function executeList(array $ids): void
     {
-        $this->orchestrator->reindex('product', array_map('intval', $ids));
+        $this->reindexWithParents(array_map('intval', $ids));
     }
 
     public function executeRow($id): void
     {
-        $this->orchestrator->reindex('product', [(int) $id]);
+        $this->reindexWithParents([(int) $id]);
     }
 
     public function execute($ids): void
     {
-        $this->orchestrator->reindex('product', array_map('intval', $ids));
+        $this->reindexWithParents(array_map('intval', $ids));
+    }
+
+    /**
+     * @param int[] $ids
+     */
+    private function reindexWithParents(array $ids): void
+    {
+        // Parents are expanded here only: a changed child alters its parent's document, and the orchestrator must not re-expand.
+        $ids = array_values(array_unique([...$ids, ...$this->parentIdResolver->getParentIds($ids)]));
+
+        $this->orchestrator->reindex('product', $ids);
     }
 }

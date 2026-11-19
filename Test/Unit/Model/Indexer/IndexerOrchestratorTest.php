@@ -16,6 +16,7 @@ use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
 use RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Indexer\BatchImportService;
+use RunAsRoot\TypeSense\Model\Indexer\DocumentDeleter;
 use RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool;
 use RunAsRoot\TypeSense\Model\Indexer\IndexerOrchestrator;
 
@@ -29,6 +30,7 @@ final class IndexerOrchestratorTest extends TestCase
     private StoreRepositoryInterface&MockObject $storeRepository;
     private AliasManagerInterface&MockObject $aliasManager;
     private CollectionManagerInterface&MockObject $collectionManager;
+    private DocumentDeleter&MockObject $documentDeleter;
     private LoggerInterface&MockObject $logger;
     private IndexerOrchestrator $sut;
 
@@ -54,6 +56,7 @@ final class IndexerOrchestratorTest extends TestCase
 
         $this->aliasManager = $this->createMock(AliasManagerInterface::class);
         $this->collectionManager = $this->createMock(CollectionManagerInterface::class);
+        $this->documentDeleter = $this->createMock(DocumentDeleter::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->sut = new IndexerOrchestrator(
@@ -65,6 +68,7 @@ final class IndexerOrchestratorTest extends TestCase
             $this->storeRepository,
             $this->aliasManager,
             $this->collectionManager,
+            $this->documentDeleter,
             $this->logger,
         );
     }
@@ -108,6 +112,55 @@ final class IndexerOrchestratorTest extends TestCase
             static fn (string $message): bool => str_contains($message, 'full reindex required'),
         );
         self::assertNotEmpty($skipMessages);
+    }
+
+    public function test_partial_reindex_deletes_ids_not_yielded_by_indexer(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->aliasManager->method('aliasExists')->with('rar_product_de')->willReturn(true);
+        $this->batchImportService->method('import')->willReturnCallback(
+            static function (string $name, iterable $documents): array {
+                foreach ($documents as $document) {
+                    unset($document);
+                }
+                return ['success' => 1, 'failed' => 0, 'total' => 1];
+            },
+        );
+
+        $this->documentDeleter->expects(self::once())
+            ->method('deleteByIds')
+            ->with('rar_product_de', ['6', '7'], 3);
+
+        $this->sut->reindex('product', [5, 6, 7]);
+    }
+
+    public function test_partial_reindex_does_not_delete_when_all_ids_yielded(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->aliasManager->method('aliasExists')->willReturn(true);
+        $this->batchImportService->method('import')->willReturnCallback(
+            static function (string $name, iterable $documents): array {
+                foreach ($documents as $document) {
+                    unset($document);
+                }
+                return ['success' => 1, 'failed' => 0, 'total' => 1];
+            },
+        );
+
+        $this->documentDeleter->expects(self::never())->method('deleteByIds');
+
+        $this->sut->reindex('product', [5]);
+    }
+
+    public function test_full_reindex_never_deletes_documents(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
+        $this->collectionManager->method('collectionExists')->willReturn(true);
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+
+        $this->documentDeleter->expects(self::never())->method('deleteByIds');
+
+        $this->sut->reindex('product');
     }
 
     public function test_full_reindex_uses_versioned_collection_and_swaps(): void
@@ -159,6 +212,7 @@ final class IndexerOrchestratorTest extends TestCase
             $this->storeRepository,
             $this->aliasManager,
             $this->collectionManager,
+            $this->documentDeleter,
             $this->logger,
         );
     }
