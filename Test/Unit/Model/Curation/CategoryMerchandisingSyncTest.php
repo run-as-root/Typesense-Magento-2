@@ -15,6 +15,7 @@ use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Api\Data\CategoryMerchandisingInterface;
 use RunAsRoot\TypeSense\Model\Curation\CategoryMerchandisingSync;
 use RunAsRoot\TypeSense\Api\OverrideManagerInterface;
+use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleResolver;
 
 final class CategoryMerchandisingSyncTest extends TestCase
@@ -42,7 +43,7 @@ final class CategoryMerchandisingSyncTest extends TestCase
             $this->repository,
             $this->searchCriteriaBuilder,
             $this->logger,
-            $this->resolver,
+            new CategoryListingFilterBuilder($this->resolver),
         );
     }
 
@@ -80,7 +81,7 @@ final class CategoryMerchandisingSyncTest extends TestCase
             'rule' => [
                 'query' => '*',
                 'match' => 'exact',
-                'filter_by' => "category_ids:={$categoryId}",
+                'filter_by' => "(category_ids:={$categoryId}) && visibility:[2,4]",
             ],
             'includes' => [
                 ['id' => '101', 'position' => 1],
@@ -271,7 +272,7 @@ final class CategoryMerchandisingSyncTest extends TestCase
                 $collectionName,
                 'cat_merch_8_1',
                 self::callback(fn(array $payload): bool =>
-                    $payload['rule']['filter_by'] === 'color:=`red` || category_ids:=9'),
+                    $payload['rule']['filter_by'] === '(color:=`red` || category_ids:=9) && visibility:[2,4]'),
             );
 
         $this->sut->sync($categoryId, $storeId, $storeCode);
@@ -297,5 +298,33 @@ final class CategoryMerchandisingSyncTest extends TestCase
             ->with('rar_product_de_v2', 'cat_merch_5_3', self::anything());
 
         $this->sut->sync(5, 3, 'de', 'rar_product_de_v2');
+    }
+
+    public function test_sync_rule_filter_by_equals_storefront_listing_filter(): void
+    {
+        $pinRule = $this->createMock(CategoryMerchandisingInterface::class);
+        $pinRule->method('getAction')->willReturn('pin');
+        $pinRule->method('getProductId')->willReturn(1);
+        $pinRule->method('getPosition')->willReturn(1);
+
+        $searchResults = $this->createMock(SearchResultsInterface::class);
+        $searchResults->method('getItems')->willReturn([$pinRule]);
+        $this->searchCriteriaBuilder->method('addFilter')->willReturnSelf();
+        $this->searchCriteriaBuilder->method('create')->willReturn($this->createMock(SearchCriteriaInterface::class));
+        $this->repository->method('getList')->willReturn($searchResults);
+        $this->collectionNameResolver->method('resolve')->willReturn('rar_product_de');
+        $this->resolver->method('resolveFilter')->with(5, 3)->willReturn('category_ids:=5');
+
+        $expected = (new CategoryListingFilterBuilder($this->resolver))->build(5, 3);
+
+        $this->overrideManager->expects(self::once())
+            ->method('createOverride')
+            ->with(
+                'rar_product_de',
+                'cat_merch_5_3',
+                self::callback(fn(array $payload): bool => $payload['rule']['filter_by'] === $expected),
+            );
+
+        $this->sut->sync(5, 3, 'de');
     }
 }

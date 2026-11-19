@@ -10,7 +10,7 @@ use RunAsRoot\TypeSense\Api\CategoryMerchandisingRepositoryInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Api\Data\CategoryMerchandisingInterface;
 use RunAsRoot\TypeSense\Api\OverrideManagerInterface;
-use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleResolver;
+use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
 
 class CategoryMerchandisingSync
 {
@@ -20,7 +20,7 @@ class CategoryMerchandisingSync
         private readonly CategoryMerchandisingRepositoryInterface $repository,
         private readonly SearchCriteriaBuilder $searchCriteriaBuilder,
         private readonly LoggerInterface $logger,
-        private readonly CategoryVirtualRuleResolver $virtualRuleResolver,
+        private readonly CategoryListingFilterBuilder $listingFilterBuilder,
     ) {
     }
 
@@ -60,7 +60,7 @@ class CategoryMerchandisingSync
             'rule' => [
                 'query' => '*',
                 'match' => 'exact',
-                'filter_by' => $this->virtualRuleResolver->resolveFilter($categoryId, $storeId),
+                'filter_by' => $this->listingFilterBuilder->build($categoryId, $storeId),
             ],
             'includes' => array_values(array_map(
                 fn(CategoryMerchandisingInterface $r) => ['id' => (string) $r->getProductId(), 'position' => $r->getPosition()],

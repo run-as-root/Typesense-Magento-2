@@ -10,7 +10,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
-use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleResolver;
+use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\ConditionsToFilterByCompiler;
 
 class CategorySearchConfigViewModel implements ArgumentInterface
@@ -20,7 +20,7 @@ class CategorySearchConfigViewModel implements ArgumentInterface
         private readonly StoreManagerInterface $storeManager,
         private readonly CollectionNameResolverInterface $collectionNameResolver,
         private readonly Registry $registry,
-        private readonly CategoryVirtualRuleResolver $virtualRuleResolver,
+        private readonly CategoryListingFilterBuilder $listingFilterBuilder,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -48,7 +48,7 @@ class CategorySearchConfigViewModel implements ArgumentInterface
         }
 
         try {
-            return $this->virtualRuleResolver->resolveFilter($categoryId, (int) $this->storeManager->getStore()->getId());
+            return $this->listingFilterBuilder->build($categoryId, (int) $this->storeManager->getStore()->getId());
         } catch (\Throwable $e) {
             // Graceful degradation, matching the pattern conversational search already uses:
             // never let a corrupted/malformed rule (bad conditions_serialized JSON, a compiler
