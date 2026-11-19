@@ -50,8 +50,9 @@ class Delete extends Action implements HttpPostActionInterface
         $aliasName = (string) preg_replace('/_v\d+$/', '', $collection);
 
         try {
-            $this->deleteStored($aliasName, $synonymId);
+            // Remote first: a Typesense failure then leaves both copies intact and the delete can be retried.
             $this->deleteRemote($aliasName, $synonymId);
+            $this->deleteStored($aliasName, $synonymId);
             $this->messageManager->addSuccessMessage(__('Synonym "%1" has been deleted.', $synonymId));
         } catch (\Exception $e) {
             $this->logger->error(

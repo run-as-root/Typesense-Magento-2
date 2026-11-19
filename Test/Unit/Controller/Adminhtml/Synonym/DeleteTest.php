@@ -103,4 +103,15 @@ final class DeleteTest extends TestCase
 
         $this->sut->execute();
     }
+
+    public function test_typesense_failure_leaves_stored_row_untouched_and_shows_error(): void
+    {
+        $this->repository->method('getByTypesenseId')->willReturn($this->createMock(SynonymInterface::class));
+        $this->remoteSynonym->method('delete')->willThrowException(new \RuntimeException('typesense down'));
+        $this->repository->expects(self::never())->method('delete');
+        $this->messageManager->expects(self::once())->method('addErrorMessage');
+        $this->messageManager->expects(self::never())->method('addSuccessMessage');
+
+        $this->sut->execute();
+    }
 }
