@@ -7,6 +7,7 @@ namespace RunAsRoot\TypeSense\Controller\Adminhtml\BoostRule;
 use Magento\Backend\App\Action;
 use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
+use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Psr\Log\LoggerInterface;
@@ -16,9 +17,13 @@ class Delete extends Action implements HttpPostActionInterface
 {
     public const ADMIN_RESOURCE = 'RunAsRoot_TypeSense::boost_rules';
 
+    // The rules are rendered into the storefront search config, which the full page cache keeps.
+    private const FULL_PAGE_CACHE_TYPE = 'full_page';
+
     public function __construct(
         Context $context,
         private readonly BoostRuleRepositoryInterface $repository,
+        private readonly TypeListInterface $cacheTypeList,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct($context);
@@ -37,6 +42,7 @@ class Delete extends Action implements HttpPostActionInterface
 
         try {
             $this->repository->delete($this->repository->getById($id));
+            $this->cacheTypeList->cleanType(self::FULL_PAGE_CACHE_TYPE);
             $this->messageManager->addSuccessMessage(__('The boosting rule has been deleted.'));
         } catch (NoSuchEntityException) {
             $this->messageManager->addErrorMessage(__('This boosting rule no longer exists.'));

@@ -7,6 +7,7 @@ namespace RunAsRoot\TypeSense\Controller\Adminhtml\BoostRule;
 use Magento\Backend\App\Action;
 use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
+use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Stdlib\DateTime\Filter\Date as DateFilter;
@@ -20,6 +21,9 @@ class Save extends Action implements HttpPostActionInterface
 {
     public const ADMIN_RESOURCE = 'RunAsRoot_TypeSense::boost_rules';
 
+    // The rules are rendered into the storefront search config, which the full page cache keeps.
+    private const FULL_PAGE_CACHE_TYPE = 'full_page';
+
     public function __construct(
         Context $context,
         private readonly BoostRuleRepositoryInterface $repository,
@@ -27,6 +31,7 @@ class Save extends Action implements HttpPostActionInterface
         private readonly ConditionsRuleFactory $conditionsRuleFactory,
         private readonly AllowedAttributeValidator $allowedAttributeValidator,
         private readonly DateFilter $dateFilter,
+        private readonly TypeListInterface $cacheTypeList,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct($context);
@@ -101,6 +106,7 @@ class Save extends Action implements HttpPostActionInterface
             $rule->setConditionsSerialized(json_encode($conditions, JSON_THROW_ON_ERROR));
 
             $savedId = (int) $this->repository->save($rule)->getId();
+            $this->cacheTypeList->cleanType(self::FULL_PAGE_CACHE_TYPE);
             $this->messageManager->addSuccessMessage(__('The boosting rule has been saved.'));
 
             return $redirect->setPath('*/*/edit', ['id' => $savedId]);

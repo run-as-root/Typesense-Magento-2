@@ -8,6 +8,7 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Store\Model\ScopeInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfig;
@@ -283,6 +284,32 @@ final class TypeSenseConfigTest extends TestCase
         self::assertTrue($this->sut->isPrioritizeExactMatch());
         self::assertSame('fallback', $this->sut->getSplitJoinTokens());
         self::assertSame(300, $this->sut->getSearchCacheTtl());
+    }
+
+    public function test_boost_text_match_buckets_reads_search_group(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/search/boost_text_match_buckets', ScopeInterface::SCOPE_STORE, 2, '4'],
+            ]);
+
+        self::assertSame(4, $this->sut->getBoostTextMatchBuckets(2));
+    }
+
+    #[DataProvider('invalidBucketsProvider')]
+    public function test_boost_text_match_buckets_falls_back_to_ten(?string $value): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn($value);
+
+        self::assertSame(10, $this->sut->getBoostTextMatchBuckets());
+    }
+
+    /**
+     * @return array<string, array{?string}>
+     */
+    public static function invalidBucketsProvider(): array
+    {
+        return ['unset' => [null], 'empty' => [''], 'zero' => ['0'], 'negative' => ['-3']];
     }
 
     public function test_prefix_search_and_cache_flags_read_search_group(): void

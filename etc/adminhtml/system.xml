@@ -269,6 +269,12 @@
                         <field id="use_cache">1</field>
                     </depends>
                 </field>
+                <field id="boost_text_match_buckets" translate="label comment" type="text"
+                       sortOrder="145" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Boosting Rule Text Match Buckets</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>Boosting rules reorder products only within the same text-match bucket. More buckets keep relevance closer to the query; fewer give the rules more influence. Default 10.</comment>
+                </field>
                 <field id="german_decompounding" translate="label comment" type="select"
                        sortOrder="150" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>German Decompounding</label>

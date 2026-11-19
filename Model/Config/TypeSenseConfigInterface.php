@@ -87,6 +87,11 @@ interface TypeSenseConfigInterface
 
     public function getSearchCacheTtl(?int $storeId = null): int;
 
+    /**
+     * Number of text-match buckets boosting rules reorder within; always positive.
+     */
+    public function getBoostTextMatchBuckets(?int $storeId = null): int;
+
     public function isInstantSearchEnabled(?int $storeId = null): bool;
 
     public function getProductsPerPage(?int $storeId = null): int;

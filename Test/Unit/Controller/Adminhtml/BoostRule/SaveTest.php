@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Test\Unit\Controller\Adminhtml\BoostRule;
 
 use Magento\Backend\App\Action\Context;
+use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Controller\Result\RedirectFactory;
@@ -33,6 +34,7 @@ final class SaveTest extends TestCase
     private TypeSenseConfigInterface&MockObject $config;
     private ManagerInterface&MockObject $messageManager;
     private Redirect&MockObject $redirect;
+    private TypeListInterface&MockObject $cacheTypeList;
     private Save $sut;
 
     /** @var array<string, mixed> */
@@ -60,6 +62,7 @@ final class SaveTest extends TestCase
         $this->ruleFactory = $this->createMock(BoostRuleFactory::class);
         $this->conditionsRuleFactory = $this->createMock(ConditionsRuleFactory::class);
         $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->cacheTypeList = $this->createMock(TypeListInterface::class);
 
         $dateFilter = $this->createMock(DateFilter::class);
         $dateFilter->method('filter')->willReturnCallback(
@@ -73,6 +76,7 @@ final class SaveTest extends TestCase
             $this->conditionsRuleFactory,
             new AllowedAttributeValidator($this->config),
             $dateFilter,
+            $this->cacheTypeList,
             $this->createMock(LoggerInterface::class),
         );
     }
@@ -84,6 +88,7 @@ final class SaveTest extends TestCase
         $this->config->method('getAdditionalAttributes')->with(1)->willReturn(['color']);
 
         $this->repository->expects(self::never())->method('save');
+        $this->cacheTypeList->expects(self::never())->method('cleanType');
         $this->messageManager->expects(self::once())
             ->method('addErrorMessage')
             ->with(self::callback(
@@ -123,6 +128,38 @@ final class SaveTest extends TestCase
         $this->messageManager->expects(self::once())->method('addSuccessMessage');
         $this->messageManager->expects(self::never())->method('addErrorMessage');
         $this->redirect->expects(self::once())->method('setPath')->with('*/*/edit', ['id' => 11])->willReturnSelf();
+
+        $this->sut->execute();
+    }
+
+    public function test_successful_save_cleans_full_page_cache(): void
+    {
+        $this->params = $this->postedForm();
+        $this->stubParsedConditions($this->conditionsTree(['sku']));
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+
+        $rule = $this->createMock(BoostRule::class);
+        $rule->method('getId')->willReturn(11);
+        $this->ruleFactory->method('create')->willReturn($rule);
+        $this->repository->method('save')->willReturn($rule);
+        $this->redirect->method('setPath')->willReturnSelf();
+
+        $this->cacheTypeList->expects(self::once())->method('cleanType')->with('full_page');
+
+        $this->sut->execute();
+    }
+
+    public function test_failed_save_does_not_clean_full_page_cache(): void
+    {
+        $this->params = $this->postedForm();
+        $this->stubParsedConditions($this->conditionsTree(['sku']));
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+
+        $this->ruleFactory->method('create')->willReturn($this->createMock(BoostRule::class));
+        $this->repository->method('save')->willThrowException(new \RuntimeException('db down'));
+        $this->redirect->method('setPath')->willReturnSelf();
+
+        $this->cacheTypeList->expects(self::never())->method('cleanType');
 
         $this->sut->execute();
     }

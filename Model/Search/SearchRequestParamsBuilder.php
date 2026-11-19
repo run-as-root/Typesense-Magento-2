@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Search;
 
+use Magento\Store\Model\StoreManagerInterface;
+use RunAsRoot\TypeSense\Model\Boost\BoostSortBuilder;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
 class SearchRequestParamsBuilder
@@ -16,6 +18,8 @@ class SearchRequestParamsBuilder
         private readonly SearchParametersProvider $searchParametersProvider,
         private readonly SearchableAttributesProvider $searchableAttributesProvider,
         private readonly TypeSenseConfigInterface $config,
+        private readonly BoostSortBuilder $boostSortBuilder,
+        private readonly StoreManagerInterface $storeManager,
     ) {
     }
 
@@ -41,10 +45,23 @@ class SearchRequestParamsBuilder
 
     /**
      * sort_by for "relevance" ordering; null lets Typesense use its default text-match sort.
+     * Text match is bucketed so boosting rules reorder products of similar relevance without
+     * lifting a weak match above a strong one.
      */
     public function getRelevanceSortBy(string $context, ?int $storeId = null): ?string
     {
-        return null;
+        $storeId ??= (int) $this->storeManager->getStore()->getId();
+        $evalClause = $this->boostSortBuilder->buildEvalClause($context, $storeId);
+
+        if ($evalClause === null) {
+            return null;
+        }
+
+        return sprintf(
+            '_text_match(buckets: %d):desc,%s:desc',
+            $this->config->getBoostTextMatchBuckets($storeId),
+            $evalClause,
+        );
     }
 
     /** @param string[] $queryBy */

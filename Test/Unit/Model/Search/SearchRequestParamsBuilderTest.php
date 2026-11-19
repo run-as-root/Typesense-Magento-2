@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Test\Unit\Model\Search;
 
+use Magento\Store\Api\Data\StoreInterface;
+use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use RunAsRoot\TypeSense\Model\Boost\BoostSortBuilder;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Search\SearchableAttributesProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
@@ -16,6 +19,8 @@ final class SearchRequestParamsBuilderTest extends TestCase
     private SearchParametersProvider&MockObject $searchParametersProvider;
     private SearchableAttributesProvider&MockObject $searchableAttributesProvider;
     private TypeSenseConfigInterface&MockObject $config;
+    private BoostSortBuilder&MockObject $boostSortBuilder;
+    private StoreManagerInterface&MockObject $storeManager;
     private SearchRequestParamsBuilder $sut;
 
     protected function setUp(): void
@@ -25,10 +30,14 @@ final class SearchRequestParamsBuilderTest extends TestCase
         $this->searchableAttributesProvider->method('getWeightedFields')
             ->willReturn(['name' => 10, 'sku' => 9, 'description' => 1]);
         $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->boostSortBuilder = $this->createMock(BoostSortBuilder::class);
+        $this->storeManager = $this->createMock(StoreManagerInterface::class);
         $this->sut = new SearchRequestParamsBuilder(
             $this->searchParametersProvider,
             $this->searchableAttributesProvider,
             $this->config,
+            $this->boostSortBuilder,
+            $this->storeManager,
         );
     }
 
@@ -61,6 +70,8 @@ final class SearchRequestParamsBuilderTest extends TestCase
             $this->searchParametersProvider,
             $searchableAttributesProvider,
             $this->config,
+            $this->boostSortBuilder,
+            $this->storeManager,
         );
 
         self::assertSame(
@@ -104,7 +115,37 @@ final class SearchRequestParamsBuilderTest extends TestCase
 
     public function test_relevance_sort_by_is_null_without_boost_rules(): void
     {
+        $this->boostSortBuilder->method('buildEvalClause')->willReturn(null);
+
         self::assertNull($this->sut->getRelevanceSortBy(SearchRequestParamsBuilder::CONTEXT_SEARCH, 1));
-        self::assertNull($this->sut->getRelevanceSortBy(SearchRequestParamsBuilder::CONTEXT_CATEGORY));
+    }
+
+    public function test_relevance_sort_uses_configured_buckets(): void
+    {
+        $this->boostSortBuilder->method('buildEvalClause')
+            ->with(SearchRequestParamsBuilder::CONTEXT_CATEGORY, 2)
+            ->willReturn('_eval([(F1):1000, (F2):-50])');
+        $this->config->method('getBoostTextMatchBuckets')->with(2)->willReturn(7);
+
+        self::assertSame(
+            '_text_match(buckets: 7):desc,_eval([(F1):1000, (F2):-50]):desc',
+            $this->sut->getRelevanceSortBy(SearchRequestParamsBuilder::CONTEXT_CATEGORY, 2),
+        );
+    }
+
+    public function test_relevance_sort_resolves_current_store_when_none_given(): void
+    {
+        $store = $this->createMock(StoreInterface::class);
+        $store->method('getId')->willReturn('5');
+        $this->storeManager->method('getStore')->willReturn($store);
+        $this->boostSortBuilder->expects(self::once())->method('buildEvalClause')
+            ->with(SearchRequestParamsBuilder::CONTEXT_SEARCH, 5)
+            ->willReturn('_eval([(F1):10])');
+        $this->config->method('getBoostTextMatchBuckets')->with(5)->willReturn(10);
+
+        self::assertSame(
+            '_text_match(buckets: 10):desc,_eval([(F1):10]):desc',
+            $this->sut->getRelevanceSortBy(SearchRequestParamsBuilder::CONTEXT_SEARCH),
+        );
     }
 }

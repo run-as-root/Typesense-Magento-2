@@ -228,6 +228,13 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return $this->getIntOrDefault('search/cache_ttl', 300, $storeId);
     }
 
+    public function getBoostTextMatchBuckets(?int $storeId = null): int
+    {
+        $buckets = $this->getIntOrDefault('search/boost_text_match_buckets', 10, $storeId);
+
+        return $buckets > 0 ? $buckets : 10;
+    }
+
     // Instant Search
     public function isInstantSearchEnabled(?int $storeId = null): bool
     {
