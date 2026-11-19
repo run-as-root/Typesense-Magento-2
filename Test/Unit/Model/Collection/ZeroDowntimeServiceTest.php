@@ -92,6 +92,9 @@ final class ZeroDowntimeServiceTest extends TestCase
             ->with('products', 'default', null)
             ->willReturn('rar_products_default');
 
+        $this->aliasManager->method('getAlias')
+            ->with('rar_products_default')
+            ->willReturn(['collection_name' => 'rar_products_default_v2']);
         $this->aliasManager->expects(self::once())
             ->method('upsertAlias')
             ->with('rar_products_default', 'rar_products_default_v3');
@@ -114,6 +117,7 @@ final class ZeroDowntimeServiceTest extends TestCase
     public function test_cleanup_keeps_current_and_previous_version(): void
     {
         $this->nameResolver->method('resolve')->willReturn('rar_p');
+        $this->aliasManager->method('getAlias')->willReturn(['collection_name' => 'rar_p_v2']);
         $this->collectionManager->method('listCollections')->willReturn([
             ['name' => 'rar_p_v1'], ['name' => 'rar_p_v2'], ['name' => 'rar_p_v3'],
         ]);
@@ -125,6 +129,7 @@ final class ZeroDowntimeServiceTest extends TestCase
     public function test_cleanup_compares_versions_numerically(): void
     {
         $this->nameResolver->method('resolve')->willReturn('rar_p');
+        $this->aliasManager->method('getAlias')->willReturn(['collection_name' => 'rar_p_v10']);
         $this->collectionManager->method('listCollections')->willReturn([
             ['name' => 'rar_p_v9'], ['name' => 'rar_p_v10'], ['name' => 'rar_p_v11'], ['name' => 'rar_p_vx'],
         ]);
@@ -260,5 +265,106 @@ final class ZeroDowntimeServiceTest extends TestCase
         $this->aliasManager->expects(self::once())->method('upsertAlias');
 
         $this->sut->finishReindex('product', 'de', 'rar_product_de_v2');
+    }
+
+    public function test_cleanup_keeps_previously_live_version_and_deletes_failed_build_orphan(): void
+    {
+        $this->nameResolver->method('resolve')->willReturn('rar_p');
+        $this->aliasManager->method('getAlias')->willReturn(['collection_name' => 'rar_p_v5']);
+        $this->collectionManager->method('listCollections')->willReturn([
+            ['name' => 'rar_p_v5'], ['name' => 'rar_p_v6'], ['name' => 'rar_p_v7'],
+        ]);
+        $this->aliasManager->expects(self::once())->method('upsertAlias')->with('rar_p', 'rar_p_v7');
+        $this->collectionManager->expects(self::once())->method('deleteCollection')->with('rar_p_v6');
+
+        $this->sut->finishReindex('p', 'de', 'rar_p_v7');
+    }
+
+    public function test_cleanup_without_previous_alias_keeps_only_new_collection(): void
+    {
+        $this->nameResolver->method('resolve')->willReturn('rar_p');
+        $this->aliasManager->method('getAlias')->willThrowException(new ObjectNotFound());
+        $this->collectionManager->method('listCollections')->willReturn([
+            ['name' => 'rar_p_v1'], ['name' => 'rar_p_v2'],
+        ]);
+        $this->collectionManager->expects(self::once())->method('deleteCollection')->with('rar_p_v1');
+
+        $this->sut->finishReindex('p', 'de', 'rar_p_v2');
+    }
+
+    public function test_reindex_after_rollback_keeps_rolled_back_to_version(): void
+    {
+        $aliasTarget = 'rar_p_v6';
+        $collections = ['rar_p_v5', 'rar_p_v6'];
+        $deleted = [];
+
+        $this->nameResolver->method('resolve')->willReturn('rar_p');
+        $this->nameResolver->method('resolveVersioned')->willReturnCallback(
+            static fn (string $type, string $code, int $version): string => 'rar_p_v' . $version,
+        );
+        $this->aliasManager->method('getAlias')->willReturnCallback(
+            static function () use (&$aliasTarget): array {
+                return ['collection_name' => $aliasTarget];
+            },
+        );
+        $this->aliasManager->method('upsertAlias')->willReturnCallback(
+            static function (string $alias, string $collection) use (&$aliasTarget): array {
+                $aliasTarget = $collection;
+
+                return [];
+            },
+        );
+        $this->collectionManager->method('listCollections')->willReturnCallback(
+            static function () use (&$collections): array {
+                return array_map(static fn (string $name): array => ['name' => $name], $collections);
+            },
+        );
+        $this->collectionManager->method('createCollection')->willReturnCallback(
+            static function (string $name) use (&$collections): array {
+                $collections[] = $name;
+
+                return [];
+            },
+        );
+        $this->collectionManager->method('deleteCollection')->willReturnCallback(
+            static function (string $name) use (&$collections, &$deleted): array {
+                $deleted[] = $name;
+                $collections = array_values(array_diff($collections, [$name]));
+
+                return [];
+            },
+        );
+
+        self::assertSame('rar_p_v5', $this->sut->rollback('p', 'de'));
+        $new = $this->sut->startReindex('p', 'de', []);
+        self::assertSame('rar_p_v7', $new);
+        $this->sut->finishReindex('p', 'de', $new);
+
+        self::assertSame(['rar_p_v6'], $deleted);
+        self::assertSame(['rar_p_v5', 'rar_p_v7'], $collections);
+    }
+
+    public function test_rollback_picks_highest_version_below_current_when_several_exist(): void
+    {
+        $this->nameResolver->method('resolve')->willReturn('rar_p');
+        $this->aliasManager->method('getAlias')->willReturn(['collection_name' => 'rar_p_v7']);
+        $this->collectionManager->method('listCollections')->willReturn([
+            ['name' => 'rar_p_v5'], ['name' => 'rar_p_v6'], ['name' => 'rar_p_v7'], ['name' => 'rar_p_v9'],
+        ]);
+        $this->aliasManager->expects(self::once())->method('upsertAlias')->with('rar_p', 'rar_p_v6');
+
+        self::assertSame('rar_p_v6', $this->sut->rollback('p', 'de'));
+    }
+
+    public function test_rollback_falls_forward_to_other_version_when_none_below(): void
+    {
+        $this->nameResolver->method('resolve')->willReturn('rar_p');
+        $this->aliasManager->method('getAlias')->willReturn(['collection_name' => 'rar_p_v5']);
+        $this->collectionManager->method('listCollections')->willReturn([
+            ['name' => 'rar_p_v5'], ['name' => 'rar_p_v6'], ['name' => 'rar_p_v8'],
+        ]);
+        $this->aliasManager->expects(self::once())->method('upsertAlias')->with('rar_p', 'rar_p_v8');
+
+        self::assertSame('rar_p_v8', $this->sut->rollback('p', 'de'));
     }
 }

@@ -210,6 +210,34 @@ final class IndexerOrchestratorTest extends TestCase
         $this->sut->reindex('product');
     }
 
+    public function test_failed_zero_downtime_build_deletes_new_collection_and_rethrows(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_product_de_v2');
+        $this->batchImportService->method('import')->willThrowException(new \RuntimeException('import failed'));
+
+        $this->collectionManager->expects(self::once())->method('deleteCollection')->with('rar_product_de_v2');
+        $this->zeroDowntimeService->expects(self::never())->method('finishReindex');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('import failed');
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_failed_orphan_cleanup_still_rethrows_build_error(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_product_de_v2');
+        $this->batchImportService->method('import')->willThrowException(new \RuntimeException('import failed'));
+        $this->collectionManager->method('deleteCollection')->willThrowException(new \RuntimeException('typesense down'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('import failed');
+
+        $this->sut->reindex('product');
+    }
+
     public function test_full_reindex_without_zero_downtime_creates_missing_collection(): void
     {
         $this->config->method('isZeroDowntimeEnabled')->willReturn(false);

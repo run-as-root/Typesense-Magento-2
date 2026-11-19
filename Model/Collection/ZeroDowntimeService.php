@@ -52,10 +52,14 @@ class ZeroDowntimeService
             $this->logger->info("One-time migration: deleted plain collection {$aliasName} to make way for the alias");
         }
 
+        // Read before the swap: the version that was live is the only safe rollback target. The
+        // highest lower number may be a half-built orphan or the version rolled away from.
+        $previouslyLive = $this->getAliasTarget($aliasName);
+
         $this->aliasManager->upsertAlias($aliasName, $collectionName);
         $this->logger->info("Swapped alias {$aliasName} → {$collectionName}");
 
-        $this->cleanupOldVersions($aliasName, $collectionName);
+        $this->cleanupOldVersions($aliasName, $collectionName, $previouslyLive);
     }
 
     private function runAppliers(string $entityType, string $storeCode, string $collectionName, ?int $storeId): void
@@ -86,7 +90,7 @@ class ZeroDowntimeService
         $currentVersion = $this->parseVersion($aliasName, $alias['collection_name']);
         $versions = $this->listVersions($aliasName);
 
-        $previous = $this->findPreviousVersion($versions, $currentVersion);
+        $previous = $this->findRollbackTarget($versions, $currentVersion);
 
         if ($previous === null) {
             throw new \RuntimeException('No previous version to roll back to');
@@ -100,13 +104,8 @@ class ZeroDowntimeService
 
     private function getNextVersion(string $aliasName): int
     {
-        $highest = 0;
-        try {
-            $alias = $this->aliasManager->getAlias($aliasName);
-            $highest = $this->parseVersion($aliasName, $alias['collection_name']) ?? 0;
-        } catch (ObjectNotFound) {
-            // Alias doesn't exist yet — start at version 1
-        }
+        $target = $this->getAliasTarget($aliasName);
+        $highest = $target === null ? 0 : ($this->parseVersion($aliasName, $target) ?? 0);
 
         // After a rollback the alias is behind the newest collection; reusing its number would collide.
         $existing = array_keys($this->listVersions($aliasName));
@@ -114,16 +113,23 @@ class ZeroDowntimeService
         return max([$highest, ...$existing]) + 1;
     }
 
-    private function cleanupOldVersions(string $aliasName, string $currentCollection): void
+    private function getAliasTarget(string $aliasName): ?string
     {
-        $currentVersion = $this->parseVersion($aliasName, $currentCollection);
+        try {
+            $alias = $this->aliasManager->getAlias($aliasName);
+        } catch (ObjectNotFound) {
+            return null;
+        }
+
+        return $alias['collection_name'] ?? null;
+    }
+
+    private function cleanupOldVersions(string $aliasName, string $currentCollection, ?string $previouslyLive): void
+    {
         $versions = $this->listVersions($aliasName);
 
-        // Keep the current and the highest lower version so a rollback target always exists.
-        $keep = $this->findPreviousVersion($versions, $currentVersion);
-
-        foreach ($versions as $version => $name) {
-            if ($version !== $currentVersion && $version !== $keep) {
+        foreach ($versions as $name) {
+            if ($name !== $currentCollection && $name !== $previouslyLive) {
                 $this->collectionManager->deleteCollection($name);
                 $this->logger->info("Deleted old collection: {$name}");
             }
@@ -131,18 +137,24 @@ class ZeroDowntimeService
     }
 
     /**
+     * Prefers the highest version below the current one; after a rollback only a higher one may remain.
+     *
      * @param array<int, string> $versions
      */
-    private function findPreviousVersion(array $versions, ?int $currentVersion): ?int
+    private function findRollbackTarget(array $versions, ?int $currentVersion): ?int
     {
-        $previous = null;
-        foreach ($versions as $version => $name) {
-            if ($currentVersion !== null && $version < $currentVersion && ($previous === null || $version > $previous)) {
-                $previous = $version;
-            }
+        $others = array_keys($versions);
+        if ($currentVersion !== null) {
+            $others = array_values(array_diff($others, [$currentVersion]));
         }
 
-        return $previous;
+        if ($others === []) {
+            return null;
+        }
+
+        $below = array_filter($others, static fn (int $version): bool => $currentVersion !== null && $version < $currentVersion);
+
+        return $below !== [] ? max($below) : max($others);
     }
 
     /**

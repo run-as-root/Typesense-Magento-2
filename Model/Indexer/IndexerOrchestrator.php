@@ -126,14 +126,34 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
             }
         }
 
-        $documents = $indexer->buildDocuments([], $storeId);
-        $stats = $this->batchImportService->import($collectionName, $documents, $storeId);
+        try {
+            $documents = $indexer->buildDocuments([], $storeId);
+            $stats = $this->batchImportService->import($collectionName, $documents, $storeId);
+        } catch (\Throwable $e) {
+            if ($zeroDowntime) {
+                $this->discardFailedBuild($collectionName);
+            }
+            throw $e;
+        }
 
         if ($zeroDowntime) {
             $this->zeroDowntimeService->finishReindex($entityType, $storeCode, $collectionName, $storeId);
         }
 
         $this->logComplete($entityType, $storeCode, $stats);
+    }
+
+    private function discardFailedBuild(string $collectionName): void
+    {
+        try {
+            $this->collectionManager->deleteCollection($collectionName);
+            $this->logger->warning("Deleted partially built collection {$collectionName} after a failed reindex");
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                "Could not delete partially built collection {$collectionName}: {$e->getMessage()}",
+                ['exception' => $e],
+            );
+        }
     }
 
     private function reindexStorePartial(
