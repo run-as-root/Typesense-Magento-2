@@ -17,6 +17,7 @@ use RunAsRoot\TypeSense\Api\CategoryVirtualRuleRepositoryInterface;
 use RunAsRoot\TypeSense\Controller\Adminhtml\CategoryVirtualRule\Save;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Curation\CategoryMerchandisingSync;
+use RunAsRoot\TypeSense\Model\VirtualRule\AllowedAttributeValidator;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRule;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleFactory;
 use RunAsRoot\TypeSense\Model\VirtualRule\Condition\Combine;
@@ -85,7 +86,7 @@ final class SaveTest extends TestCase
             $this->cacheInvalidator,
             $this->merchandisingSync,
             $this->storeManager,
-            $this->config,
+            new AllowedAttributeValidator($this->config),
             $this->logger,
         );
     }

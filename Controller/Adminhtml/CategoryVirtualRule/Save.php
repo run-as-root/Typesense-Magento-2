@@ -12,11 +12,10 @@ use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\CategoryVirtualRuleRepositoryInterface;
-use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Curation\CategoryMerchandisingSync;
+use RunAsRoot\TypeSense\Model\VirtualRule\AllowedAttributeValidator;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleFactory;
 use RunAsRoot\TypeSense\Model\VirtualRule\Condition\ConditionsRuleFactory;
-use RunAsRoot\TypeSense\Model\VirtualRule\Condition\Product as VirtualRuleProductCondition;
 use RunAsRoot\TypeSense\Model\VirtualRule\VirtualRuleCacheInvalidator;
 
 /**
@@ -56,7 +55,7 @@ class Save extends Action implements HttpPostActionInterface
         private readonly VirtualRuleCacheInvalidator $cacheInvalidator,
         private readonly CategoryMerchandisingSync $merchandisingSync,
         private readonly StoreManagerInterface $storeManager,
-        private readonly TypeSenseConfigInterface $config,
+        private readonly AllowedAttributeValidator $allowedAttributeValidator,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct($context);
@@ -90,7 +89,10 @@ class Save extends Action implements HttpPostActionInterface
             return $resultJson->setData(['success' => false, 'message' => (string) __('Invalid rule conditions payload.')]);
         }
 
-        $disallowedAttributes = $this->findDisallowedAttributes($conditionsArray, $storeId);
+        $disallowedAttributes = $this->allowedAttributeValidator->findDisallowedAttributes(
+            $conditionsArray,
+            $storeId,
+        );
 
         if ($disallowedAttributes !== []) {
             return $resultJson->setData([
@@ -169,56 +171,5 @@ class Save extends Action implements HttpPostActionInterface
         $conditionsRule->loadPost(['conditions' => $conditionsPost]);
 
         return $conditionsRule->getConditions()->asArray();
-    }
-
-    /**
-     * Walks the decoded condition tree (same combine/leaf shape ConditionsToFilterByCompiler
-     * already understands: a node with a "conditions" key is a combine/group, otherwise it's a
-     * leaf) and returns every leaf attribute that isn't in the Typesense-filterable allowlist.
-     *
-     * @param array<string, mixed> $conditionsArray
-     * @return string[]
-     */
-    private function findDisallowedAttributes(array $conditionsArray, int $storeId): array
-    {
-        $allowed = array_merge(
-            VirtualRuleProductCondition::CORE_FILTERABLE_ATTRIBUTES,
-            $this->config->getAdditionalAttributes($storeId),
-        );
-
-        $disallowed = [];
-
-        foreach ($this->collectLeafAttributes($conditionsArray) as $attribute) {
-            if ($attribute === '') {
-                continue;
-            }
-
-            if (!in_array($attribute, $allowed, true) && !in_array($attribute, $disallowed, true)) {
-                $disallowed[] = $attribute;
-            }
-        }
-
-        return $disallowed;
-    }
-
-    /**
-     * @param array<string, mixed> $node
-     * @return string[]
-     */
-    private function collectLeafAttributes(array $node): array
-    {
-        if (array_key_exists('conditions', $node) && is_array($node['conditions'])) {
-            $attributes = [];
-
-            foreach ($node['conditions'] as $child) {
-                if (is_array($child)) {
-                    $attributes = array_merge($attributes, $this->collectLeafAttributes($child));
-                }
-            }
-
-            return $attributes;
-        }
-
-        return [(string) ($node['attribute'] ?? '')];
     }
 }

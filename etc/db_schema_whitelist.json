@@ -75,5 +75,30 @@
             "UNQ_TS_SYNONYM_COLLECTION_TYPESENSE_ID": true,
             "RUN_AS_ROOT_TYPESENSE_SYNONYM_COLLECTION_TYPESENSE_ID": true
         }
+    },
+    "run_as_root_typesense_boost_rule": {
+        "column": {
+            "rule_id": true,
+            "name": true,
+            "store_id": true,
+            "is_active": true,
+            "weight": true,
+            "apply_to_search": true,
+            "apply_to_category": true,
+            "from_date": true,
+            "to_date": true,
+            "conditions_serialized": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "index": {
+            "IDX_TS_BOOST_RULE_STORE_ACTIVE": true,
+            "RUN_AS_ROOT_TYPESENSE_BOOST_RULE_STORE_ID_IS_ACTIVE": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "FK_TS_BOOST_RULE_STORE": true,
+            "RUN_AS_ROOT_TYPESENSE_BOOST_RULE_STORE_ID_STORE_STORE_ID": true
+        }
     }
 }
