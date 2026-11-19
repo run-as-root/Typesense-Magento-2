@@ -143,9 +143,13 @@ $labelNoResults   = $escaper->escapeJs(__('No results found'));
                     }
                     const response = await this.client.multiSearch.perform({ searches }, config.cacheParams);
 
+                    const main = response.results[0];
+                    if (main.error || (main.code && !main.hits)) {
+                        throw new Error(main.error || 'Typesense search failed with code ' + main.code);
+                    }
                     const products = config.directMatchesFirst
-                        ? window.runAsRootTypesense.reorderByDirectMatches(response.results[0], response.results[3], 1)
-                        : response.results[0];
+                        ? window.runAsRootTypesense.reorderByDirectMatches(main, response.results[3], 1)
+                        : main;
                     this.results.products    = products?.hits || [];
                     this.results.categories  = response.results[1]?.hits || [];
                     this.results.suggestions = response.results[2]?.hits || [];

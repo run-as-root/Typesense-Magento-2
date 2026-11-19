@@ -135,13 +135,21 @@ $sortOptions = $viewModel->getSortOptions();
                 }
 
                 try {
+                    // Page 1 of a relevance sort only: any other sort order must stay globally ordered, and
+                    // later pages have no direct-match search to merge.
+                    const reorder = config.directMatchesFirst && this.page <= 1
+                        && (!this.sortBy || this.sortBy === config.relevanceSortBy);
                     const searches = [Object.assign({ collection: config.productCollection }, searchParams)];
-                    if (config.directMatchesFirst) {
+                    if (reorder) {
                         searches.push(Object.assign({}, searches[0], { enable_synonyms: false, page: 1 }));
                     }
                     const response = await this.client.multiSearch.perform({ searches }, config.cacheParams);
                     const main = response.results[0];
-                    const result = config.directMatchesFirst
+                    // multi_search reports a failed search as a result object instead of rejecting.
+                    if (main.error || (main.code && !main.hits)) {
+                        throw new Error(main.error || 'Typesense search failed with code ' + main.code);
+                    }
+                    const result = reorder
                         ? window.runAsRootTypesense.reorderByDirectMatches(main, response.results[1], this.page)
                         : main;
                     this.hits = result.hits || [];
