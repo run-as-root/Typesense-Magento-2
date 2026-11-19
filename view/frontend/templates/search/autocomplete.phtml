@@ -129,7 +129,7 @@ $labelNoResults   = $escaper->escapeJs(__('No results found'));
                         searches: [
                             { collection: config.productCollection,    q: this.query, query_by: 'name,sku,description', filter_by: 'visibility:[3,4]', per_page: config.productCount || 6 },
                             { collection: config.categoryCollection,   q: this.query, query_by: 'name',                 per_page: 4 },
-                            { collection: config.suggestionCollection, q: this.query, query_by: 'q',                    per_page: 5 },
+                            { collection: config.suggestionCollection, q: this.query, query_by: 'query',                    per_page: 5 },
                         ],
                     }, {});
 
@@ -151,7 +151,7 @@ $labelNoResults   = $escaper->escapeJs(__('No results found'));
             },
 
             selectSuggestion(hit) {
-                const q = hit.document.q;
+                const q = hit.document.query;
                 this.query = q;
                 this._input.value = q;
                 this.search();
@@ -249,7 +249,7 @@ $labelNoResults   = $escaper->escapeJs(__('No results found'));
                              +  ' data-ac-row-idx="' + absIdx + '"'
                              +  ' data-ac-suggestion-idx="' + i + '"'
                              +  ' class="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 cursor-pointer rounded">'
-                             +  this.esc(hit.document.q)
+                             +  this.esc(hit.document.query)
                              +  '</button>';
                         absIdx++;
                     }

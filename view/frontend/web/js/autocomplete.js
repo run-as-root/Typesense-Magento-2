@@ -58,7 +58,7 @@ function typesenseAutocomplete(config) {
                             {
                                 collection: config.suggestionCollection,
                                 q: this.query,
-                                query_by: 'q',
+                                query_by: 'query',
                                 per_page: 5,
                             },
                         ],
@@ -112,7 +112,7 @@ function typesenseAutocomplete(config) {
 
             if (this.selectedIndex < suggestionsLen) {
                 const hit = this.results.suggestions[this.selectedIndex];
-                this.query = hit.document.q;
+                this.query = hit.document.query;
                 this.isOpen = false;
                 this.search();
                 return;
