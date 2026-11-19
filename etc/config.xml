@@ -39,6 +39,7 @@
                 <prefix_search>1</prefix_search>
                 <use_cache>1</use_cache>
                 <cache_ttl>300</cache_ttl>
+                <searchable_attributes>{"_default_1":{"attribute":"name","weight":"10"},"_default_2":{"attribute":"sku","weight":"9"},"_default_3":{"attribute":"description","weight":"1"}}</searchable_attributes>
             </search>
             <instant_search>
                 <enabled>1</enabled>

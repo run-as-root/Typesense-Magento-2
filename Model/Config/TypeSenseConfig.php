@@ -6,6 +6,7 @@ namespace RunAsRoot\TypeSense\Model\Config;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Store\Model\ScopeInterface;
 
 class TypeSenseConfig implements TypeSenseConfigInterface
@@ -15,6 +16,7 @@ class TypeSenseConfig implements TypeSenseConfigInterface
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
         private readonly EncryptorInterface $encryptor,
+        private readonly SerializerInterface $serializer,
     ) {
     }
 
@@ -236,6 +238,27 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         }
 
         return explode(',', $value);
+    }
+
+    public function getSearchableAttributes(?int $storeId = null): array
+    {
+        $value = (string) $this->getValue('search/searchable_attributes', $storeId);
+        $rows = $value === '' ? null : $this->serializer->unserialize($value);
+
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $attributes = [];
+        foreach ($rows as $row) {
+            if (!is_array($row) || ($row['attribute'] ?? '') === '') {
+                continue;
+            }
+
+            $attributes[] = ['attribute' => (string) $row['attribute'], 'weight' => max(1, (int) ($row['weight'] ?? 1))];
+        }
+
+        return $attributes;
     }
 
     public function getTileAttributes(?int $storeId = null): array

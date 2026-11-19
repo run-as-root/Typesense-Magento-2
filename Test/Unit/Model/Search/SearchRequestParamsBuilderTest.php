@@ -6,18 +6,26 @@ namespace RunAsRoot\TypeSense\Test\Unit\Model\Search;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use RunAsRoot\TypeSense\Model\Search\SearchableAttributesProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 
 final class SearchRequestParamsBuilderTest extends TestCase
 {
     private SearchParametersProvider&MockObject $searchParametersProvider;
+    private SearchableAttributesProvider&MockObject $searchableAttributesProvider;
     private SearchRequestParamsBuilder $sut;
 
     protected function setUp(): void
     {
         $this->searchParametersProvider = $this->createMock(SearchParametersProvider::class);
-        $this->sut = new SearchRequestParamsBuilder($this->searchParametersProvider);
+        $this->searchableAttributesProvider = $this->createMock(SearchableAttributesProvider::class);
+        $this->searchableAttributesProvider->method('getWeightedFields')
+            ->willReturn(['name' => 10, 'sku' => 9, 'description' => 1]);
+        $this->sut = new SearchRequestParamsBuilder(
+            $this->searchParametersProvider,
+            $this->searchableAttributesProvider,
+        );
     }
 
     public function test_build_merges_search_parameters_and_query_by(): void
@@ -32,8 +40,23 @@ final class SearchRequestParamsBuilderTest extends TestCase
                 'num_typos' => 2,
                 'prefix' => true,
                 'query_by' => 'name,sku,description',
+                'query_by_weights' => '10,9,1',
             ],
             $this->sut->build(SearchRequestParamsBuilder::CONTEXT_SEARCH, 4),
+        );
+    }
+
+    public function test_builder_query_by_and_weights_are_aligned(): void
+    {
+        $searchableAttributesProvider = $this->createMock(SearchableAttributesProvider::class);
+        $searchableAttributesProvider->expects(self::once())->method('getWeightedFields')->with(2)
+            ->willReturn(['sku' => 9, 'name' => 5]);
+        $this->searchParametersProvider->method('getParameters')->willReturn([]);
+        $sut = new SearchRequestParamsBuilder($this->searchParametersProvider, $searchableAttributesProvider);
+
+        self::assertSame(
+            ['query_by' => 'sku,name', 'query_by_weights' => '9,5'],
+            $sut->build(SearchRequestParamsBuilder::CONTEXT_SEARCH, 2),
         );
     }
 

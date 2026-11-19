@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Admin-configurable weighted searchable attributes (Stores > Configuration > TypeSense > Search); they drive `query_by` and `query_by_weights` for storefront product searches. Defaults: name (10), SKU (9), description (1).
+
 ### Fixed
 
 - Partial reindexes (mview/`executeList`) no longer build a new collection and swap the alias to it; they upsert into the live alias and skip with a log when no index exists yet.

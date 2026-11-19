@@ -12,6 +12,7 @@ class SearchRequestParamsBuilder
 
     public function __construct(
         private readonly SearchParametersProvider $searchParametersProvider,
+        private readonly SearchableAttributesProvider $searchableAttributesProvider,
     ) {
     }
 
@@ -23,9 +24,14 @@ class SearchRequestParamsBuilder
      */
     public function build(string $context, ?int $storeId = null): array
     {
+        $fields = $this->searchableAttributesProvider->getWeightedFields($storeId);
+
         return array_merge(
             $this->searchParametersProvider->getParameters($storeId),
-            ['query_by' => 'name,sku,description'],
+            [
+                'query_by' => implode(',', array_keys($fields)),
+                'query_by_weights' => implode(',', $fields),
+            ],
         );
     }
 

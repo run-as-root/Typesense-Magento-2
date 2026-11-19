@@ -6,6 +6,7 @@ namespace RunAsRoot\TypeSense\Test\Unit\Model\Config;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Store\Model\ScopeInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -21,7 +22,7 @@ final class TypeSenseConfigTest extends TestCase
     {
         $this->scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $this->encryptor = $this->createMock(EncryptorInterface::class);
-        $this->sut = new TypeSenseConfig($this->scopeConfig, $this->encryptor);
+        $this->sut = new TypeSenseConfig($this->scopeConfig, $this->encryptor, new Json());
     }
 
     public function test_is_enabled_returns_true_when_config_is_set(): void
@@ -294,5 +295,24 @@ final class TypeSenseConfigTest extends TestCase
 
         self::assertTrue($this->sut->isPrefixSearchEnabled(1));
         self::assertFalse($this->sut->isSearchCacheEnabled(1));
+    }
+
+    public function test_get_searchable_attributes_decodes_rows_in_saved_order(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->with('run_as_root_typesense/search/searchable_attributes', ScopeInterface::SCOPE_STORE, 3)
+            ->willReturn('{"_1":{"attribute":"name","weight":"10"},"_2":{"attribute":"","weight":"5"},"_3":{"attribute":"sku"}}');
+
+        self::assertSame(
+            [['attribute' => 'name', 'weight' => 10], ['attribute' => 'sku', 'weight' => 1]],
+            $this->sut->getSearchableAttributes(3),
+        );
+    }
+
+    public function test_get_searchable_attributes_is_empty_when_unset(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertSame([], $this->sut->getSearchableAttributes());
     }
 }

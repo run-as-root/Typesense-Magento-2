@@ -166,6 +166,13 @@
                     <source_model>RunAsRoot\TypeSense\Model\Config\Source\TextMatchType</source_model>
                     <comment>How the text-match score is combined across the searched fields (Typesense text_match_type).</comment>
                 </field>
+                <field id="searchable_attributes" translate="label comment" type="text"
+                       sortOrder="55" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Searchable Attributes</label>
+                    <frontend_model>RunAsRoot\TypeSense\Block\Adminhtml\Form\Field\SearchableAttributes</frontend_model>
+                    <backend_model>RunAsRoot\TypeSense\Model\Config\Backend\SearchableAttributes</backend_model>
+                    <comment>Attributes Typesense searches, with their weight (higher matches rank first). Attributes that are not indexed are ignored. Falls back to the product name when empty.</comment>
+                </field>
                 <field id="drop_tokens_threshold" translate="label comment" type="text"
                        sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Drop Tokens Threshold</label>

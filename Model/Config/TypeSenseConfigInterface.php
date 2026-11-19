@@ -89,6 +89,9 @@ interface TypeSenseConfigInterface
     /** @return string[] */
     public function getAdditionalAttributes(?int $storeId = null): array;
 
+    /** @return list<array{attribute: string, weight: int}> */
+    public function getSearchableAttributes(?int $storeId = null): array;
+
     /** @return string[] */
     public function getTileAttributes(?int $storeId = null): array;
 
