@@ -40,11 +40,7 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
      */
     public function reindex(string $entityType, array $entityIds = []): void
     {
-        if (!$this->config->isEnabled()) {
-            $this->logger->info("TypeSense is disabled, skipping reindex for {$entityType}");
-            return;
-        }
-
+        // No default-scope gate: a module enabled for a single store view must still be indexed there.
         $indexer = $this->indexerPool->getIndexer($entityType);
 
         $stores = $this->storeRepository->getList();

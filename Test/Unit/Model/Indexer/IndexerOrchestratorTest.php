@@ -283,6 +283,24 @@ final class IndexerOrchestratorTest extends TestCase
         $this->sut->reindex('product');
     }
 
+    public function test_reindex_indexes_store_enabled_when_default_scope_is_disabled(): void
+    {
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->config->method('isEnabled')->willReturnCallback(
+            static fn (?int $storeId = null): bool => $storeId === 3,
+        );
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
+        $this->sut = $this->buildSut();
+
+        $this->collectionManager->method('collectionExists')->willReturn(true);
+        $this->batchImportService->expects(self::once())
+            ->method('import')
+            ->with('rar_product_de', self::anything(), 3)
+            ->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+
+        $this->sut->reindex('product');
+    }
+
     public function test_reindex_emulates_store_and_stops_on_exception(): void
     {
         $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
