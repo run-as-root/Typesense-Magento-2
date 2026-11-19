@@ -100,6 +100,17 @@
     <preference for="RunAsRoot\TypeSense\Api\SynonymRepositoryInterface"
                 type="RunAsRoot\TypeSense\Model\Synonym\SynonymRepository"/>
 
+    <!-- Re-create collection-level state on each new versioned collection before the alias swap -->
+    <type name="RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService">
+        <arguments>
+            <argument name="appliers" xsi:type="array">
+                <item name="synonyms" xsi:type="object">RunAsRoot\TypeSense\Model\Collection\Applier\SynonymApplier</item>
+                <item name="category_merchandising" xsi:type="object">RunAsRoot\TypeSense\Model\Collection\Applier\CategoryMerchandisingApplier</item>
+                <item name="query_merchandising" xsi:type="object">RunAsRoot\TypeSense\Model\Collection\Applier\QueryMerchandisingApplier</item>
+            </argument>
+        </arguments>
+    </type>
+
     <!-- Entity indexer pool: register all entity indexers -->
     <type name="RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool">
         <arguments>

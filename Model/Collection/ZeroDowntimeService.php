@@ -8,15 +8,20 @@ use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\AliasManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
+use RunAsRoot\TypeSense\Api\PostSwapApplierInterface;
 use Typesense\Exceptions\ObjectNotFound;
 
 class ZeroDowntimeService
 {
+    /**
+     * @param array<string, PostSwapApplierInterface> $appliers
+     */
     public function __construct(
         private readonly CollectionManagerInterface $collectionManager,
         private readonly AliasManagerInterface $aliasManager,
         private readonly CollectionNameResolverInterface $nameResolver,
         private readonly LoggerInterface $logger,
+        private readonly array $appliers = [],
     ) {
     }
 
@@ -38,10 +43,34 @@ class ZeroDowntimeService
     {
         $aliasName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
 
+        // Synonyms and overrides live on the collection, so the new one must carry them before it goes live.
+        $this->runAppliers($entityType, $storeCode, $collectionName, $storeId);
+
         $this->aliasManager->upsertAlias($aliasName, $collectionName);
         $this->logger->info("Swapped alias {$aliasName} → {$collectionName}");
 
         $this->cleanupOldVersions($aliasName, $collectionName);
+    }
+
+    private function runAppliers(string $entityType, string $storeCode, string $collectionName, ?int $storeId): void
+    {
+        if ($storeId === null) {
+            $this->logger->info(
+                "No store id for {$entityType}/{$storeCode}: skipping post-swap appliers on {$collectionName}",
+            );
+            return;
+        }
+
+        foreach ($this->appliers as $code => $applier) {
+            try {
+                $applier->apply($entityType, $storeId, $storeCode, $collectionName);
+            } catch (\Throwable $e) {
+                $this->logger->error(
+                    "Post-swap applier {$code} failed on {$collectionName}: {$e->getMessage()}",
+                    ['exception' => $e],
+                );
+            }
+        }
     }
 
     private function getNextVersion(string $aliasName): int

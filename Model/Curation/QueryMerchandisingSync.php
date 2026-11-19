@@ -20,9 +20,14 @@ class QueryMerchandisingSync
     ) {
     }
 
-    public function sync(int $queryMerchandisingId, int $storeId, string $storeCode): void
-    {
-        $collectionName = $this->collectionNameResolver->resolve('product', $storeCode, $storeId);
+    public function sync(
+        int $queryMerchandisingId,
+        int $storeId,
+        string $storeCode,
+        ?string $targetCollection = null,
+    ): void {
+        $collectionName = $targetCollection
+            ?? $this->collectionNameResolver->resolve('product', $storeCode, $storeId);
         $overrideId = sprintf('query_merch_%d', $queryMerchandisingId);
 
         try {

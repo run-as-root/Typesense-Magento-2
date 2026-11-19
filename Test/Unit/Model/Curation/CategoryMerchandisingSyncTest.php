@@ -276,4 +276,26 @@ final class CategoryMerchandisingSyncTest extends TestCase
 
         $this->sut->sync($categoryId, $storeId, $storeCode);
     }
+
+    public function test_sync_writes_to_target_collection_instead_of_alias_when_given(): void
+    {
+        $pinRule = $this->createMock(CategoryMerchandisingInterface::class);
+        $pinRule->method('getAction')->willReturn('pin');
+        $pinRule->method('getProductId')->willReturn(1);
+        $pinRule->method('getPosition')->willReturn(1);
+
+        $searchResults = $this->createMock(SearchResultsInterface::class);
+        $searchResults->method('getItems')->willReturn([$pinRule]);
+        $this->searchCriteriaBuilder->method('addFilter')->willReturnSelf();
+        $this->searchCriteriaBuilder->method('create')->willReturn($this->createMock(SearchCriteriaInterface::class));
+        $this->repository->method('getList')->willReturn($searchResults);
+        $this->collectionNameResolver->method('resolve')->willReturn('rar_product_de');
+        $this->resolver->method('resolveFilter')->willReturn('category_ids:=5');
+
+        $this->overrideManager->expects(self::once())
+            ->method('createOverride')
+            ->with('rar_product_de_v2', 'cat_merch_5_3', self::anything());
+
+        $this->sut->sync(5, 3, 'de', 'rar_product_de_v2');
+    }
 }

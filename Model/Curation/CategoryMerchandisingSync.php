@@ -24,8 +24,12 @@ class CategoryMerchandisingSync
     ) {
     }
 
-    public function sync(int $categoryId, int $storeId, string $storeCode): void
-    {
+    public function sync(
+        int $categoryId,
+        int $storeId,
+        string $storeCode,
+        ?string $targetCollection = null,
+    ): void {
         $searchCriteria = $this->searchCriteriaBuilder
             ->addFilter('category_id', $categoryId)
             ->addFilter('store_id', $storeId)
@@ -34,7 +38,8 @@ class CategoryMerchandisingSync
         $searchResults = $this->repository->getList($searchCriteria);
         $rules = $searchResults->getItems();
 
-        $collectionName = $this->collectionNameResolver->resolve('product', $storeCode, $storeId);
+        $collectionName = $targetCollection
+            ?? $this->collectionNameResolver->resolve('product', $storeCode, $storeId);
         $overrideId = sprintf('cat_merch_%d_%d', $categoryId, $storeId);
 
         if (empty($rules)) {

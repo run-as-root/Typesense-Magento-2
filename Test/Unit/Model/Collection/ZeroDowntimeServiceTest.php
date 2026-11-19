@@ -10,6 +10,7 @@ use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\AliasManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
+use RunAsRoot\TypeSense\Api\PostSwapApplierInterface;
 use RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService;
 use Typesense\Exceptions\ObjectNotFound;
 
@@ -19,6 +20,7 @@ final class ZeroDowntimeServiceTest extends TestCase
     private AliasManagerInterface&MockObject $aliasManager;
     private CollectionNameResolverInterface&MockObject $nameResolver;
     private LoggerInterface&MockObject $logger;
+    private PostSwapApplierInterface&MockObject $applier;
     private ZeroDowntimeService $sut;
 
     protected function setUp(): void
@@ -27,12 +29,14 @@ final class ZeroDowntimeServiceTest extends TestCase
         $this->aliasManager = $this->createMock(AliasManagerInterface::class);
         $this->nameResolver = $this->createMock(CollectionNameResolverInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->applier = $this->createMock(PostSwapApplierInterface::class);
 
         $this->sut = new ZeroDowntimeService(
             $this->collectionManager,
             $this->aliasManager,
             $this->nameResolver,
             $this->logger,
+            ['synonyms' => $this->applier],
         );
     }
 
@@ -108,5 +112,63 @@ final class ZeroDowntimeServiceTest extends TestCase
             ));
 
         $this->sut->finishReindex('products', 'default', 'rar_products_default_v3');
+    }
+
+    public function test_finish_reindex_runs_appliers_before_alias_swap(): void
+    {
+        $calls = [];
+        $this->nameResolver->method('resolve')->with('product', 'de', 3)->willReturn('rar_product_de');
+        $this->collectionManager->method('listCollections')->willReturn([]);
+
+        $this->applier->expects(self::once())
+            ->method('apply')
+            ->with('product', 3, 'de', 'rar_product_de_v2')
+            ->willReturnCallback(static function () use (&$calls): void {
+                $calls[] = 'apply';
+            });
+        $this->aliasManager->expects(self::once())
+            ->method('upsertAlias')
+            ->with('rar_product_de', 'rar_product_de_v2')
+            ->willReturnCallback(static function () use (&$calls): array {
+                $calls[] = 'upsertAlias';
+
+                return [];
+            });
+
+        $this->sut->finishReindex('product', 'de', 'rar_product_de_v2', 3);
+
+        self::assertSame(['apply', 'upsertAlias'], $calls);
+    }
+
+    public function test_failing_applier_does_not_block_swap(): void
+    {
+        $second = $this->createMock(PostSwapApplierInterface::class);
+        $sut = new ZeroDowntimeService(
+            $this->collectionManager,
+            $this->aliasManager,
+            $this->nameResolver,
+            $this->logger,
+            ['synonyms' => $this->applier, 'category_merchandising' => $second],
+        );
+        $this->nameResolver->method('resolve')->willReturn('rar_product_de');
+        $this->collectionManager->method('listCollections')->willReturn([]);
+
+        $this->applier->method('apply')->willThrowException(new \RuntimeException('typesense down'));
+        $second->expects(self::once())->method('apply');
+        $this->logger->expects(self::once())->method('error')->with(self::stringContains('synonyms'));
+        $this->aliasManager->expects(self::once())->method('upsertAlias')->with('rar_product_de', 'rar_product_de_v2');
+
+        $sut->finishReindex('product', 'de', 'rar_product_de_v2', 3);
+    }
+
+    public function test_finish_reindex_without_store_id_skips_appliers_but_still_swaps(): void
+    {
+        $this->nameResolver->method('resolve')->willReturn('rar_product_de');
+        $this->collectionManager->method('listCollections')->willReturn([]);
+
+        $this->applier->expects(self::never())->method('apply');
+        $this->aliasManager->expects(self::once())->method('upsertAlias');
+
+        $this->sut->finishReindex('product', 'de', 'rar_product_de_v2');
     }
 }
