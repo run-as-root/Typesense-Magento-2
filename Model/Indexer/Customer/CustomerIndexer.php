@@ -22,7 +22,7 @@ class CustomerIndexer implements ActionInterface, MviewActionInterface
 
     public function executeList(array $ids): void
     {
-        $this->orchestrator->reindex('customer', array_map('intval', $ids));
+        $this->reindexIds($ids);
     }
 
     public function executeRow($id): void
@@ -32,6 +32,19 @@ class CustomerIndexer implements ActionInterface, MviewActionInterface
 
     public function execute($ids): void
     {
+        $this->reindexIds($ids);
+    }
+
+    /**
+     * @param array<int|string> $ids
+     */
+    private function reindexIds(array $ids): void
+    {
+        // An empty list must not reach the orchestrator, where it means a full reindex.
+        if ($ids === []) {
+            return;
+        }
+
         $this->orchestrator->reindex('customer', array_map('intval', $ids));
     }
 }
