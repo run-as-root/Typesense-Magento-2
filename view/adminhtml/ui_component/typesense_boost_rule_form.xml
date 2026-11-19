@@ -112,10 +112,11 @@
             <settings>
                 <dataType>text</dataType>
                 <label translate="true">Weight</label>
-                <notice translate="true">Rules are applied highest weight first; a higher weight ranks matching products higher.</notice>
+                <notice translate="true">A non-zero whole number. A positive weight boosts matching products, a negative weight demotes them; the larger the number, the stronger the effect.</notice>
                 <validation>
                     <rule name="required-entry" xsi:type="boolean">true</rule>
-                    <rule name="validate-digits" xsi:type="boolean">true</rule>
+                    <rule name="integer" xsi:type="boolean">true</rule>
+                    <rule name="pattern" xsi:type="string">^-?[1-9][0-9]*$</rule>
                 </validation>
             </settings>
         </field>

@@ -11,8 +11,8 @@ $jsObjectName = $block->getJsObjectName();
 <div class="rule-tree">
     <p class="note">
         <?= $escaper->escapeHtml(__(
-            'Products matching these conditions are ranked above equally relevant products that do not '
-            . 'match. A higher weight means a stronger boost.'
+            'Products matching these conditions are ranked above (positive weight) or below (negative '
+            . 'weight) equally relevant products that do not match. The larger the number, the stronger the effect.'
         )) ?>
     </p>
     <div id="<?= $escaper->escapeHtmlAttr($jsObjectName) ?>" class="rule-tree-wrapper">

@@ -45,6 +45,15 @@ class Save extends Action implements HttpPostActionInterface
             return $backToForm();
         }
 
+        $weight = $this->parseWeight($this->getRequest()->getParam('weight'));
+        if ($weight === null) {
+            $this->messageManager->addErrorMessage(
+                __('The weight must be a non-zero whole number; negative weights demote matching products.'),
+            );
+
+            return $backToForm();
+        }
+
         try {
             $conditions = $this->parseConditions();
         } catch (\Throwable $e) {
@@ -84,7 +93,7 @@ class Save extends Action implements HttpPostActionInterface
             $rule->setName($name);
             $rule->setStoreId($storeId);
             $rule->setIsActive((bool) $this->getRequest()->getParam('is_active', false));
-            $rule->setWeight((int) $this->getRequest()->getParam('weight', 0));
+            $rule->setWeight($weight);
             $rule->setApplyToSearch((bool) $this->getRequest()->getParam('apply_to_search', false));
             $rule->setApplyToCategory((bool) $this->getRequest()->getParam('apply_to_category', false));
             $rule->setFromDate($fromDate);
@@ -125,6 +134,22 @@ class Save extends Action implements HttpPostActionInterface
         $conditionsRule->loadPost(['conditions' => $conditionsPost]);
 
         return $conditionsRule->getConditions()->asArray();
+    }
+
+    /**
+     * Bounded to the signed INT column; 0 is rejected because it would be a rule without effect.
+     */
+    private function parseWeight(mixed $value): ?int
+    {
+        $weight = is_string($value)
+            ? filter_var(
+                $value,
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => -2147483648, 'max_range' => 2147483647]],
+            )
+            : false;
+
+        return $weight === false || $weight === 0 ? null : $weight;
     }
 
     private function filterDate(mixed $value): ?string

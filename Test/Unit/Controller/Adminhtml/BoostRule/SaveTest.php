@@ -10,6 +10,7 @@ use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Controller\Result\RedirectFactory;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\Stdlib\DateTime\Filter\Date as DateFilter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -137,6 +138,54 @@ final class SaveTest extends TestCase
         $this->redirect->method('setPath')->willReturnSelf();
 
         $this->sut->execute();
+    }
+
+    public function test_save_accepts_negative_weight_to_demote(): void
+    {
+        $this->params = $this->postedForm(['weight' => '-50']);
+        $this->stubParsedConditions($this->conditionsTree(['sku']));
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+
+        $rule = $this->createMock(BoostRule::class);
+        $rule->method('getId')->willReturn(12);
+        $this->ruleFactory->method('create')->willReturn($rule);
+        $rule->expects(self::once())->method('setWeight')->with(-50)->willReturnSelf();
+
+        $this->repository->expects(self::once())->method('save')->with($rule)->willReturn($rule);
+        $this->messageManager->expects(self::never())->method('addErrorMessage');
+        $this->redirect->method('setPath')->willReturnSelf();
+
+        $this->sut->execute();
+    }
+
+    #[DataProvider('invalidWeightProvider')]
+    public function test_save_rejects_weight_that_is_not_a_non_zero_integer(mixed $weight): void
+    {
+        $this->params = $this->postedForm(['rule_id' => '4', 'weight' => $weight]);
+        $this->stubParsedConditions($this->conditionsTree(['sku']));
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+
+        $this->repository->expects(self::never())->method('save');
+        $this->messageManager->expects(self::once())
+            ->method('addErrorMessage')
+            ->with(self::callback(static fn($message): bool => str_contains((string) $message, 'weight')));
+        $this->redirect->expects(self::once())->method('setPath')->with('*/*/edit', ['id' => 4])->willReturnSelf();
+
+        $this->sut->execute();
+    }
+
+    /**
+     * @return array<string, array{mixed}>
+     */
+    public static function invalidWeightProvider(): array
+    {
+        return [
+            'zero' => ['0'],
+            'empty' => [''],
+            'missing' => [null],
+            'not a number' => ['abc'],
+            'decimal' => ['1.5'],
+        ];
     }
 
     /**
