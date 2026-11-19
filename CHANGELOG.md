@@ -61,6 +61,8 @@ All notable changes to this project are documented in this file.
 - An inactive store, or one with TypeSense disabled, keeps its old collection; it is neither updated nor deleted.
 - With zero-downtime disabled, stored synonyms are not pushed when a collection is (re)created; re-save them in the admin or use zero-downtime mode.
 - Installs without zero-downtime reindex must re-save each category's merchandising once after upgrading so stored overrides get the new listing filter (zero-downtime installs refresh them on the required full reindex).
+- **Full reindex required** after changing Enable Stemming, Enable Infix Search, Infix Search Fields, German Decompounding or Never Split Words Of: they change the collection schema or the indexed documents. Stemming is on by default, so upgrading installs need one anyway. Until then, storefront searches fail when the request names something the live schema lacks (a weighted `name_decompounded` row, or infix on a field not yet flagged).
+- `run-as-root/german-compound-splitter` is a new dependency. Until it and this module are on Packagist, add both VCS repositories before `composer require` (see README, Installation).
 
 ## [0.2.0]
 
