@@ -131,7 +131,7 @@ Navigate to **Stores > Configuration > TypeSense > TypeSense Search**.
 
 ### Search Settings
 
-Store-view scope. These drive the search page, autocomplete product results and (with "Replace Category Pages") category listings. Settings marked "Reindex" change the collection schema: run `bin/magento typesense:reindex --entity=product` after changing them.
+Store-view scope. These drive the search page, autocomplete product results and (with "Replace Category Pages") category listings. Settings marked "Reindex" change the collection schema: run `bin/magento typesense:reindex --entity=product` after changing them. Searches can fail until that reindex has finished. Schema changes (infix, stemming, decompounding) only take effect with Zero-Downtime Reindex enabled, which builds a new collection; without it the existing collection is reused, so delete it first (`typesense:collection:delete`). Flush the full page cache after the reindex, because cached pages still send the old search parameters.
 
 | Setting | Default | Description |
 |---|---|---|
@@ -153,7 +153,7 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | Enable Server-Side Search Cache | Yes | Typesense caches identical search requests in memory (`use_cache`) |
 | Search Cache TTL (seconds) | 300 | `cache_ttl` |
 | Boosting Rule Text Match Buckets | 10 | `_text_match(buckets: N)` used with boosting rules (see [Boosting Rules](#boosting-rules)) |
-| German Decompounding | No | Index the product name plus the tails of its German compound words ("Treppensackkarre" → "Treppensackkarre Sackkarre Karre") in `name_decompounded`. Add "Name (decompounded)" to Searchable Attributes to search it. Reindex |
+| German Decompounding | No | Index the product name plus the tails of its German compound words ("Treppensackkarre" → "Treppensackkarre Sackkarre Karre") in `name_decompounded`. Add "Name (decompounded)" to Searchable Attributes to search it, but only after the full reindex has finished: a row added earlier makes every search in the store fail. Reindex |
 | Never Split Words Of | — | Product attribute whose words (e.g. a product line name) are never split. Reindex |
 
 ### Instant Search Settings

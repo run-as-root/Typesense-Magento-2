@@ -222,14 +222,14 @@
                        sortOrder="122" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Enable Infix Search</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Match query words inside other words (e.g. "phone" finds "smartphone") on the fields below. Requires a full reindex.</comment>
+                    <comment>Match query words inside other words (e.g. "phone" finds "smartphone") on the fields below. Requires a full reindex; searches can fail until it has finished.</comment>
                 </field>
                 <field id="infix_fields" translate="label comment" type="multiselect"
                        sortOrder="124" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Infix Search Fields</label>
                     <source_model>RunAsRoot\TypeSense\Model\Config\Source\SearchableAttributeOptions</source_model>
                     <can_be_empty>1</can_be_empty>
-                    <comment>Requires a full reindex.</comment>
+                    <comment>Requires a full reindex; searches can fail until it has finished.</comment>
                     <depends>
                         <field id="infix_enabled">1</field>
                     </depends>
@@ -279,7 +279,7 @@
                        sortOrder="150" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>German Decompounding</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Index the product name with the tails of its German compound words (e.g. "Treppensackkarre" also as "Sackkarre" and "Karre") in the "Name (decompounded)" field; give that field a weight under Searchable Attributes. Requires a full reindex.</comment>
+                    <comment>Index the product name with the tails of its German compound words (e.g. "Treppensackkarre" also as "Sackkarre" and "Karre") in the "Name (decompounded)" field. Enable it, run a full product reindex, and only then add a "Name (decompounded)" row under Searchable Attributes: adding the row before the reindex has finished makes every search in this store fail.</comment>
                 </field>
                 <field id="decompound_skip_attribute" translate="label comment" type="select"
                        sortOrder="152" showInDefault="1" showInWebsite="1" showInStore="1">
