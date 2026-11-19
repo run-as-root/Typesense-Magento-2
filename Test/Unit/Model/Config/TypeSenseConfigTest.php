@@ -297,6 +297,33 @@ final class TypeSenseConfigTest extends TestCase
         self::assertFalse($this->sut->isSearchCacheEnabled(1));
     }
 
+    public function test_infix_and_stem_getters_read_search_group(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->willReturnMap([
+                ['run_as_root_typesense/search/infix_enabled', ScopeInterface::SCOPE_STORE, 1, true],
+                ['run_as_root_typesense/search/stem_enabled', ScopeInterface::SCOPE_STORE, 1, false],
+            ]);
+        $this->scopeConfig->method('getValue')
+            ->willReturnMap([
+                ['run_as_root_typesense/search/infix_fields', ScopeInterface::SCOPE_STORE, 1, 'name,sku'],
+                ['run_as_root_typesense/search/infix_mode', ScopeInterface::SCOPE_STORE, 1, 'fallback'],
+            ]);
+
+        self::assertTrue($this->sut->isInfixEnabled(1));
+        self::assertFalse($this->sut->isStemEnabled(1));
+        self::assertSame(['name', 'sku'], $this->sut->getInfixFields(1));
+        self::assertSame('fallback', $this->sut->getInfixMode(1));
+    }
+
+    public function test_infix_fields_empty_and_mode_defaults_to_always(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertSame([], $this->sut->getInfixFields());
+        self::assertSame('always', $this->sut->getInfixMode());
+    }
+
     public function test_get_searchable_attributes_decodes_rows_in_saved_order(): void
     {
         $this->scopeConfig->method('getValue')

@@ -144,6 +144,28 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return (string) ($this->getValue('search/text_match_type', $storeId) ?: 'max_weight');
     }
 
+    public function isInfixEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/infix_enabled', $storeId);
+    }
+
+    public function getInfixFields(?int $storeId = null): array
+    {
+        $value = (string) $this->getValue('search/infix_fields', $storeId);
+
+        return $value === '' ? [] : explode(',', $value);
+    }
+
+    public function getInfixMode(?int $storeId = null): string
+    {
+        return $this->getValue('search/infix_mode', $storeId) === 'fallback' ? 'fallback' : 'always';
+    }
+
+    public function isStemEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/stem_enabled', $storeId);
+    }
+
     public function getDropTokensThreshold(?int $storeId = null): int
     {
         return $this->getIntOrDefault('search/drop_tokens_threshold', 0, $storeId);

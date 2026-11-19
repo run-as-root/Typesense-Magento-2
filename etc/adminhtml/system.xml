@@ -218,6 +218,37 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Match the last word of the query as a prefix (search-as-you-type).</comment>
                 </field>
+                <field id="infix_enabled" translate="label comment" type="select"
+                       sortOrder="122" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Infix Search</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Match query words inside other words (e.g. "phone" finds "smartphone") on the fields below. Requires a full reindex.</comment>
+                </field>
+                <field id="infix_fields" translate="label comment" type="multiselect"
+                       sortOrder="124" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Infix Search Fields</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\SearchableAttributeOptions</source_model>
+                    <can_be_empty>1</can_be_empty>
+                    <comment>Requires a full reindex.</comment>
+                    <depends>
+                        <field id="infix_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="infix_mode" translate="label comment" type="select"
+                       sortOrder="126" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Infix Search Mode</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\InfixMode</source_model>
+                    <comment>"Fallback" only uses infix matching when the exact search finds nothing; "Always" combines both. Requires a full reindex.</comment>
+                    <depends>
+                        <field id="infix_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="stem_enabled" translate="label comment" type="select"
+                       sortOrder="128" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Stemming</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Match word variants (e.g. "running" finds "run"). Requires a full reindex.</comment>
+                </field>
                 <field id="use_cache" translate="label comment" type="select"
                        sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Enable Server-Side Search Cache</label>

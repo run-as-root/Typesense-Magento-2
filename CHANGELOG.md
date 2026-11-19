@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- Configurable infix search (fields and `always`/`fallback` mode) and stemming under Stores > Configuration > TypeSense > Search; the `infix` request parameter is aligned with `query_by`. Upgrade note: both are schema flags, so run a full reindex after changing them (stemming is on by default, so existing installs need one after upgrading).
 - Admin-configurable weighted searchable attributes (Stores > Configuration > TypeSense > Search); they drive `query_by` and `query_by_weights` for storefront product searches. Defaults: name (10), SKU (9), description (1).
 
 ### Fixed

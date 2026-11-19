@@ -16,6 +16,9 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
     /** @return array<int, array<string, mixed>> */
     public function getFields(): array
     {
+        $infixFields = $this->config->isInfixEnabled() ? $this->config->getInfixFields() : [];
+        $stem = $this->config->isStemEnabled();
+
         $fields = [
             ['name' => 'id', 'type' => 'string'],
             ['name' => 'product_id', 'type' => 'int32'],
@@ -49,6 +52,8 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
         // Text representation of categories for embedding
         $fields[] = ['name' => 'categories_text', 'type' => 'string', 'optional' => true];
 
+        $fields = array_map(fn(array $field): array => $this->applyTextFlags($field, $infixFields, $stem), $fields);
+
         // Auto-embedding for conversational/semantic search
         if ($this->config->isConversationalSearchEnabled()) {
             $fields[] = [
@@ -64,5 +69,28 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
         }
 
         return $fields;
+    }
+
+    /**
+     * @param array<string, mixed> $field
+     * @param string[] $infixFields
+     * @return array<string, mixed>
+     */
+    private function applyTextFlags(array $field, array $infixFields, bool $stem): array
+    {
+        if (!in_array($field['type'], ['string', 'string[]'], true)) {
+            return $field;
+        }
+
+        // The document id is an opaque key, not text to stem.
+        if ($stem && $field['name'] !== 'id') {
+            $field['stem'] = true;
+        }
+
+        if (in_array($field['name'], $infixFields, true)) {
+            $field['infix'] = true;
+        }
+
+        return $field;
     }
 }

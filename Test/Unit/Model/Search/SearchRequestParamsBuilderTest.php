@@ -6,6 +6,7 @@ namespace RunAsRoot\TypeSense\Test\Unit\Model\Search;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Search\SearchableAttributesProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
@@ -14,6 +15,7 @@ final class SearchRequestParamsBuilderTest extends TestCase
 {
     private SearchParametersProvider&MockObject $searchParametersProvider;
     private SearchableAttributesProvider&MockObject $searchableAttributesProvider;
+    private TypeSenseConfigInterface&MockObject $config;
     private SearchRequestParamsBuilder $sut;
 
     protected function setUp(): void
@@ -22,9 +24,11 @@ final class SearchRequestParamsBuilderTest extends TestCase
         $this->searchableAttributesProvider = $this->createMock(SearchableAttributesProvider::class);
         $this->searchableAttributesProvider->method('getWeightedFields')
             ->willReturn(['name' => 10, 'sku' => 9, 'description' => 1]);
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
         $this->sut = new SearchRequestParamsBuilder(
             $this->searchParametersProvider,
             $this->searchableAttributesProvider,
+            $this->config,
         );
     }
 
@@ -41,6 +45,7 @@ final class SearchRequestParamsBuilderTest extends TestCase
                 'prefix' => true,
                 'query_by' => 'name,sku,description',
                 'query_by_weights' => '10,9,1',
+                'infix' => 'off',
             ],
             $this->sut->build(SearchRequestParamsBuilder::CONTEXT_SEARCH, 4),
         );
@@ -52,12 +57,39 @@ final class SearchRequestParamsBuilderTest extends TestCase
         $searchableAttributesProvider->expects(self::once())->method('getWeightedFields')->with(2)
             ->willReturn(['sku' => 9, 'name' => 5]);
         $this->searchParametersProvider->method('getParameters')->willReturn([]);
-        $sut = new SearchRequestParamsBuilder($this->searchParametersProvider, $searchableAttributesProvider);
+        $sut = new SearchRequestParamsBuilder(
+            $this->searchParametersProvider,
+            $searchableAttributesProvider,
+            $this->config,
+        );
 
         self::assertSame(
-            ['query_by' => 'sku,name', 'query_by_weights' => '9,5'],
+            ['query_by' => 'sku,name', 'query_by_weights' => '9,5', 'infix' => 'off'],
             $sut->build(SearchRequestParamsBuilder::CONTEXT_SEARCH, 2),
         );
+    }
+
+    public function test_infix_param_is_aligned_with_query_by(): void
+    {
+        $this->searchParametersProvider->method('getParameters')->willReturn([]);
+        $this->config->method('isInfixEnabled')->willReturn(true);
+        $this->config->method('getInfixFields')->willReturn(['name']);
+        $this->config->method('getInfixMode')->willReturn('fallback');
+
+        $params = $this->sut->build(SearchRequestParamsBuilder::CONTEXT_SEARCH);
+
+        self::assertSame('fallback,off,off', $params['infix']);
+    }
+
+    public function test_infix_param_off_when_disabled(): void
+    {
+        $this->searchParametersProvider->method('getParameters')->willReturn([]);
+        $this->config->method('isInfixEnabled')->willReturn(false);
+        $this->config->method('getInfixFields')->willReturn(['name']);
+
+        $params = $this->sut->build(SearchRequestParamsBuilder::CONTEXT_SEARCH);
+
+        self::assertSame('off', $params['infix']);
     }
 
     public function test_build_returns_same_parameters_for_every_context(): void

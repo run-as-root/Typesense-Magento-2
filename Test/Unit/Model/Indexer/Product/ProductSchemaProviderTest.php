@@ -281,6 +281,52 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertNotContains('embedding', $fieldNames);
     }
 
+    public function test_string_fields_get_stem_flag_when_enabled(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn(['color']);
+        $config->method('isStemEnabled')->willReturn(true);
+        $fields = (new ProductSchemaProvider($config))->getFields();
+
+        foreach (['name', 'sku', 'categories', 'categories.lvl0', 'color', 'categories_text'] as $name) {
+            self::assertTrue($this->findField($fields, $name)['stem'], "{$name} should stem");
+        }
+        foreach (['id', 'price', 'product_id', 'category_ids', 'in_stock'] as $name) {
+            self::assertArrayNotHasKey('stem', $this->findField($fields, $name), "{$name} should not stem");
+        }
+    }
+
+    public function test_stem_flag_absent_when_disabled(): void
+    {
+        $fields = $this->sut->getFields();
+
+        self::assertArrayNotHasKey('stem', $this->findField($fields, 'name'));
+    }
+
+    public function test_infix_flag_only_on_configured_fields(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn([]);
+        $config->method('isInfixEnabled')->willReturn(true);
+        $config->method('getInfixFields')->willReturn(['name', 'price']);
+        $fields = (new ProductSchemaProvider($config))->getFields();
+
+        self::assertTrue($this->findField($fields, 'name')['infix']);
+        self::assertArrayNotHasKey('infix', $this->findField($fields, 'sku'));
+        self::assertArrayNotHasKey('infix', $this->findField($fields, 'price'));
+    }
+
+    public function test_infix_flag_absent_when_disabled(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn([]);
+        $config->method('isInfixEnabled')->willReturn(false);
+        $config->method('getInfixFields')->willReturn(['name']);
+        $fields = (new ProductSchemaProvider($config))->getFields();
+
+        self::assertArrayNotHasKey('infix', $this->findField($fields, 'name'));
+    }
+
     /** @param array<int, array<string, mixed>> $fields */
     private function findField(array $fields, string $name): array
     {

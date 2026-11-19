@@ -54,6 +54,15 @@ interface TypeSenseConfigInterface
 
     public function getTextMatchType(?int $storeId = null): string;
 
+    public function isInfixEnabled(?int $storeId = null): bool;
+
+    /** @return string[] */
+    public function getInfixFields(?int $storeId = null): array;
+
+    public function getInfixMode(?int $storeId = null): string;
+
+    public function isStemEnabled(?int $storeId = null): bool;
+
     public function getDropTokensThreshold(?int $storeId = null): int;
 
     public function getTypoTokensThreshold(?int $storeId = null): int;
