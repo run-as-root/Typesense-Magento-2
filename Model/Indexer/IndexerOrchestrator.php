@@ -6,6 +6,8 @@ namespace RunAsRoot\TypeSense\Model\Indexer;
 
 use Magento\Store\Api\StoreRepositoryInterface;
 use Psr\Log\LoggerInterface;
+use RunAsRoot\TypeSense\Api\AliasManagerInterface;
+use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 use RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface;
 use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
@@ -21,6 +23,8 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         private readonly CollectionNameResolver $nameResolver,
         private readonly TypeSenseConfigInterface $config,
         private readonly StoreRepositoryInterface $storeRepository,
+        private readonly AliasManagerInterface $aliasManager,
+        private readonly CollectionManagerInterface $collectionManager,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -39,7 +43,9 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
 
         $indexer = $this->indexerPool->getIndexer($entityType);
 
-        foreach ($this->storeRepository->getList() as $store) {
+        $stores = $this->storeRepository->getList();
+
+        foreach ($stores as $store) {
             $storeId = (int) $store->getId();
             $storeCode = $store->getCode();
 
@@ -70,23 +76,78 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
     ): void {
         $this->logger->info("Reindexing {$entityType} for store {$storeCode} (ID: {$storeId})");
 
-        $schema = ['fields' => $indexer->getSchemaFields()];
+        if ($entityIds === []) {
+            $this->reindexStoreFull($indexer, $entityType, $storeCode, $storeId);
+            return;
+        }
 
-        if ($this->config->isZeroDowntimeEnabled($storeId)) {
-            $collectionName = $this->zeroDowntimeService->startReindex($entityType, $storeCode, $schema, $storeId);
+        $this->reindexStorePartial($indexer, $entityType, $storeCode, $storeId, $entityIds);
+    }
+
+    private function reindexStoreFull(
+        EntityIndexerInterface $indexer,
+        string $entityType,
+        string $storeCode,
+        int $storeId,
+    ): void {
+        $schemaFields = $indexer->getSchemaFields();
+        $zeroDowntime = $this->config->isZeroDowntimeEnabled($storeId);
+
+        if ($zeroDowntime) {
+            $collectionName = $this->zeroDowntimeService->startReindex(
+                $entityType,
+                $storeCode,
+                ['fields' => $schemaFields],
+                $storeId,
+            );
         } else {
             $collectionName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
-            // For non-zero-downtime, we'd need to drop and recreate or just upsert into existing
-            // For now, this creates the collection if it doesn't exist
+
+            if (!$this->collectionManager->collectionExists($collectionName)) {
+                $this->collectionManager->createCollection(
+                    $collectionName,
+                    ['name' => $collectionName, 'fields' => $schemaFields],
+                );
+            }
+        }
+
+        $documents = $indexer->buildDocuments([], $storeId);
+        $stats = $this->batchImportService->import($collectionName, $documents, $storeId);
+
+        if ($zeroDowntime) {
+            $this->zeroDowntimeService->finishReindex($entityType, $storeCode, $collectionName, $storeId);
+        }
+
+        $this->logComplete($entityType, $storeCode, $stats);
+    }
+
+    private function reindexStorePartial(
+        EntityIndexerInterface $indexer,
+        string $entityType,
+        string $storeCode,
+        int $storeId,
+        array $entityIds,
+    ): void {
+        $collectionName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
+
+        // A partial import into a missing target would create an index holding only the changed documents.
+        if (!$this->aliasManager->aliasExists($collectionName)
+            && !$this->collectionManager->collectionExists($collectionName)
+        ) {
+            $this->logger->info(
+                "No index {$collectionName} for {$entityType}/{$storeCode}: full reindex required, skipping partial update",
+            );
+            return;
         }
 
         $documents = $indexer->buildDocuments($entityIds, $storeId);
         $stats = $this->batchImportService->import($collectionName, $documents, $storeId);
 
-        if ($this->config->isZeroDowntimeEnabled($storeId)) {
-            $this->zeroDowntimeService->finishReindex($entityType, $storeCode, $collectionName, $storeId);
-        }
+        $this->logComplete($entityType, $storeCode, $stats);
+    }
 
+    private function logComplete(string $entityType, string $storeCode, array $stats): void
+    {
         $this->logger->info("Reindex complete for {$entityType}/{$storeCode}: {$stats['success']}/{$stats['total']} docs");
     }
 }
