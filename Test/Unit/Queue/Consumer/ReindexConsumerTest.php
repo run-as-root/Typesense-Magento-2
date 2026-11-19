@@ -10,12 +10,14 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface;
 use RunAsRoot\TypeSense\Queue\Consumer\ReindexConsumer;
+use RunAsRoot\TypeSense\Queue\Publisher\ReindexPublisher;
 
 final class ReindexConsumerTest extends TestCase
 {
     private IndexerOrchestratorInterface&MockObject $orchestrator;
     private StoreManagerInterface&MockObject $storeManager;
     private LoggerInterface&MockObject $logger;
+    private ReindexPublisher&MockObject $publisher;
     private ReindexConsumer $consumer;
 
     protected function setUp(): void
@@ -23,11 +25,13 @@ final class ReindexConsumerTest extends TestCase
         $this->orchestrator = $this->createMock(IndexerOrchestratorInterface::class);
         $this->storeManager = $this->createMock(StoreManagerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->publisher = $this->createMock(ReindexPublisher::class);
 
         $this->consumer = new ReindexConsumer(
             $this->orchestrator,
             $this->storeManager,
             $this->logger,
+            $this->publisher,
         );
     }
 
@@ -80,15 +84,57 @@ final class ReindexConsumerTest extends TestCase
         $this->consumer->process($message);
     }
 
-    public function test_consumer_rethrows_partial_failures(): void
+    public function test_partial_failure_republishes_with_next_attempt_instead_of_throwing(): void
     {
-        $message = json_encode(['entity_type' => 'product', 'entity_ids' => [7]]);
+        $message = json_encode(['entity_type' => 'product', 'store_id' => 2, 'entity_ids' => [7, 9]]);
 
         $this->orchestrator->method('reindex')
             ->willThrowException(new \RuntimeException('Typesense unavailable'));
-        $this->logger->expects(self::once())->method('error');
+        $this->publisher->expects(self::once())->method('publish')->with('product', 2, [7, 9], 1);
 
-        $this->expectException(\RuntimeException::class);
+        $this->consumer->process($message);
+    }
+
+    public function test_partial_failure_increments_existing_attempt(): void
+    {
+        $message = json_encode(['entity_type' => 'product', 'entity_ids' => [7], 'attempt' => 2]);
+
+        $this->orchestrator->method('reindex')
+            ->willThrowException(new \RuntimeException('Typesense unavailable'));
+        $this->publisher->expects(self::once())->method('publish')->with('product', null, [7], 3);
+
+        $this->consumer->process($message);
+    }
+
+    public function test_partial_failure_on_fifth_attempt_logs_ids_and_stops_retrying(): void
+    {
+        $message = json_encode(['entity_type' => 'product', 'entity_ids' => [7, 9], 'attempt' => 4]);
+
+        $this->orchestrator->method('reindex')
+            ->willThrowException(new \RuntimeException('Typesense unavailable'));
+        $this->publisher->expects(self::never())->method('publish');
+
+        $errors = [];
+        $this->logger->method('error')->willReturnCallback(
+            function (string $msg, array $context = []) use (&$errors): void {
+                $errors[] = [$msg, $context];
+            },
+        );
+
+        $this->consumer->process($message);
+
+        $giveUp = array_values(array_filter($errors, fn(array $e): bool => ($e[1]['entity_ids'] ?? null) === [7, 9]));
+        self::assertCount(1, $giveUp);
+    }
+
+    public function test_full_reindex_failure_only_logs(): void
+    {
+        $message = json_encode(['entity_type' => null]);
+
+        $this->orchestrator->method('reindexAll')
+            ->willThrowException(new \RuntimeException('Typesense unavailable'));
+        $this->publisher->expects(self::never())->method('publish');
+        $this->logger->expects(self::once())->method('error');
 
         $this->consumer->process($message);
     }
