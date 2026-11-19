@@ -9,6 +9,7 @@ use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\BoostRuleRepositoryInterface;
 use RunAsRoot\TypeSense\Api\Data\BoostRuleInterface;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
+use RunAsRoot\TypeSense\Model\VirtualRule\AllowedAttributeValidator;
 use RunAsRoot\TypeSense\Model\VirtualRule\ConditionsToFilterByCompiler;
 
 class BoostSortBuilder
@@ -21,6 +22,7 @@ class BoostSortBuilder
         private readonly ConditionsToFilterByCompiler $compiler,
         private readonly TimezoneInterface $timezone,
         private readonly LoggerInterface $logger,
+        private readonly AllowedAttributeValidator $allowedAttributeValidator,
     ) {
     }
 
@@ -51,7 +53,7 @@ class BoostSortBuilder
                 continue;
             }
 
-            $filter = $this->compileFilter($rule);
+            $filter = $this->compileFilter($rule, $storeId);
             if ($filter !== null) {
                 $terms[] = '(' . $filter . '):' . $rule->getWeight();
             }
@@ -73,8 +75,26 @@ class BoostSortBuilder
     /**
      * One broken rule must not break the storefront sort, so it is dropped with a warning.
      */
-    private function compileFilter(BoostRuleInterface $rule): ?string
+    private function compileFilter(BoostRuleInterface $rule, int $storeId): ?string
     {
+        // Typesense rejects the whole sort_by when _eval names a field missing from the schema, so a
+        // rule on an attribute dropped from (or overridden out of) this store's Additional Attributes
+        // after it was saved would fail every search in the store.
+        $disallowed = $this->allowedAttributeValidator->findDisallowedAttributes($rule->getConditions(), $storeId);
+        if ($disallowed !== []) {
+            $this->logger->warning(
+                sprintf(
+                    'Boosting rule %d skipped: its conditions use attributes not indexed for store %d - %s',
+                    $rule->getId(),
+                    $storeId,
+                    implode(', ', $disallowed),
+                ),
+                ['rule_id' => $rule->getId(), 'store_id' => $storeId, 'attributes' => $disallowed],
+            );
+
+            return null;
+        }
+
         try {
             $filter = $this->compiler->compile($rule->getConditions());
         } catch (\Throwable $e) {

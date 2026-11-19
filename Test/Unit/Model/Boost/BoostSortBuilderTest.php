@@ -12,7 +12,9 @@ use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\BoostRuleRepositoryInterface;
 use RunAsRoot\TypeSense\Api\Data\BoostRuleInterface;
 use RunAsRoot\TypeSense\Model\Boost\BoostSortBuilder;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
+use RunAsRoot\TypeSense\Model\VirtualRule\AllowedAttributeValidator;
 use RunAsRoot\TypeSense\Model\VirtualRule\ConditionsToFilterByCompiler;
 
 final class BoostSortBuilderTest extends TestCase
@@ -20,6 +22,8 @@ final class BoostSortBuilderTest extends TestCase
     private BoostRuleRepositoryInterface&MockObject $repository;
     private ConditionsToFilterByCompiler&MockObject $compiler;
     private LoggerInterface&MockObject $logger;
+    private TypeSenseConfigInterface&MockObject $config;
+    private AllowedAttributeValidator $validator;
     private BoostSortBuilder $sut;
 
     protected function setUp(): void
@@ -34,8 +38,16 @@ final class BoostSortBuilderTest extends TestCase
         $timezone = $this->createMock(TimezoneInterface::class);
         $timezone->method('scopeDate')->willReturn(new \DateTime('2026-12-24 23:30:00'));
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->validator = new AllowedAttributeValidator($this->config);
 
-        $this->sut = new BoostSortBuilder($this->repository, $this->compiler, $timezone, $this->logger);
+        $this->sut = new BoostSortBuilder(
+            $this->repository,
+            $this->compiler,
+            $timezone,
+            $this->logger,
+            $this->validator,
+        );
     }
 
     public function test_eval_clause_combines_rules_with_weights(): void
@@ -111,6 +123,50 @@ final class BoostSortBuilderTest extends TestCase
         );
     }
 
+    public function test_rule_on_attribute_not_indexed_for_the_store_is_skipped_and_logged(): void
+    {
+        $this->config->method('getAdditionalAttributes')->willReturnMap([
+            [2, ['manufacturer']],
+        ]);
+        $this->repository->method('getActiveForStore')->willReturn([
+            $this->rule(11, 50, 'manufacturer:=`Prinz`', attributes: ['manufacturer', 'color']),
+            $this->rule(12, 20, 'sku:=`x`', attributes: ['sku']),
+        ]);
+
+        $logged = [];
+        $this->logger->expects(self::once())
+            ->method('warning')
+            ->willReturnCallback(static function (string $message, array $context) use (&$logged): void {
+                $logged[] = [$message, $context];
+            });
+
+        self::assertSame(
+            '_eval([(sku:=`x`):20])',
+            $this->sut->buildEvalClause(SearchRequestParamsBuilder::CONTEXT_SEARCH, 2),
+        );
+        self::assertStringContainsString('Boosting rule 11 skipped', $logged[0][0]);
+        self::assertStringContainsString('color', $logged[0][0]);
+        self::assertSame(11, $logged[0][1]['rule_id']);
+        self::assertSame(['color'], $logged[0][1]['attributes']);
+    }
+
+    public function test_rule_on_attributes_indexed_for_the_store_is_kept(): void
+    {
+        $this->config->expects(self::atLeastOnce())
+            ->method('getAdditionalAttributes')
+            ->with(3)
+            ->willReturn(['manufacturer']);
+        $this->repository->method('getActiveForStore')->willReturn([
+            $this->rule(11, 50, 'manufacturer:=`Prinz` && price:>5', attributes: ['manufacturer', 'price']),
+        ]);
+        $this->logger->expects(self::never())->method('warning');
+
+        self::assertSame(
+            '_eval([(manufacturer:=`Prinz` && price:>5):50])',
+            $this->sut->buildEvalClause(SearchRequestParamsBuilder::CONTEXT_SEARCH, 3),
+        );
+    }
+
     public function test_returns_null_when_no_rule_is_usable(): void
     {
         $this->repository->method('getActiveForStore')->willReturn([$this->rule(7, 500, null)]);
@@ -151,7 +207,7 @@ final class BoostSortBuilderTest extends TestCase
             ->method('getActiveForStore')
             ->with(3, '2026-12-24')
             ->willReturn([$this->rule(1, 10, 'F1')]);
-        $sut = new BoostSortBuilder($this->repository, $this->compiler, $timezone, $this->logger);
+        $sut = new BoostSortBuilder($this->repository, $this->compiler, $timezone, $this->logger, $this->validator);
 
         self::assertSame('_eval([(F1):10])', $sut->buildEvalClause(SearchRequestParamsBuilder::CONTEXT_SEARCH, 3));
     }
@@ -174,13 +230,17 @@ final class BoostSortBuilderTest extends TestCase
         ?string $filter,
         bool $applyToSearch = true,
         bool $applyToCategory = true,
+        array $attributes = [],
     ): BoostRuleInterface&MockObject {
         $rule = $this->createMock(BoostRuleInterface::class);
         $rule->method('getId')->willReturn($id);
         $rule->method('getWeight')->willReturn($weight);
         $rule->method('isApplyToSearch')->willReturn($applyToSearch);
         $rule->method('isApplyToCategory')->willReturn($applyToCategory);
-        $rule->method('getConditions')->willReturn($filter === null ? [] : ['filter' => $filter]);
+        $leaves = array_map(static fn(string $code): array => ['attribute' => $code], $attributes);
+        $rule->method('getConditions')->willReturn(
+            $filter === null ? ['conditions' => $leaves] : ['filter' => $filter, 'conditions' => $leaves],
+        );
 
         return $rule;
     }
