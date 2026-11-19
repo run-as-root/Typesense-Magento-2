@@ -22,10 +22,6 @@ class SynonymApplier implements PostSwapApplierInterface
 
     public function apply(string $entityType, int $storeId, string $storeCode, string $collectionName): void
     {
-        if ($entityType !== 'product') {
-            return;
-        }
-
         $aliasName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
         $synonyms = $this->repository->getByCollection($aliasName);
 

@@ -28,7 +28,9 @@ final class SynonymApplierTest extends TestCase
         $this->nameResolver = $this->createMock(CollectionNameResolverInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
-        $this->nameResolver->method('resolve')->with('product', 'de', 3)->willReturn('rar_product_de');
+        $this->nameResolver->method('resolve')->willReturnCallback(
+            static fn(string $entityType, string $storeCode): string => "rar_{$entityType}_{$storeCode}",
+        );
 
         $this->sut = new SynonymApplier($this->repository, $this->pusher, $this->nameResolver, $this->logger);
     }
@@ -72,10 +74,15 @@ final class SynonymApplierTest extends TestCase
         self::assertSame(3, $pushCount);
     }
 
-    public function test_skips_non_product_entities(): void
+    public function test_pushes_synonyms_of_non_product_alias_to_its_new_collection(): void
     {
-        $this->repository->expects(self::never())->method('getByCollection');
-        $this->pusher->expects(self::never())->method('push');
+        $synonym = $this->createMock(SynonymInterface::class);
+        $this->repository->expects(self::once())
+            ->method('getByCollection')
+            ->with('rar_category_de')
+            ->willReturn([$synonym]);
+
+        $this->pusher->expects(self::once())->method('push')->with($synonym, 'rar_category_de_v2');
 
         $this->sut->apply('category', 3, 'de', 'rar_category_de_v2');
     }

@@ -79,7 +79,7 @@ final class SaveTest extends TestCase
         $this->synonym->expects(self::once())->method('setCollectionName')->with('rar_product_de')->willReturnSelf();
         $this->synonym->expects(self::once())
             ->method('setTypesenseId')
-            ->with(self::matchesRegularExpression('/^syn_\d+$/'))
+            ->with(self::matchesRegularExpression('/^syn_[0-9a-f]{12}$/'))
             ->willReturnSelf();
         $this->synonym->expects(self::once())->method('setType')->with('one-way')->willReturnSelf();
         $this->synonym->expects(self::once())->method('setRoot')->with('smartphone')->willReturnSelf();

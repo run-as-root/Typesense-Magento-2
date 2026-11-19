@@ -69,7 +69,7 @@ class Save extends Action implements HttpPostActionInterface
 
         $synonym = $this->synonymFactory->create();
         $synonym->setCollectionName($aliasName)
-            ->setTypesenseId('syn_' . time())
+            ->setTypesenseId('syn_' . bin2hex(random_bytes(6)))
             ->setType($type)
             ->setRoot($type === SynonymInterface::TYPE_ONE_WAY ? $root : null)
             ->setSynonyms($synonymWords);
