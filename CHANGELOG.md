@@ -28,6 +28,7 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- `openai-php/client` constraint widened to `^0.19 || ^0.20` (installs that already lock 0.20 can require the module).
 - Product collections now include "Catalog" visibility; the search page and autocomplete filter `visibility:[3,4]`, category listings `visibility:[2,4]`.
 - Zero-downtime cleanup keeps the new collection and the one the alias pointed at before the swap (the rollback target) and deletes every other version. Rollback moves to the highest lower version, or to the other remaining version when none is lower.
 - A plain (non-versioned) collection that has the alias name is replaced by a versioned collection + alias on the next full reindex.
