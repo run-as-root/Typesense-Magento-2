@@ -32,7 +32,8 @@ class SearchableAttributeColumn extends Select
     {
         if (!$this->getOptions()) {
             $options = [];
-            foreach ($this->searchableAttributesProvider->getOptions() as $code => $label) {
+            $attributes = $this->searchableAttributesProvider->getOptions();
+            foreach ($attributes as $code => $label) {
                 $options[] = ['value' => $code, 'label' => $label];
             }
             $this->setOptions($options);
