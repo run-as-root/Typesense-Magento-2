@@ -42,8 +42,13 @@ class Delete extends Action implements HttpPostActionInterface
 
         try {
             $this->repository->delete($this->repository->getById($id));
-            $this->cacheTypeList->cleanType(self::FULL_PAGE_CACHE_TYPE);
-            $this->messageManager->addSuccessMessage(__('The boosting rule has been deleted.'));
+            if ($this->cleanFullPageCache()) {
+                $this->messageManager->addSuccessMessage(__('The boosting rule has been deleted.'));
+            } else {
+                $this->messageManager->addWarningMessage(
+                    __('The boosting rule has been deleted, but cleaning the page cache failed; flush it manually.'),
+                );
+            }
         } catch (NoSuchEntityException) {
             $this->messageManager->addErrorMessage(__('This boosting rule no longer exists.'));
         } catch (\Throwable $e) {
@@ -52,5 +57,21 @@ class Delete extends Action implements HttpPostActionInterface
         }
 
         return $redirect;
+    }
+
+    private function cleanFullPageCache(): bool
+    {
+        try {
+            $this->cacheTypeList->cleanType(self::FULL_PAGE_CACHE_TYPE);
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                'BoostRule Delete: page cache clean failed - ' . $e->getMessage(),
+                ['exception' => $e],
+            );
+
+            return false;
+        }
+
+        return true;
     }
 }

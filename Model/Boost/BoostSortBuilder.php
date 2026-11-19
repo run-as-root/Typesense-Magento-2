@@ -90,6 +90,18 @@ class BoostSortBuilder
             return null;
         }
 
+        // Typesense 29's _eval list parser splits on parentheses even inside backtick-quoted values
+        // (`Birne (alt` makes the whole sort_by malformed, breaking every search), so such rules are
+        // dropped rather than risking the store's search.
+        if ($this->hasParenthesisInQuotedValue($filter)) {
+            $this->logger->warning(
+                sprintf('Boosting rule %d skipped: a condition value contains parentheses', $rule->getId()),
+                ['rule_id' => $rule->getId()],
+            );
+
+            return null;
+        }
+
         if ($filter === ConditionsToFilterByCompiler::NO_MATCH_FILTER) {
             $this->logger->warning(
                 sprintf('Boosting rule %d skipped: it has no conditions', $rule->getId()),
@@ -100,5 +112,21 @@ class BoostSortBuilder
         }
 
         return $filter;
+    }
+
+    private function hasParenthesisInQuotedValue(string $filter): bool
+    {
+        // Matched as consecutive pairs (the compiler rejects backticks inside values), so the
+        // unquoted text between two values is never mistaken for a value.
+        preg_match_all('/`[^`]*`/', $filter, $matches);
+        $quotedValues = $matches[0];
+
+        foreach ($quotedValues as $quotedValue) {
+            if (strpbrk($quotedValue, '()') !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

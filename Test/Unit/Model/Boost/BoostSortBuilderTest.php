@@ -74,6 +74,43 @@ final class BoostSortBuilderTest extends TestCase
         self::assertSame([7, 8], $loggedRuleIds);
     }
 
+    public function test_rule_with_parenthesis_in_quoted_value_is_skipped_and_logged(): void
+    {
+        $this->repository->method('getActiveForStore')->willReturn([
+            $this->rule(4, 500, 'name:=`Birne (alt`'),
+            $this->rule(5, 300, '(sku:=`a)`) || (price:>5)'),
+            $this->rule(6, 100, '(price:>5) && (in_stock:=true)'),
+        ]);
+
+        $loggedRuleIds = [];
+        $this->logger->expects(self::exactly(2))
+            ->method('warning')
+            ->willReturnCallback(static function (string $message, array $context) use (&$loggedRuleIds): void {
+                self::assertStringContainsString('parenthes', $message);
+                $loggedRuleIds[] = $context['rule_id'];
+            });
+
+        self::assertSame(
+            '_eval([((price:>5) && (in_stock:=true)):100])',
+            $this->sut->buildEvalClause(SearchRequestParamsBuilder::CONTEXT_SEARCH, 1),
+        );
+        self::assertSame([4, 5], $loggedRuleIds);
+    }
+
+    public function test_rule_with_commas_and_colons_in_quoted_values_is_kept(): void
+    {
+        $this->repository->method('getActiveForStore')->willReturn([
+            $this->rule(4, 500, 'sku:[`x, y`,`10029-group`] && name:=`Birne: 1,5l`'),
+            $this->rule(5, 100, '(name:=`x`) && (sku:=`y`)'),
+        ]);
+        $this->logger->expects(self::never())->method('warning');
+
+        self::assertSame(
+            '_eval([(sku:[`x, y`,`10029-group`] && name:=`Birne: 1,5l`):500, ((name:=`x`) && (sku:=`y`)):100])',
+            $this->sut->buildEvalClause(SearchRequestParamsBuilder::CONTEXT_SEARCH, 1),
+        );
+    }
+
     public function test_returns_null_when_no_rule_is_usable(): void
     {
         $this->repository->method('getActiveForStore')->willReturn([$this->rule(7, 500, null)]);

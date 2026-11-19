@@ -24,6 +24,7 @@ final class DeleteTest extends TestCase
     private BoostRuleRepositoryInterface&MockObject $repository;
     private TypeListInterface&MockObject $cacheTypeList;
     private ManagerInterface&MockObject $messageManager;
+    private LoggerInterface&MockObject $logger;
     private Delete $sut;
 
     protected function setUp(): void
@@ -47,12 +48,13 @@ final class DeleteTest extends TestCase
 
         $this->repository = $this->createMock(BoostRuleRepositoryInterface::class);
         $this->cacheTypeList = $this->createMock(TypeListInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->sut = new Delete(
             $context,
             $this->repository,
             $this->cacheTypeList,
-            $this->createMock(LoggerInterface::class),
+            $this->logger,
         );
     }
 
@@ -64,6 +66,21 @@ final class DeleteTest extends TestCase
         $this->messageManager->expects(self::once())->method('addSuccessMessage');
 
         $this->cacheTypeList->expects(self::once())->method('cleanType')->with('full_page');
+
+        $this->sut->execute();
+    }
+
+    public function test_cache_clean_failure_after_delete_shows_warning_not_error(): void
+    {
+        $this->repository->method('getById')->willReturn($this->createMock(BoostRuleInterface::class));
+        $this->repository->expects(self::once())->method('delete')->willReturn(true);
+        $this->cacheTypeList->method('cleanType')->willThrowException(new \RuntimeException('redis down'));
+
+        $this->messageManager->expects(self::never())->method('addErrorMessage');
+        $this->messageManager->expects(self::once())
+            ->method('addWarningMessage')
+            ->with(self::callback(static fn($message): bool => str_contains((string) $message, 'flush')));
+        $this->logger->expects(self::once())->method('error');
 
         $this->sut->execute();
     }

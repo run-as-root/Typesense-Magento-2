@@ -35,6 +35,7 @@ final class SaveTest extends TestCase
     private ManagerInterface&MockObject $messageManager;
     private Redirect&MockObject $redirect;
     private TypeListInterface&MockObject $cacheTypeList;
+    private LoggerInterface&MockObject $logger;
     private Save $sut;
 
     /** @var array<string, mixed> */
@@ -63,6 +64,7 @@ final class SaveTest extends TestCase
         $this->conditionsRuleFactory = $this->createMock(ConditionsRuleFactory::class);
         $this->config = $this->createMock(TypeSenseConfigInterface::class);
         $this->cacheTypeList = $this->createMock(TypeListInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
 
         $dateFilter = $this->createMock(DateFilter::class);
         $dateFilter->method('filter')->willReturnCallback(
@@ -77,7 +79,7 @@ final class SaveTest extends TestCase
             new AllowedAttributeValidator($this->config),
             $dateFilter,
             $this->cacheTypeList,
-            $this->createMock(LoggerInterface::class),
+            $this->logger,
         );
     }
 
@@ -145,6 +147,66 @@ final class SaveTest extends TestCase
         $this->redirect->method('setPath')->willReturnSelf();
 
         $this->cacheTypeList->expects(self::once())->method('cleanType')->with('full_page');
+
+        $this->sut->execute();
+    }
+
+    public function test_cache_clean_failure_after_save_shows_warning_not_error(): void
+    {
+        $this->params = $this->postedForm();
+        $this->stubParsedConditions($this->conditionsTree(['sku']));
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+
+        $rule = $this->createMock(BoostRule::class);
+        $rule->method('getId')->willReturn(11);
+        $this->ruleFactory->method('create')->willReturn($rule);
+        $this->repository->method('save')->willReturn($rule);
+        $this->cacheTypeList->method('cleanType')->willThrowException(new \RuntimeException('redis down'));
+
+        $this->messageManager->expects(self::never())->method('addErrorMessage');
+        $this->messageManager->expects(self::once())
+            ->method('addWarningMessage')
+            ->with(self::callback(static fn($message): bool => str_contains((string) $message, 'flush')));
+        $this->logger->expects(self::once())->method('error');
+        $this->redirect->expects(self::once())->method('setPath')->with('*/*/edit', ['id' => 11])->willReturnSelf();
+
+        $this->sut->execute();
+    }
+
+    public function test_save_warns_when_a_condition_value_contains_parentheses(): void
+    {
+        $this->params = $this->postedForm();
+        $conditionsTree = $this->conditionsTree(['sku']);
+        $conditionsTree['conditions'][0]['value'] = 'Birne (alt';
+        $this->stubParsedConditions($conditionsTree);
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+
+        $rule = $this->createMock(BoostRule::class);
+        $rule->method('getId')->willReturn(11);
+        $this->ruleFactory->method('create')->willReturn($rule);
+        $this->redirect->method('setPath')->willReturnSelf();
+
+        $this->repository->expects(self::once())->method('save')->willReturn($rule);
+        $this->messageManager->expects(self::once())
+            ->method('addWarningMessage')
+            ->with(self::callback(static fn($message): bool => str_contains((string) $message, 'parenthes')));
+
+        $this->sut->execute();
+    }
+
+    public function test_save_does_not_warn_without_parentheses_in_values(): void
+    {
+        $this->params = $this->postedForm();
+        $this->stubParsedConditions($this->conditionsTree(['sku']));
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+
+        $rule = $this->createMock(BoostRule::class);
+        $rule->method('getId')->willReturn(11);
+        $this->ruleFactory->method('create')->willReturn($rule);
+        $this->repository->method('save')->willReturn($rule);
+        $this->redirect->method('setPath')->willReturnSelf();
+
+        $this->messageManager->expects(self::never())->method('addWarningMessage');
 
         $this->sut->execute();
     }

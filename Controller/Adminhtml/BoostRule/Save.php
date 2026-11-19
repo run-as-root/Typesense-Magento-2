@@ -106,8 +106,18 @@ class Save extends Action implements HttpPostActionInterface
             $rule->setConditionsSerialized(json_encode($conditions, JSON_THROW_ON_ERROR));
 
             $savedId = (int) $this->repository->save($rule)->getId();
-            $this->cacheTypeList->cleanType(self::FULL_PAGE_CACHE_TYPE);
-            $this->messageManager->addSuccessMessage(__('The boosting rule has been saved.'));
+            if ($this->hasParenthesisInValues($conditions)) {
+                $this->messageManager->addWarningMessage(
+                    __('The storefront ignores this rule while a condition value contains parentheses.'),
+                );
+            }
+            if ($this->cleanFullPageCache()) {
+                $this->messageManager->addSuccessMessage(__('The boosting rule has been saved.'));
+            } else {
+                $this->messageManager->addWarningMessage(
+                    __('The boosting rule has been saved, but cleaning the page cache failed; flush it manually.'),
+                );
+            }
 
             return $redirect->setPath('*/*/edit', ['id' => $savedId]);
         } catch (NoSuchEntityException) {
@@ -120,6 +130,50 @@ class Save extends Action implements HttpPostActionInterface
 
             return $backToForm();
         }
+    }
+
+    private function cleanFullPageCache(): bool
+    {
+        try {
+            $this->cacheTypeList->cleanType(self::FULL_PAGE_CACHE_TYPE);
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                'BoostRule Save: page cache clean failed - ' . $e->getMessage(),
+                ['exception' => $e],
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Mirrors BoostSortBuilder's check on the compiled filter, so the admin learns at save time.
+     *
+     * @param array<string, mixed> $node
+     */
+    private function hasParenthesisInValues(array $node): bool
+    {
+        $children = $node['conditions'] ?? null;
+        if (is_array($children)) {
+            foreach ($children as $child) {
+                if (is_array($child) && $this->hasParenthesisInValues($child)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        $values = is_array($node['value'] ?? null) ? $node['value'] : [$node['value'] ?? ''];
+        foreach ($values as $value) {
+            if (is_string($value) && strpbrk($value, '()') !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
