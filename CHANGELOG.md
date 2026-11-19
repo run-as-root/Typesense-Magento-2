@@ -50,3 +50,4 @@ All notable changes to this project are documented in this file.
 ## [0.2.0]
 
 Initial public release.
+- Installs without zero-downtime reindex must re-save each category's merchandising once after upgrading so stored overrides get the new listing filter (zero-downtime installs refresh them on the required full reindex).
