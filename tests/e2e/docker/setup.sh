@@ -62,6 +62,7 @@ bin/magento setup:upgrade
 
 echo "=== Installing TypeSense extension ==="
 composer config repositories.typesense path /var/www/html/typesense-extension
+composer config repositories.german-compound-splitter vcs https://github.com/run-as-root/german-compound-splitter
 composer require run-as-root/magento2-typesense:@dev --no-interaction
 bin/magento setup:upgrade
 bin/magento setup:di:compile

@@ -63,6 +63,10 @@ interface TypeSenseConfigInterface
 
     public function isStemEnabled(?int $storeId = null): bool;
 
+    public function isGermanDecompoundingEnabled(?int $storeId = null): bool;
+
+    public function getDecompoundSkipAttribute(?int $storeId = null): string;
+
     public function getDropTokensThreshold(?int $storeId = null): int;
 
     public function getTypoTokensThreshold(?int $storeId = null): int;

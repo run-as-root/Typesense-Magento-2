@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- German decompounding (Stores > Configuration > TypeSense > Search, per store): products get a `name_decompounded` field with the tails of German compound words ("Treppensackkarre" -> "Treppensackkarre Sackkarre Karre"), searchable once it is given a weight under Searchable Attributes. Words of an optional "never split" product attribute (e.g. a product line) are kept whole. Upgrade note: the module now requires `run-as-root/german-compound-splitter` (add its VCS repository until it is on Packagist, see README); run a full reindex after enabling.
 - Configurable infix search (fields and `always`/`fallback` mode) and stemming under Stores > Configuration > TypeSense > Search; the `infix` request parameter is aligned with `query_by`. Upgrade note: both are schema flags, so run a full reindex after changing them (stemming is on by default, so existing installs need one after upgrading).
 - Admin-configurable weighted searchable attributes (Stores > Configuration > TypeSense > Search); they drive `query_by` and `query_by_weights` for storefront product searches. Defaults: name (10), SKU (9), description (1).
 

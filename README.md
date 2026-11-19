@@ -64,10 +64,18 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 | Typesense | 27+ |
 | Hyva Theme | 1.3+ |
 | typesense/typesense-php | ^6.0 |
+| run-as-root/german-compound-splitter | ^1.0 |
 
 ---
 
 ## Installation
+
+Until both packages are published on Packagist, add their GitHub repositories to your project first:
+
+```bash
+composer config repositories.magento2-typesense vcs https://github.com/run-as-root/Typesense-Magento-2
+composer config repositories.german-compound-splitter vcs https://github.com/run-as-root/german-compound-splitter
+```
 
 ```bash
 composer require run-as-root/magento2-typesense

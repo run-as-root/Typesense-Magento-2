@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\NameDecompounder;
 
 class ProductSchemaProvider implements ProductSchemaProviderInterface
 {
@@ -51,6 +52,10 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
 
         // Text representation of categories for embedding
         $fields[] = ['name' => 'categories_text', 'type' => 'string', 'optional' => true];
+
+        if ($this->config->isGermanDecompoundingEnabled()) {
+            $fields[] = ['name' => NameDecompounder::FIELD, 'type' => 'string', 'optional' => true];
+        }
 
         $fields = array_map(fn(array $field): array => $this->applyTextFlags($field, $infixFields, $stem), $fields);
 

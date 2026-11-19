@@ -7,6 +7,7 @@ namespace RunAsRoot\TypeSense\Model\Search;
 use Magento\Catalog\Api\ProductAttributeRepositoryInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\NameDecompounder;
 
 class SearchableAttributesProvider
 {
@@ -16,7 +17,7 @@ class SearchableAttributesProvider
         'description' => 'Description',
         'short_description' => 'Short Description',
         'categories_text' => 'Categories',
-        'name_decompounded' => 'Name (decompounded)',
+        NameDecompounder::FIELD => 'Name (decompounded)',
     ];
 
     private const string FALLBACK_FIELD = 'name';
@@ -45,8 +46,9 @@ class SearchableAttributesProvider
     {
         $additional = $this->config->getAdditionalAttributes($storeId);
         $indexed = array_flip(array_merge(array_keys(self::CORE_FIELDS), $additional));
-        // Decompounded names are only indexed when the store enables it, which is not wired up yet.
-        unset($indexed['name_decompounded']);
+        if (!$this->config->isGermanDecompoundingEnabled($storeId)) {
+            unset($indexed[NameDecompounder::FIELD]);
+        }
 
         $fields = [];
         $rows = $this->config->getSearchableAttributes($storeId);

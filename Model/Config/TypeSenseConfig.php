@@ -166,6 +166,16 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return $this->getFlag('search/stem_enabled', $storeId);
     }
 
+    public function isGermanDecompoundingEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/german_decompounding', $storeId);
+    }
+
+    public function getDecompoundSkipAttribute(?int $storeId = null): string
+    {
+        return (string) $this->getValue('search/decompound_skip_attribute', $storeId);
+    }
+
     public function getDropTokensThreshold(?int $storeId = null): int
     {
         return $this->getIntOrDefault('search/drop_tokens_threshold', 0, $storeId);

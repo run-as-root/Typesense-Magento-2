@@ -10,6 +10,8 @@ use Magento\Catalog\Model\Product\Visibility;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Store\Model\StoreManagerInterface;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\NameDecompounder;
 
 class ProductDataBuilder
 {
@@ -24,6 +26,8 @@ class ProductDataBuilder
         private readonly SalesCountResolverInterface $salesCountResolver,
         private readonly ReviewResolverInterface $reviewResolver,
         private readonly StoreManagerInterface $storeManager,
+        private readonly TypeSenseConfigInterface $config,
+        private readonly NameDecompounder $nameDecompounder,
     ) {
     }
 
@@ -78,6 +82,14 @@ class ProductDataBuilder
             $document = array_merge($document, $extra);
         }
 
+        if ($this->config->isGermanDecompoundingEnabled($storeId)) {
+            $document[NameDecompounder::FIELD] = $this->nameDecompounder->decompound(
+                $document['name'],
+                $this->getSkipWordsSource($product, $storeId),
+                $storeId,
+            );
+        }
+
         $document['sales_count'] = $this->salesCountResolver->getSalesCount($productId);
         $document['rating_summary'] = $this->reviewResolver->getRatingSummary($productId, $storeId);
         $document['review_count'] = $this->reviewResolver->getReviewCount($productId, $storeId);
@@ -112,6 +124,27 @@ class ProductDataBuilder
         }
 
         return $collection;
+    }
+
+    private function getSkipWordsSource(Product $product, int $storeId): string
+    {
+        $code = $this->config->getDecompoundSkipAttribute($storeId);
+        if ($code === '') {
+            return '';
+        }
+
+        $attribute = $product->getResource()->getAttribute($code);
+        if (!$attribute) {
+            return '';
+        }
+
+        if (in_array($attribute->getFrontendInput(), ['select', 'multiselect'], true)) {
+            $text = $product->getAttributeText($code);
+
+            return is_array($text) ? implode(' ', $text) : (string) $text;
+        }
+
+        return (string) $product->getData($code);
     }
 
     private function toTimestamp(string $dateString): int

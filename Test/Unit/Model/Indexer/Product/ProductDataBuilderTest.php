@@ -8,13 +8,21 @@ use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\Product\Attribute\Source\Status;
 use Magento\Catalog\Model\Product\Visibility;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
+use Magento\Catalog\Model\ResourceModel\Product as ProductResource;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
+use Magento\Eav\Model\Entity\Attribute\AbstractAttribute;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Model\Indexer\Product\AttributeResolverInterface;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\CategoryResolverInterface;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\CatalogWordsProvider;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\CompoundTailExtractor;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\NameDecompounder;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\SplitterProvider;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ImageResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\PriceCalculatorInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductDataBuilder;
@@ -35,6 +43,10 @@ final class ProductDataBuilderTest extends TestCase
     private SalesCountResolverInterface&MockObject $salesCountResolver;
     private ReviewResolverInterface&MockObject $reviewResolver;
     private StoreManagerInterface&MockObject $storeManager;
+    private TypeSenseConfigInterface&MockObject $config;
+    private SplitterProvider&MockObject $splitterProvider;
+    private CatalogWordsProvider&MockObject $catalogWordsProvider;
+    private NameDecompounder $nameDecompounder;
     private ProductDataBuilder $sut;
 
     protected function setUp(): void
@@ -58,18 +70,15 @@ final class ProductDataBuilderTest extends TestCase
         $this->storeManager = $this->createMock(StoreManagerInterface::class);
         $this->storeManager->method('getStore')->willReturn($store);
 
-        $this->sut = new ProductDataBuilder(
-            $this->attributeResolver,
-            $this->priceCalculator,
-            $this->imageResolver,
-            $this->stockResolver,
-            $this->categoryResolver,
-            $this->urlResolver,
-            $this->collectionFactory,
-            $this->salesCountResolver,
-            $this->reviewResolver,
-            $this->storeManager,
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->splitterProvider = $this->createMock(SplitterProvider::class);
+        $this->catalogWordsProvider = $this->createMock(CatalogWordsProvider::class);
+        $this->nameDecompounder = new NameDecompounder(
+            new CompoundTailExtractor($this->splitterProvider),
+            $this->catalogWordsProvider,
         );
+
+        $this->sut = $this->buildSut();
     }
 
     public function test_build_returns_document_with_core_fields(): void
@@ -287,7 +296,7 @@ final class ProductDataBuilderTest extends TestCase
         $store->method('getWebsiteId')->willReturn(7);
         $this->storeManager = $this->createMock(StoreManagerInterface::class);
         $this->storeManager->expects(self::once())->method('getStore')->with(3)->willReturn($store);
-        $this->sut = $this->buildSutWithStoreManager();
+        $this->sut = $this->buildSut();
 
         $collection = $this->createMock(ProductCollection::class);
         $this->collectionFactory->method('create')->willReturn($collection);
@@ -296,7 +305,7 @@ final class ProductDataBuilderTest extends TestCase
         $this->sut->getProductCollection([], 3);
     }
 
-    private function buildSutWithStoreManager(): ProductDataBuilder
+    private function buildSut(): ProductDataBuilder
     {
         return new ProductDataBuilder(
             $this->attributeResolver,
@@ -309,6 +318,8 @@ final class ProductDataBuilderTest extends TestCase
             $this->salesCountResolver,
             $this->reviewResolver,
             $this->storeManager,
+            $this->config,
+            $this->nameDecompounder,
         );
     }
 
@@ -479,6 +490,8 @@ final class ProductDataBuilderTest extends TestCase
             $salesCountResolver,
             $reviewResolver,
             $this->storeManager,
+            $this->config,
+            $this->nameDecompounder,
         );
 
         $document = $sut->build($product, 1);
@@ -520,6 +533,8 @@ final class ProductDataBuilderTest extends TestCase
             $salesCountResolver,
             $reviewResolver,
             $this->storeManager,
+            $this->config,
+            $this->nameDecompounder,
         );
 
         $document = $sut->build($product, 2);
@@ -561,11 +576,118 @@ final class ProductDataBuilderTest extends TestCase
             $salesCountResolver,
             $reviewResolver,
             $this->storeManager,
+            $this->config,
+            $this->nameDecompounder,
         );
 
         $document = $sut->build($product, 2);
 
         self::assertSame(15, $document['review_count']);
+    }
+
+    public function test_builder_omits_field_and_never_loads_splitter_when_disabled(): void
+    {
+        $product = $this->createProductMock(name: 'Treppensackkarre bis 200 kg');
+        $this->stubEmptyProductData($product);
+        $this->config->method('isGermanDecompoundingEnabled')->with(3)->willReturn(false);
+        $this->splitterProvider->expects(self::never())->method('get');
+        $this->catalogWordsProvider->expects(self::never())->method('getWords');
+
+        $document = $this->sut->build($product, 3);
+
+        self::assertArrayNotHasKey('name_decompounded', $document);
+    }
+
+    public function test_builder_sets_decompounded_name_when_enabled(): void
+    {
+        $product = $this->createProductMock(name: 'Treppensackkarre bis 200 kg');
+        $this->stubEmptyProductData($product);
+        $this->config->method('isGermanDecompoundingEnabled')->with(3)->willReturn(true);
+        $this->config->method('getDecompoundSkipAttribute')->with(3)->willReturn('');
+        $this->nameDecompounder = $this->createMock(NameDecompounder::class);
+        $this->nameDecompounder->expects(self::once())->method('decompound')
+            ->with('Treppensackkarre bis 200 kg', '', 3)
+            ->willReturn('Treppensackkarre Sackkarre Karre bis 200 kg');
+
+        $document = $this->buildSut()->build($product, 3);
+
+        self::assertSame('Treppensackkarre Sackkarre Karre bis 200 kg', $document['name_decompounded']);
+    }
+
+    /** @param string|string[]|false $optionText */
+    #[DataProvider('skipAttributeProvider')]
+    public function test_builder_passes_skip_attribute_value_of_the_product(
+        string $frontendInput,
+        string|array|false $optionText,
+        ?string $rawValue,
+        string $expected,
+    ): void {
+        $product = $this->createProductMock(name: 'Schuhregal Blackpool');
+        $this->stubEmptyProductData($product, ['product_line' => $rawValue]);
+        $attribute = $this->createMock(AbstractAttribute::class);
+        $attribute->method('getFrontendInput')->willReturn($frontendInput);
+        $resource = $this->createMock(ProductResource::class);
+        $resource->method('getAttribute')->with('product_line')->willReturn($attribute);
+        $product->method('getResource')->willReturn($resource);
+        $product->method('getAttributeText')->with('product_line')->willReturn($optionText);
+        $this->config->method('isGermanDecompoundingEnabled')->willReturn(true);
+        $this->config->method('getDecompoundSkipAttribute')->willReturn('product_line');
+        $this->nameDecompounder = $this->createMock(NameDecompounder::class);
+        $this->nameDecompounder->expects(self::once())->method('decompound')
+            ->with('Schuhregal Blackpool', $expected, 3)
+            ->willReturn('Schuhregal Regal Blackpool');
+
+        $this->buildSut()->build($product, 3);
+    }
+
+    /** @return array<string, array{string, string|string[]|false, ?string, string}> */
+    public static function skipAttributeProvider(): array
+    {
+        return [
+            'select uses the option label' => ['select', 'Blackpool', '42', 'Blackpool'],
+            'multiselect joins the option labels' => [
+                'multiselect',
+                ['Blackpool', 'Lausanne'],
+                '42,43',
+                'Blackpool Lausanne',
+            ],
+            'select without a value' => ['select', false, null, ''],
+            'text uses the raw value' => ['text', false, 'Blackpool', 'Blackpool'],
+            'text without a value' => ['text', false, null, ''],
+        ];
+    }
+
+    public function test_builder_passes_empty_skip_words_when_attribute_does_not_exist(): void
+    {
+        $product = $this->createProductMock(name: 'Schuhregal');
+        $this->stubEmptyProductData($product);
+        $resource = $this->createMock(ProductResource::class);
+        $resource->method('getAttribute')->willReturn(false);
+        $product->method('getResource')->willReturn($resource);
+        $this->config->method('isGermanDecompoundingEnabled')->willReturn(true);
+        $this->config->method('getDecompoundSkipAttribute')->willReturn('removed_attribute');
+        $this->nameDecompounder = $this->createMock(NameDecompounder::class);
+        $this->nameDecompounder->expects(self::once())->method('decompound')
+            ->with('Schuhregal', '', 3)
+            ->willReturn('Schuhregal Regal');
+
+        $this->buildSut()->build($product, 3);
+    }
+
+    /** @param array<string, mixed> $data */
+    private function stubEmptyProductData(Product&MockObject $product, array $data = []): void
+    {
+        $this->priceCalculator->method('getFinalPrice')->willReturn(0.0);
+        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
+        $this->imageResolver->method('getImageUrl')->willReturn('');
+        $this->stockResolver->method('isInStock')->willReturn(true);
+        $this->urlResolver->method('getProductUrl')->willReturn('');
+        $this->categoryResolver->method('getCategoryData')->willReturn([
+            'categories' => [], 'category_ids' => [],
+            'categories.lvl0' => [], 'categories.lvl1' => [], 'categories.lvl2' => [],
+        ]);
+        $this->attributeResolver->method('getExtraAttributes')->willReturn([]);
+        $product->method('getData')->willReturnCallback(static fn (string $key): mixed => $data[$key] ?? null);
     }
 
     /**

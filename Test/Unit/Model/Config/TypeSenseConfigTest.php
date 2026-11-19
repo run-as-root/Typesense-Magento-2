@@ -324,6 +324,26 @@ final class TypeSenseConfigTest extends TestCase
         self::assertSame('always', $this->sut->getInfixMode());
     }
 
+    public function test_decompounding_getters_read_search_group_per_store(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/search/german_decompounding', ScopeInterface::SCOPE_STORE, 4)
+            ->willReturn(true);
+        $this->scopeConfig->method('getValue')
+            ->with('run_as_root_typesense/search/decompound_skip_attribute', ScopeInterface::SCOPE_STORE, 4)
+            ->willReturn('brand_line');
+
+        self::assertTrue($this->sut->isGermanDecompoundingEnabled(4));
+        self::assertSame('brand_line', $this->sut->getDecompoundSkipAttribute(4));
+    }
+
+    public function test_decompound_skip_attribute_is_empty_when_unset(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertSame('', $this->sut->getDecompoundSkipAttribute());
+    }
+
     public function test_get_searchable_attributes_decodes_rows_in_saved_order(): void
     {
         $this->scopeConfig->method('getValue')

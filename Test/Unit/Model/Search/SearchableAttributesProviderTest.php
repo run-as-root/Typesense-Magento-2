@@ -55,6 +55,18 @@ final class SearchableAttributesProviderTest extends TestCase
         self::assertSame(['name' => 10, 'material' => 3], $this->sut->getWeightedFields());
     }
 
+    public function test_weighted_fields_keep_name_decompounded_when_decompounding_is_enabled_for_the_store(): void
+    {
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+        $this->config->method('isGermanDecompoundingEnabled')->with(5)->willReturn(true);
+        $this->config->method('getSearchableAttributes')->willReturn([
+            ['attribute' => 'name', 'weight' => 10],
+            ['attribute' => 'name_decompounded', 'weight' => 7],
+        ]);
+
+        self::assertSame(['name' => 10, 'name_decompounded' => 7], $this->sut->getWeightedFields(5));
+    }
+
     public function test_weighted_fields_fall_back_to_name_when_nothing_valid(): void
     {
         $this->config->method('getAdditionalAttributes')->willReturn([]);

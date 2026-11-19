@@ -263,6 +263,21 @@
                         <field id="use_cache">1</field>
                     </depends>
                 </field>
+                <field id="german_decompounding" translate="label comment" type="select"
+                       sortOrder="150" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>German Decompounding</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Index the product name with the tails of its German compound words (e.g. "Treppensackkarre" also as "Sackkarre" and "Karre") in the "Name (decompounded)" field; give that field a weight under Searchable Attributes. Requires a full reindex.</comment>
+                </field>
+                <field id="decompound_skip_attribute" translate="label comment" type="select"
+                       sortOrder="152" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Never Split Words Of</label>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\OptionalProductAttributeSource</source_model>
+                    <comment>Words of this product attribute's value (e.g. a product line such as "Blackpool") are names and are never split. Requires a full reindex.</comment>
+                    <depends>
+                        <field id="german_decompounding">1</field>
+                    </depends>
+                </field>
             </group>
 
             <!-- Instant Search -->

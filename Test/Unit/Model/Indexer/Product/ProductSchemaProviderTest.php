@@ -327,6 +327,36 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertArrayNotHasKey('infix', $this->findField($fields, 'name'));
     }
 
+    public function test_schema_has_name_decompounded_only_when_enabled(): void
+    {
+        self::assertNotContains('name_decompounded', array_column($this->sut->getFields(), 'name'));
+
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn([]);
+        $config->method('isGermanDecompoundingEnabled')->willReturn(true);
+        $fields = (new ProductSchemaProvider($config))->getFields();
+
+        self::assertSame(
+            ['name' => 'name_decompounded', 'type' => 'string', 'optional' => true],
+            $this->findField($fields, 'name_decompounded'),
+        );
+    }
+
+    public function test_name_decompounded_gets_stem_and_infix_flags(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn([]);
+        $config->method('isGermanDecompoundingEnabled')->willReturn(true);
+        $config->method('isStemEnabled')->willReturn(true);
+        $config->method('isInfixEnabled')->willReturn(true);
+        $config->method('getInfixFields')->willReturn(['name_decompounded']);
+
+        $field = $this->findField((new ProductSchemaProvider($config))->getFields(), 'name_decompounded');
+
+        self::assertTrue($field['stem']);
+        self::assertTrue($field['infix']);
+    }
+
     /** @param array<int, array<string, mixed>> $fields */
     private function findField(array $fields, string $name): array
     {
