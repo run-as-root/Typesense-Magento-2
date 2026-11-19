@@ -161,4 +161,12 @@
         </arguments>
     </type>
 
+    <type name="Magento\Framework\Mview\View">
+        <arguments>
+            <argument name="changelogBatchSize" xsi:type="array">
+                <item name="typesense_product" xsi:type="number">200</item>
+            </argument>
+        </arguments>
+    </type>
+
 </config>

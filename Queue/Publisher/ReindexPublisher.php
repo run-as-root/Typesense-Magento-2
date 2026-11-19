@@ -15,11 +15,15 @@ class ReindexPublisher
     ) {
     }
 
-    public function publish(?string $entityType = null, ?int $storeId = null): void
+    /**
+     * @param int[] $entityIds
+     */
+    public function publish(?string $entityType = null, ?int $storeId = null, array $entityIds = []): void
     {
         $message = json_encode([
             'entity_type' => $entityType,
             'store_id' => $storeId,
+            'entity_ids' => array_values(array_map('intval', $entityIds)),
         ]);
 
         $this->publisher->publish(self::TOPIC, $message);

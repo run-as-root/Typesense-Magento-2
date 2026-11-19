@@ -19,12 +19,15 @@ class ReindexConsumer
 
     public function process(string $message): void
     {
+        $entityIds = [];
+
         try {
             $data = json_decode($message, true);
             $entityType = $data['entity_type'] ?? null;
+            $entityIds = array_map('intval', $data['entity_ids'] ?? []);
 
             if ($entityType) {
-                $this->orchestrator->reindex($entityType);
+                $this->orchestrator->reindex($entityType, $entityIds);
             } else {
                 $this->orchestrator->reindexAll();
             }
@@ -32,6 +35,11 @@ class ReindexConsumer
             $this->logger->error('TypeSense queue reindex failed: ' . $e->getMessage(), [
                 'message' => $message,
             ]);
+
+            // Partial reindexes are rethrown so the queue retries them; a full reindex is too costly to loop on failure.
+            if ($entityIds !== []) {
+                throw $e;
+            }
         }
     }
 }

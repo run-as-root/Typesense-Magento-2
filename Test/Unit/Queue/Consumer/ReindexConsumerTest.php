@@ -70,4 +70,26 @@ final class ReindexConsumerTest extends TestCase
 
         $this->consumer->process($message);
     }
+
+    public function test_consumer_passes_entity_ids_to_orchestrator(): void
+    {
+        $message = json_encode(['entity_type' => 'product', 'entity_ids' => [7, 8]]);
+
+        $this->orchestrator->expects(self::once())->method('reindex')->with('product', [7, 8]);
+
+        $this->consumer->process($message);
+    }
+
+    public function test_consumer_rethrows_partial_failures(): void
+    {
+        $message = json_encode(['entity_type' => 'product', 'entity_ids' => [7]]);
+
+        $this->orchestrator->method('reindex')
+            ->willThrowException(new \RuntimeException('Typesense unavailable'));
+        $this->logger->expects(self::once())->method('error');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->consumer->process($message);
+    }
 }
