@@ -46,8 +46,8 @@ All notable changes to this project are documented in this file.
 - A rollback target holds catalog data from when it was built; partial updates made since then are missing until the next full reindex.
 - An inactive store, or one with TypeSense disabled, keeps its old collection; it is neither updated nor deleted.
 - With zero-downtime disabled, stored synonyms are not pushed when a collection is (re)created; re-save them in the admin or use zero-downtime mode.
+- Installs without zero-downtime reindex must re-save each category's merchandising once after upgrading so stored overrides get the new listing filter (zero-downtime installs refresh them on the required full reindex).
 
 ## [0.2.0]
 
 Initial public release.
-- Installs without zero-downtime reindex must re-save each category's merchandising once after upgrading so stored overrides get the new listing filter (zero-downtime installs refresh them on the required full reindex).
