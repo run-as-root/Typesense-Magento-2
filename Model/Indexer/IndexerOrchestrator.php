@@ -67,7 +67,9 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
      */
     public function reindexAll(): void
     {
-        foreach ($this->indexerPool->getAll() as $entityType => $indexer) {
+        $entityTypes = array_keys($this->indexerPool->getAll());
+
+        foreach ($entityTypes as $entityType) {
             $this->reindex($entityType);
         }
     }

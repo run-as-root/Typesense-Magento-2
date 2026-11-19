@@ -301,6 +301,34 @@ final class IndexerOrchestratorTest extends TestCase
         $this->sut->reindex('product');
     }
 
+    public function test_reindex_all_reindexes_every_registered_entity_type(): void
+    {
+        $category = $this->createMock(EntityIndexerInterface::class);
+        $category->method('getSchemaFields')->willReturn([]);
+        $category->method('buildDocuments')->willReturn([]);
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
+        $this->collectionManager->method('collectionExists')->willReturn(true);
+        $sut = new IndexerOrchestrator(
+            new EntityIndexerPool(['product' => $this->indexer, 'category' => $category]),
+            $this->zeroDowntimeService,
+            $this->batchImportService,
+            $this->nameResolver,
+            $this->config,
+            $this->storeRepository,
+            $this->aliasManager,
+            $this->collectionManager,
+            $this->documentDeleter,
+            $this->logger,
+            $this->emulation,
+        );
+
+        $this->indexer->expects(self::once())->method('buildDocuments');
+        $category->expects(self::once())->method('buildDocuments');
+        $this->batchImportService->method('import')->willReturn(['success' => 0, 'failed' => 0, 'total' => 0]);
+
+        $sut->reindexAll();
+    }
+
     public function test_reindex_emulates_store_and_stops_on_exception(): void
     {
         $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
