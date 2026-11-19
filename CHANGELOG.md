@@ -15,6 +15,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- The search page, autocomplete and category listing configs are JSON-encoded with `JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT`, so admin-entered values (e.g. boosting rule conditions containing `</script>` or `<!--`) cannot break the inline script.
 - Partial reindexes (mview/`executeList`) no longer build a new collection and swap the alias to it; they upsert into the live alias and skip with a log when no index exists yet.
 - Partial reindexes delete documents for entities that are disabled, removed from the store's website, not visible, or deleted; document ids are mapped per entity type (`EntityIndexerInterface::getDocumentId()`), so prefixed ids (customers, orders, stores, config) are removed too.
 - Changing a child product re-syncs its parent products (configurable, grouped, bundle) via `catalog_product_relation`.

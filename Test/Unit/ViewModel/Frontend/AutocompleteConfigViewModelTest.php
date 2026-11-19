@@ -156,4 +156,18 @@ final class AutocompleteConfigViewModelTest extends TestCase
 
         self::assertTrue($result['directMatchesFirst']);
     }
+
+    public function test_json_config_escapes_markup_in_admin_supplied_values(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $sortBy = "_eval([(name:=`</script><!--<script>a & 'b' \"c\"`):5]):desc";
+        $this->requestParamsBuilder->method('getRelevanceSortBy')->willReturn($sortBy);
+
+        $json = $this->sut->getJsonConfig();
+
+        foreach (['<', '>', '&', "'"] as $character) {
+            self::assertStringNotContainsString($character, $json);
+        }
+        self::assertSame($sortBy, json_decode($json, true)['relevanceSortBy']);
+    }
 }

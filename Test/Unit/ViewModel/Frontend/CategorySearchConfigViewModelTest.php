@@ -267,4 +267,22 @@ final class CategorySearchConfigViewModelTest extends TestCase
         self::assertArrayHasKey('relevanceSortBy', $result);
         self::assertNull($result['relevanceSortBy']);
     }
+
+    public function test_json_config_escapes_markup_in_admin_supplied_values(): void
+    {
+        $store = $this->createMock(StoreInterface::class);
+        $store->method('getCode')->willReturn('default');
+        $store->method('getId')->willReturn(1);
+        $this->storeManager->method('getStore')->willReturn($store);
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $sortBy = "_eval([(name:=`</script><!--<script>a & 'b' \"c\"`):5]):desc";
+        $this->requestParamsBuilder->method('getRelevanceSortBy')->willReturn($sortBy);
+
+        $json = $this->sut->getJsonConfig();
+
+        foreach (['<', '>', '&', "'"] as $character) {
+            self::assertStringNotContainsString($character, $json);
+        }
+        self::assertSame($sortBy, json_decode($json, true)['relevanceSortBy']);
+    }
 }
