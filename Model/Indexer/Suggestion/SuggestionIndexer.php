@@ -25,11 +25,24 @@ class SuggestionIndexer implements ActionInterface
 
     public function executeList(array $ids): void
     {
-        $this->orchestrator->reindex('suggestion', array_map('intval', $ids));
+        $this->reindexIds($ids);
     }
 
     public function executeRow($id): void
     {
         $this->orchestrator->reindex('suggestion', [(int) $id]);
+    }
+
+    /**
+     * @param array<int|string> $ids
+     */
+    private function reindexIds(array $ids): void
+    {
+        // An empty list must not reach the orchestrator, where it means a full reindex.
+        if ($ids === []) {
+            return;
+        }
+
+        $this->orchestrator->reindex('suggestion', array_map('intval', $ids));
     }
 }

@@ -12,6 +12,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleResolver;
 use RunAsRoot\TypeSense\Model\VirtualRule\ConditionsToFilterByCompiler;
 use RunAsRoot\TypeSense\ViewModel\Frontend\CategorySearchConfigViewModel;
@@ -40,7 +41,7 @@ final class CategorySearchConfigViewModelTest extends TestCase
             $this->storeManager,
             $this->collectionNameResolver,
             $this->registry,
-            $this->virtualRuleResolver,
+            new CategoryListingFilterBuilder($this->virtualRuleResolver),
             $this->logger,
         );
     }
@@ -121,7 +122,7 @@ final class CategorySearchConfigViewModelTest extends TestCase
 
         self::assertArrayHasKey('categoryId', $result);
         self::assertSame(7, $result['categoryId']);
-        self::assertSame('category_ids:=7', $result['categoryFilterBy']);
+        self::assertSame('(category_ids:=7) && visibility:[2,4]', $result['categoryFilterBy']);
     }
 
     public function test_get_config_omits_category_filter_when_no_category_in_context(): void

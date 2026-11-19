@@ -40,4 +40,9 @@ class CustomerEntityIndexer implements EntityIndexerInterface
             yield $this->dataBuilder->build($customer, $storeId);
         }
     }
+
+    public function getDocumentId(int $entityId): string
+    {
+        return $this->dataBuilder->getDocumentId($entityId);
+    }
 }

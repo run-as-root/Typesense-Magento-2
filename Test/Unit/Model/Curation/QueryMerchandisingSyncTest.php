@@ -116,4 +116,23 @@ final class QueryMerchandisingSyncTest extends TestCase
 
         $this->sut->sync(42, 3, 'en_us');
     }
+
+    public function test_sync_writes_to_target_collection_instead_of_alias_when_given(): void
+    {
+        $queryRule = $this->createMock(QueryMerchandisingInterface::class);
+        $queryRule->method('isActive')->willReturn(true);
+        $queryRule->method('getQuery')->willReturn('gin');
+        $queryRule->method('getMatchType')->willReturn('exact');
+        $queryRule->method('getIncludes')->willReturn([]);
+        $queryRule->method('getExcludes')->willReturn([]);
+
+        $this->repository->method('getById')->with(11)->willReturn($queryRule);
+        $this->collectionNameResolver->method('resolve')->willReturn('rar_product_de');
+
+        $this->overrideManager->expects(self::once())
+            ->method('createOverride')
+            ->with('rar_product_de_v2', 'query_merch_11', self::anything());
+
+        $this->sut->sync(11, 3, 'de', 'rar_product_de_v2');
+    }
 }

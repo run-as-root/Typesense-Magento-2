@@ -67,7 +67,7 @@ class StoreDataBuilder
         );
 
         return [
-            'id' => 'store_' . $storeIdInt,
+            'id' => $this->getDocumentId($storeIdInt),
             'store_id' => $storeIdInt,
             'store_code' => (string) $store->getCode(),
             'store_name' => (string) $store->getName(),
@@ -112,5 +112,10 @@ class StoreDataBuilder
                 static fn(StoreInterface $store): bool => in_array((int) $store->getId(), $entityIds, true),
             )
         );
+    }
+
+    public function getDocumentId(int $entityId): string
+    {
+        return 'store_' . $entityId;
     }
 }

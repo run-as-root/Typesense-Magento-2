@@ -8,8 +8,11 @@ use Magento\Backend\App\Action;
 use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\Redirect;
+use Magento\Framework\Exception\NoSuchEntityException;
 use Psr\Log\LoggerInterface;
+use RunAsRoot\TypeSense\Api\SynonymRepositoryInterface;
 use RunAsRoot\TypeSense\Api\TypeSenseClientFactoryInterface;
+use Typesense\Exceptions\ObjectNotFound;
 
 class Delete extends Action implements HttpPostActionInterface
 {
@@ -17,6 +20,7 @@ class Delete extends Action implements HttpPostActionInterface
 
     public function __construct(
         Context $context,
+        private readonly SynonymRepositoryInterface $repository,
         private readonly TypeSenseClientFactoryInterface $clientFactory,
         private readonly LoggerInterface $logger,
     ) {
@@ -43,16 +47,19 @@ class Delete extends Action implements HttpPostActionInterface
             return $redirect;
         }
 
+        $aliasName = (string) preg_replace('/_v\d+$/', '', $collection);
+
         try {
-            $client = $this->clientFactory->create();
-            $client->collections[$collection]->synonyms[$synonymId]->delete();
+            // Remote first: a Typesense failure then leaves both copies intact and the delete can be retried.
+            $this->deleteRemote($aliasName, $synonymId);
+            $this->deleteStored($aliasName, $synonymId);
             $this->messageManager->addSuccessMessage(__('Synonym "%1" has been deleted.', $synonymId));
         } catch (\Exception $e) {
             $this->logger->error(
                 sprintf(
                     'Failed to delete synonym "%s" from collection "%s": %s',
                     $synonymId,
-                    $collection,
+                    $aliasName,
                     $e->getMessage()
                 )
             );
@@ -60,5 +67,27 @@ class Delete extends Action implements HttpPostActionInterface
         }
 
         return $redirect;
+    }
+
+    private function deleteStored(string $aliasName, string $synonymId): void
+    {
+        try {
+            $synonym = $this->repository->getByTypesenseId($aliasName, $synonymId);
+        } catch (NoSuchEntityException) {
+            // Synonyms created before they were persisted exist only in Typesense.
+            return;
+        }
+
+        $this->repository->delete($synonym);
+    }
+
+    private function deleteRemote(string $aliasName, string $synonymId): void
+    {
+        try {
+            $client = $this->clientFactory->create();
+            $client->collections[$aliasName]->synonyms[$synonymId]->delete();
+        } catch (ObjectNotFound) {
+            // Already gone from the live collection, which is the state we want.
+        }
     }
 }

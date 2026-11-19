@@ -39,4 +39,9 @@ class CmsPageEntityIndexer implements EntityIndexerInterface
             yield $this->dataBuilder->build($page, $storeId);
         }
     }
+
+    public function getDocumentId(int $entityId): string
+    {
+        return (string) $entityId;
+    }
 }

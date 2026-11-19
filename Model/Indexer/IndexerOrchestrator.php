@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Indexer;
 
+use Magento\Framework\App\Area;
 use Magento\Store\Api\StoreRepositoryInterface;
+use Magento\Store\Model\App\Emulation;
 use Psr\Log\LoggerInterface;
+use RunAsRoot\TypeSense\Api\AliasManagerInterface;
+use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 use RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface;
 use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
@@ -21,7 +25,11 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         private readonly CollectionNameResolver $nameResolver,
         private readonly TypeSenseConfigInterface $config,
         private readonly StoreRepositoryInterface $storeRepository,
+        private readonly AliasManagerInterface $aliasManager,
+        private readonly CollectionManagerInterface $collectionManager,
+        private readonly DocumentDeleter $documentDeleter,
         private readonly LoggerInterface $logger,
+        private readonly Emulation $emulation,
     ) {
     }
 
@@ -32,18 +40,21 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
      */
     public function reindex(string $entityType, array $entityIds = []): void
     {
-        if (!$this->config->isEnabled()) {
-            $this->logger->info("TypeSense is disabled, skipping reindex for {$entityType}");
-            return;
-        }
-
+        // No default-scope gate: a module enabled for a single store view must still be indexed there.
         $indexer = $this->indexerPool->getIndexer($entityType);
 
-        foreach ($this->storeRepository->getList() as $store) {
+        $stores = $this->storeRepository->getList();
+
+        foreach ($stores as $store) {
             $storeId = (int) $store->getId();
             $storeCode = $store->getCode();
 
             if ($storeCode === 'admin') {
+                continue;
+            }
+
+            if (!$store->getIsActive() || !$this->config->isEnabled($storeId)) {
+                $this->logger->info("Skipping {$entityType} for store {$storeCode}: inactive or TypeSense disabled");
                 continue;
             }
 
@@ -56,7 +67,9 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
      */
     public function reindexAll(): void
     {
-        foreach ($this->indexerPool->getAll() as $entityType => $indexer) {
+        $entityTypes = array_keys($this->indexerPool->getAll());
+
+        foreach ($entityTypes as $entityType) {
             $this->reindex($entityType);
         }
     }
@@ -70,23 +83,124 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
     ): void {
         $this->logger->info("Reindexing {$entityType} for store {$storeCode} (ID: {$storeId})");
 
-        $schema = ['fields' => $indexer->getSchemaFields()];
+        // Documents are generated lazily, so building, importing and deleting must all happen inside emulation.
+        $this->emulation->startEnvironmentEmulation($storeId, Area::AREA_FRONTEND, true);
+        try {
+            if ($entityIds === []) {
+                $this->reindexStoreFull($indexer, $entityType, $storeCode, $storeId);
+                return;
+            }
 
-        if ($this->config->isZeroDowntimeEnabled($storeId)) {
-            $collectionName = $this->zeroDowntimeService->startReindex($entityType, $storeCode, $schema, $storeId);
+            $this->reindexStorePartial($indexer, $entityType, $storeCode, $storeId, $entityIds);
+        } finally {
+            $this->emulation->stopEnvironmentEmulation();
+        }
+    }
+
+    private function reindexStoreFull(
+        EntityIndexerInterface $indexer,
+        string $entityType,
+        string $storeCode,
+        int $storeId,
+    ): void {
+        $schemaFields = $indexer->getSchemaFields();
+        $zeroDowntime = $this->config->isZeroDowntimeEnabled($storeId);
+
+        if ($zeroDowntime) {
+            $collectionName = $this->zeroDowntimeService->startReindex(
+                $entityType,
+                $storeCode,
+                ['fields' => $schemaFields],
+                $storeId,
+            );
         } else {
             $collectionName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
-            // For non-zero-downtime, we'd need to drop and recreate or just upsert into existing
-            // For now, this creates the collection if it doesn't exist
+
+            if (!$this->collectionManager->collectionExists($collectionName)) {
+                $this->collectionManager->createCollection(
+                    $collectionName,
+                    ['name' => $collectionName, 'fields' => $schemaFields],
+                );
+            }
         }
 
-        $documents = $indexer->buildDocuments($entityIds, $storeId);
-        $stats = $this->batchImportService->import($collectionName, $documents, $storeId);
+        try {
+            $documents = $indexer->buildDocuments([], $storeId);
+            $stats = $this->batchImportService->import($collectionName, $documents, $storeId);
+        } catch (\Throwable $e) {
+            if ($zeroDowntime) {
+                $this->discardFailedBuild($collectionName);
+            }
+            throw $e;
+        }
 
-        if ($this->config->isZeroDowntimeEnabled($storeId)) {
+        if ($zeroDowntime) {
             $this->zeroDowntimeService->finishReindex($entityType, $storeCode, $collectionName, $storeId);
         }
 
+        $this->logComplete($entityType, $storeCode, $stats);
+    }
+
+    private function discardFailedBuild(string $collectionName): void
+    {
+        try {
+            $this->collectionManager->deleteCollection($collectionName);
+            $this->logger->warning("Deleted partially built collection {$collectionName} after a failed reindex");
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                "Could not delete partially built collection {$collectionName}: {$e->getMessage()}",
+                ['exception' => $e],
+            );
+        }
+    }
+
+    private function reindexStorePartial(
+        EntityIndexerInterface $indexer,
+        string $entityType,
+        string $storeCode,
+        int $storeId,
+        array $entityIds,
+    ): void {
+        $collectionName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
+
+        // A partial import into a missing target would create an index holding only the changed documents.
+        if (!$this->aliasManager->aliasExists($collectionName)
+            && !$this->collectionManager->collectionExists($collectionName)
+        ) {
+            $this->logger->info(
+                "No index {$collectionName} for {$entityType}/{$storeCode}: full reindex required, skipping partial update",
+            );
+            return;
+        }
+
+        $yieldedIds = [];
+        $documents = $this->collectYieldedIds($indexer->buildDocuments($entityIds, $storeId), $yieldedIds);
+        $stats = $this->batchImportService->import($collectionName, $documents, $storeId);
+
+        // Entities the indexer no longer yields (deleted, disabled, out of scope) must not linger in the live index.
+        $staleIds = array_values(array_diff(array_map($indexer->getDocumentId(...), $entityIds), $yieldedIds));
+        if ($staleIds !== []) {
+            $this->documentDeleter->deleteByIds($collectionName, $staleIds, $storeId);
+        }
+
+        $this->logComplete($entityType, $storeCode, $stats);
+    }
+
+    /**
+     * @param iterable<array<string, mixed>> $documents
+     * @param string[] $yieldedIds
+     * @return \Generator<int, array<string, mixed>>
+     */
+    private function collectYieldedIds(iterable $documents, array &$yieldedIds): \Generator
+    {
+        foreach ($documents as $document) {
+            $yieldedIds[] = (string) $document['id'];
+            yield $document;
+        }
+    }
+
+    private function logComplete(string $entityType, string $storeCode, array $stats): void
+    {
         $this->logger->info("Reindex complete for {$entityType}/{$storeCode}: {$stats['success']}/{$stats['total']} docs");
     }
 }

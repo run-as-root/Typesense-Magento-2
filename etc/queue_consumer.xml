@@ -4,6 +4,6 @@
     <consumer name="typesenseReindexConsumer"
               queue="typesense.reindex"
               handler="RunAsRoot\TypeSense\Queue\Consumer\ReindexConsumer::process"
-              maxMessages="10"
+              maxMessages="100"
               connection="db"/>
 </config>

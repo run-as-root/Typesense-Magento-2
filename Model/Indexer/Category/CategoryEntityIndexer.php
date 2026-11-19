@@ -39,4 +39,9 @@ class CategoryEntityIndexer implements EntityIndexerInterface
             yield $this->dataBuilder->build($category, $storeId);
         }
     }
+
+    public function getDocumentId(int $entityId): string
+    {
+        return (string) $entityId;
+    }
 }

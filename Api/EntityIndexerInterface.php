@@ -13,6 +13,11 @@ interface EntityIndexerInterface
     public function getIndexerCode(): string;
 
     /**
+     * The Typesense document id this entity is indexed under, needed to find stale documents.
+     */
+    public function getDocumentId(int $entityId): string;
+
+    /**
      * Yields documents to be indexed. Uses generator for memory efficiency.
      *
      * @param int[] $entityIds Empty array = full reindex

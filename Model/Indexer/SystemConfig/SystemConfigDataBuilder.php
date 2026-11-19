@@ -53,7 +53,7 @@ class SystemConfigDataBuilder
             $field = $parts[2] ?? '';
 
             yield [
-                'id' => 'config_' . (int) $row['config_id'],
+                'id' => $this->getDocumentId((int) $row['config_id']),
                 'path' => $path,
                 'scope' => (string) $row['scope'],
                 'scope_id' => (int) $row['scope_id'],
@@ -105,5 +105,10 @@ class SystemConfigDataBuilder
         }
 
         return false;
+    }
+
+    public function getDocumentId(int $entityId): string
+    {
+        return 'config_' . $entityId;
     }
 }

@@ -270,9 +270,9 @@ When zero-downtime reindexing is enabled:
 
 1. `ZeroDowntimeService::startReindex()` creates a new versioned collection (e.g., `rar_product_v2` while `rar_product` alias points at `rar_product_v1`)
 2. All documents are indexed into the new versioned collection
-3. `ZeroDowntimeService::finishReindex()` atomically swaps the alias to point at the new collection and deletes the old one
+3. `ZeroDowntimeService::finishReindex()` atomically swaps the alias to point at the new collection, keeps the previously live collection as a rollback target, and deletes older versions
 
-This means the live alias (`rar_product`) always points at a fully populated collection.
+This means the live alias (`rar_product`) always points at a fully populated collection. If a new version turns out bad, `bin/magento typesense:collection:rollback --entity=<type> --store=<code>` points the alias back to the previous version.
 
 ### Magento Indexer Integration
 

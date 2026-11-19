@@ -40,4 +40,9 @@ class OrderEntityIndexer implements EntityIndexerInterface
             yield $this->dataBuilder->build($order, $storeId);
         }
     }
+
+    public function getDocumentId(int $entityId): string
+    {
+        return $this->dataBuilder->getDocumentId($entityId);
+    }
 }

@@ -93,6 +93,24 @@
     <preference for="RunAsRoot\TypeSense\Api\QueryMerchandisingRepositoryInterface"
                 type="RunAsRoot\TypeSense\Model\Merchandising\QueryMerchandisingRepository"/>
 
+    <!-- Synonyms -->
+    <preference for="RunAsRoot\TypeSense\Api\Data\SynonymInterface"
+                type="RunAsRoot\TypeSense\Model\Synonym\Synonym"/>
+
+    <preference for="RunAsRoot\TypeSense\Api\SynonymRepositoryInterface"
+                type="RunAsRoot\TypeSense\Model\Synonym\SynonymRepository"/>
+
+    <!-- Re-create collection-level state on each new versioned collection before the alias swap -->
+    <type name="RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService">
+        <arguments>
+            <argument name="appliers" xsi:type="array">
+                <item name="synonyms" xsi:type="object">RunAsRoot\TypeSense\Model\Collection\Applier\SynonymApplier</item>
+                <item name="category_merchandising" xsi:type="object">RunAsRoot\TypeSense\Model\Collection\Applier\CategoryMerchandisingApplier</item>
+                <item name="query_merchandising" xsi:type="object">RunAsRoot\TypeSense\Model\Collection\Applier\QueryMerchandisingApplier</item>
+            </argument>
+        </arguments>
+    </type>
+
     <!-- Entity indexer pool: register all entity indexers -->
     <type name="RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool">
         <arguments>
@@ -148,6 +166,7 @@
                 <item name="typesense_reindex" xsi:type="object">RunAsRoot\TypeSense\Console\Command\ReindexCommand</item>
                 <item name="typesense_collection_list" xsi:type="object">RunAsRoot\TypeSense\Console\Command\CollectionListCommand</item>
                 <item name="typesense_collection_delete" xsi:type="object">RunAsRoot\TypeSense\Console\Command\CollectionDeleteCommand</item>
+                <item name="typesense_collection_rollback" xsi:type="object">RunAsRoot\TypeSense\Console\Command\CollectionRollbackCommand</item>
                 <item name="typesense_health" xsi:type="object">RunAsRoot\TypeSense\Console\Command\HealthCheckCommand</item>
             </argument>
         </arguments>
@@ -157,6 +176,14 @@
         <arguments>
             <argument name="collectors" xsi:type="array">
                 <item name="typesense_csp" xsi:type="object">RunAsRoot\TypeSense\Plugin\CspDynamicCollector</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <type name="Magento\Framework\Mview\View">
+        <arguments>
+            <argument name="changelogBatchSize" xsi:type="array">
+                <item name="typesense_product" xsi:type="number">200</item>
             </argument>
         </arguments>
     </type>

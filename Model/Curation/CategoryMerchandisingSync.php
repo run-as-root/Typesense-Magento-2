@@ -10,7 +10,7 @@ use RunAsRoot\TypeSense\Api\CategoryMerchandisingRepositoryInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Api\Data\CategoryMerchandisingInterface;
 use RunAsRoot\TypeSense\Api\OverrideManagerInterface;
-use RunAsRoot\TypeSense\Model\VirtualRule\CategoryVirtualRuleResolver;
+use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
 
 class CategoryMerchandisingSync
 {
@@ -20,12 +20,16 @@ class CategoryMerchandisingSync
         private readonly CategoryMerchandisingRepositoryInterface $repository,
         private readonly SearchCriteriaBuilder $searchCriteriaBuilder,
         private readonly LoggerInterface $logger,
-        private readonly CategoryVirtualRuleResolver $virtualRuleResolver,
+        private readonly CategoryListingFilterBuilder $listingFilterBuilder,
     ) {
     }
 
-    public function sync(int $categoryId, int $storeId, string $storeCode): void
-    {
+    public function sync(
+        int $categoryId,
+        int $storeId,
+        string $storeCode,
+        ?string $targetCollection = null,
+    ): void {
         $searchCriteria = $this->searchCriteriaBuilder
             ->addFilter('category_id', $categoryId)
             ->addFilter('store_id', $storeId)
@@ -34,7 +38,8 @@ class CategoryMerchandisingSync
         $searchResults = $this->repository->getList($searchCriteria);
         $rules = $searchResults->getItems();
 
-        $collectionName = $this->collectionNameResolver->resolve('product', $storeCode, $storeId);
+        $collectionName = $targetCollection
+            ?? $this->collectionNameResolver->resolve('product', $storeCode, $storeId);
         $overrideId = sprintf('cat_merch_%d_%d', $categoryId, $storeId);
 
         if (empty($rules)) {
@@ -55,7 +60,7 @@ class CategoryMerchandisingSync
             'rule' => [
                 'query' => '*',
                 'match' => 'exact',
-                'filter_by' => $this->virtualRuleResolver->resolveFilter($categoryId, $storeId),
+                'filter_by' => $this->listingFilterBuilder->build($categoryId, $storeId),
             ],
             'includes' => array_values(array_map(
                 fn(CategoryMerchandisingInterface $r) => ['id' => (string) $r->getProductId(), 'position' => $r->getPosition()],

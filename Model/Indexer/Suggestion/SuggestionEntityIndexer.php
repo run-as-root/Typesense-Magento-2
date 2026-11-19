@@ -39,4 +39,9 @@ class SuggestionEntityIndexer implements EntityIndexerInterface
             yield $this->dataBuilder->build($query, $storeId);
         }
     }
+
+    public function getDocumentId(int $entityId): string
+    {
+        return (string) $entityId;
+    }
 }
