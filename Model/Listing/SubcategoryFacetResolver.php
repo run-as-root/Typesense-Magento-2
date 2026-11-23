@@ -26,7 +26,7 @@ class SubcategoryFacetResolver
 
     /**
      * @return array{
-     *     field: string, label: string, type: string, searchable: bool, boolean: bool, numeric: bool, prefix: string
+     *     field: string, label: string, type: string, searchable: bool, boolean: bool, numeric: false, prefix: string
      * }|null
      */
     public function resolve(Category $category, int $storeId): ?array

@@ -8,6 +8,8 @@ use Magento\Catalog\Api\CategoryRepositoryInterface;
 use Magento\Catalog\Model\Category;
 use Magento\Catalog\Model\Product;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Store\Model\Store;
+use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Model\Indexer\Product\CategoryResolver;
@@ -30,18 +32,27 @@ final class CategoryResolverTest extends TestCase
         81 => ['Pumpkin', 3, 80, true, true],
         82 => ['Hidden', 3, 50, true, false],
     ];
+    // store id => id => [name, is_active]: store-view values that differ from store 1.
+    private const array STORE_VALUES = [
+        2 => [10 => ['Obst', true], 20 => ['Steinobst', false]],
+    ];
 
     private CategoryRepositoryInterface&MockObject $categoryRepository;
+    private int $storeId = 1;
+    /** @var list<array{int, int}> */
+    private array $loads = [];
     private CategoryResolver $sut;
 
     protected function setUp(): void
     {
         $this->categoryRepository = $this->createMock(CategoryRepositoryInterface::class);
-        $this->categoryRepository->method('get')->willReturnCallback(function (int $id): Category {
+        $this->categoryRepository->method('get')->willReturnCallback(function (int $id, ?int $storeId = null): Category {
+            $this->loads[] = [$storeId, $id];
             if (!isset(self::TREE[$id])) {
                 throw new NoSuchEntityException();
             }
             [$name, $level, $parentId, $isAnchor, $isActive] = self::TREE[$id];
+            [$name, $isActive] = self::STORE_VALUES[$storeId][$id] ?? [$name, $isActive];
             $category = $this->createMock(Category::class);
             $category->method('getId')->willReturn((string) $id);
             $category->method('getData')->willReturnCallback(
@@ -54,7 +65,14 @@ final class CategoryResolverTest extends TestCase
 
             return $category;
         });
-        $this->sut = new CategoryResolver($this->categoryRepository);
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->method('getStore')->willReturnCallback(function (): Store {
+            $store = $this->createMock(Store::class);
+            $store->method('getId')->willReturn($this->storeId);
+
+            return $store;
+        });
+        $this->sut = new CategoryResolver($this->categoryRepository, $storeManager);
     }
 
     public function test_a_product_in_a_leaf_category_gets_every_ancestor_path_at_its_own_level(): void
@@ -103,12 +121,45 @@ final class CategoryResolverTest extends TestCase
         self::assertSame([], $data['categories.lvl2']);
     }
 
-    public function test_each_category_is_loaded_once(): void
+    public function test_each_category_is_loaded_once_per_store_with_that_store_id(): void
     {
-        $this->categoryRepository->expects(self::exactly(4))->method('get');
-
         $this->sut->getCategoryData($this->product([30, 31]));
         $this->sut->getCategoryData($this->product([31]));
+        $this->storeId = 2;
+        $this->sut->getCategoryData($this->product([31]));
+
+        self::assertSame([[1, 30], [1, 20], [1, 10], [1, 31], [2, 31], [2, 20], [2, 10]], $this->loads);
+    }
+
+    public function test_names_and_active_flags_come_from_the_store_being_indexed(): void
+    {
+        $storeOne = $this->sut->getCategoryData($this->product([30]));
+        $this->storeId = 2;
+        $storeTwo = $this->sut->getCategoryData($this->product([30]));
+
+        self::assertSame(['Fruit'], $storeOne['categories.lvl0']);
+        self::assertSame([30, 10, 20], $storeOne['category_ids']);
+        // Store 2 renames Fruit and disables Stone Fruit: no lvl1 path and no anchor id of its own, but the
+        // deeper path keeps its name, as SubcategoryFacetResolver builds the prefix from the same names.
+        self::assertSame(['Obst'], $storeTwo['categories.lvl0']);
+        self::assertSame([], $storeTwo['categories.lvl1']);
+        self::assertSame(['Obst > Steinobst > Plum'], $storeTwo['categories.lvl2']);
+        self::assertSame([30, 10], $storeTwo['category_ids']);
+    }
+
+    public function test_inactive_categories_add_no_name_and_no_path_but_keep_their_assigned_id(): void
+    {
+        $hidden = $this->sut->getCategoryData($this->product([82]));
+        self::assertSame([], $hidden['categories']);
+        self::assertSame([], $hidden['categories.lvl0']);
+        self::assertSame([], $hidden['categories.lvl1']);
+        self::assertSame([82], $hidden['category_ids']);
+
+        $pumpkin = $this->sut->getCategoryData($this->product([81]));
+        self::assertSame(['Pumpkin'], $pumpkin['categories']);
+        self::assertSame([], $pumpkin['categories.lvl0']);
+        self::assertSame(['Seasonal > Pumpkin'], $pumpkin['categories.lvl1']);
+        self::assertSame([81], $pumpkin['category_ids']);
     }
 
     /**

@@ -29,7 +29,9 @@ final class FacetConfigBuilderTest extends TestCase
 
     public function test_unsupported_facet_types_fall_back_to_dropdown_price_is_always_a_slider_and_labels_use_store_label_or_code(): void
     {
-        $this->config->method('getFacetFilters')->willReturn(['color', 'size', 'volume', 'weight', 'in_stock', 'price', 'visibility', 'category_ids']);
+        $this->config->method('getFacetFilters')->willReturn([
+            'color', 'size', 'volume', 'weight', 'in_stock', 'price', 'visibility', 'category_ids', 'sales_count',
+        ]);
         $this->config->method('getFacetTypes')->with(1)->willReturn([
             'color' => ['type' => 'slider', 'searchable' => true],
             'size' => ['type' => 'checkbox', 'searchable' => true],
@@ -45,6 +47,7 @@ final class FacetConfigBuilderTest extends TestCase
             ['name' => 'price', 'type' => 'float', 'facet' => true],
             ['name' => 'visibility', 'type' => 'int32', 'facet' => true],
             ['name' => 'category_ids', 'type' => 'int32[]'],
+            ['name' => 'sales_count', 'type' => 'int64', 'facet' => true],
         ]);
         $color = $this->createMock(Attribute::class);
         $color->method('getId')->willReturn(93);
@@ -57,15 +60,16 @@ final class FacetConfigBuilderTest extends TestCase
 
         self::assertSame([
             // The listing state holds one range (price), a checkbox needs a bool field; value search only exists on
-            // dropdowns. A numeric dropdown is marked numeric, so its values are filtered unquoted.
+            // dropdowns. A numeric field carries its Typesense type, so its values are filtered unquoted.
             ['field' => 'color', 'label' => 'Farbe', 'type' => 'dropdown', 'searchable' => true, 'boolean' => false, 'numeric' => false],
             ['field' => 'size', 'label' => 'Size', 'type' => 'dropdown', 'searchable' => true, 'boolean' => false, 'numeric' => false],
-            ['field' => 'volume', 'label' => 'Volume', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => true],
+            ['field' => 'volume', 'label' => 'Volume', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => 'float'],
             ['field' => 'weight', 'label' => 'Weight', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => false],
             ['field' => 'in_stock', 'label' => 'Availability', 'type' => 'checkbox', 'searchable' => false, 'boolean' => true, 'numeric' => false],
-            ['field' => 'price', 'label' => 'Price', 'type' => 'slider', 'searchable' => false, 'boolean' => false, 'numeric' => true],
-            ['field' => 'visibility', 'label' => 'Visibility', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => true],
-            ['field' => 'category_ids', 'label' => 'Category Ids', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => true],
+            ['field' => 'price', 'label' => 'Price', 'type' => 'slider', 'searchable' => false, 'boolean' => false, 'numeric' => 'float'],
+            ['field' => 'visibility', 'label' => 'Visibility', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => 'int32'],
+            ['field' => 'category_ids', 'label' => 'Category Ids', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => 'int32'],
+            ['field' => 'sales_count', 'label' => 'Sales Count', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => 'int64'],
         ], $this->sut->build(1));
     }
 }

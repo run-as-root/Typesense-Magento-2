@@ -586,14 +586,14 @@ test('clampPriceRange keeps values inside the stats bounds and clears a full ran
 
 test('numeric facets are filtered unquoted and accept only finite numbers', () => {
     assert.equal(
-        core.buildFilterBy('', { visibility: ['4', '2', 'x', '1e3', ''], color: ['4'] }, null, [], [], ['visibility']),
+        core.buildFilterBy('', { visibility: ['4', '2', 'x', '1e3', ''], color: ['4'] }, null, [], [], { visibility: 'int32' }),
         'visibility:=[4,2] && color:=[`4`]',
     );
-    assert.equal(core.buildFilterBy('v:=1', { visibility: ['abc'] }, null, [], [], ['visibility']), 'v:=1');
-    assert.equal(core.buildFilterBy('', { volume: ['-0.5', '12.75'] }, null, [], [], ['volume']), 'volume:=[-0.5,12.75]');
+    assert.equal(core.buildFilterBy('v:=1', { visibility: ['abc'] }, null, [], [], { visibility: 'int32' }), 'v:=1');
+    assert.equal(core.buildFilterBy('', { volume: ['-0.5', '12.75'] }, null, [], [], { volume: 'float' }), 'volume:=[-0.5,12.75]');
 
     const config = searchConfig({ facets: [
-        { field: 'visibility', label: 'Visibility', type: 'dropdown', numeric: true },
+        { field: 'visibility', label: 'Visibility', type: 'dropdown', numeric: 'int32' },
         { field: 'color', label: 'Color', type: 'dropdown' },
     ] });
     const parsed = core.parseUrlState('?visibility=4|abc|%60', config);
@@ -633,4 +633,29 @@ test('facetValueSearch builds only the value search of one facet, without its ow
     assert.equal(search.q, 'gin');
     assert.equal(search.filter_by, 'visibility:[3,4] && size:=[`L`]');
     assert.equal(core.facetValueSearch(state(), config, 'unknown'), null);
+});
+
+test('integer facets accept only whole numbers in their range, float facets decimals', () => {
+    const numerics = { visibility: 'int32', big_id: 'int64', volume: 'float' };
+
+    assert.equal(
+        core.buildFilterBy('', { visibility: ['4', '4.5', '2147483647', '2147483648', '-2147483648', '-2147483649'] },
+            null, [], [], numerics),
+        'visibility:=[4,2147483647,-2147483648]',
+    );
+    assert.equal(
+        core.buildFilterBy('', { big_id: ['9007199254740993', '1.5', '12345678901234567890'] }, null, [], [], numerics),
+        'big_id:=[9007199254740993]',
+    );
+    assert.equal(core.buildFilterBy('', { volume: ['0.7', '3', '.5'] }, null, [], [], numerics), 'volume:=[0.7,3]');
+
+    const config = searchConfig({ facets: [
+        { field: 'visibility', label: 'Visibility', type: 'dropdown', numeric: 'int32' },
+        { field: 'volume', label: 'Volume', type: 'dropdown', numeric: 'float' },
+    ] });
+    assert.deepEqual(core.parseUrlState('?visibility=4|4.5|99999999999&volume=0.7|x', config).filters, {
+        visibility: ['4'], volume: ['0.7'],
+    });
+    const entry = { field_name: 'visibility', counts: [{ value: '4', count: 3 }, { value: '4.5', count: 1 }] };
+    assert.deepEqual(core.facetOptions(config.facets[0], entry, [], {}).map(option => option.value), ['4']);
 });

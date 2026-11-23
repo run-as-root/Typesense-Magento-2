@@ -25,7 +25,15 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
         const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
         // Kept out of the reactive data: they only decide which response may still render.
         let sequencer = null;
-        let facetSequencer = null;
+        // One per facet field, so a value search on one facet never drops another facet's response.
+        const facetSequencers = new Map();
+        const facetSequencer = (field) => {
+            if (!facetSequencers.has(field)) {
+                facetSequencers.set(field, core().createSequencer());
+            }
+
+            return facetSequencers.get(field);
+        };
         // Inline display values of the SEO text elements hidden on pages after the first.
         const hiddenSeoText = new Map();
 
@@ -75,7 +83,6 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     return;
                 }
                 sequencer = listing.createSequencer();
-                facetSequencer = listing.createSequencer();
                 this.state = listing.parseUrlState(window.location.search, this.config);
                 this.isReady = true;
                 this.fetchResults('init');
@@ -85,7 +92,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                 const listing = core();
                 const id = sequencer.next();
                 // The full request carries every facet value search, so pending ones are outdated.
-                facetSequencer.next();
+                facetSequencers.forEach(facetSequence => facetSequence.next());
                 this.isLoading = true;
                 // Everything that can throw sits inside the try, so loading always ends in results or the error state.
                 try {
@@ -150,7 +157,8 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     this.fetchResults('facet-query');
                     return;
                 }
-                const id = facetSequencer.next();
+                const sequence = facetSequencer(field);
+                const id = sequence.next();
                 try {
                     const search = listing.facetValueSearch(this.state, this.config, field);
                     if (search === null) {
@@ -159,7 +167,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     const client = await window.runAsRootTypesense.getClient();
                     const response = await client.multiSearch.perform({ searches: [search] }, this.config.cacheParams);
                     const result = (response.results || [])[0];
-                    if (!facetSequencer.isCurrent(id) || !result || result.error) {
+                    if (!sequence.isCurrent(id) || !result || result.error) {
                         return;
                     }
                     const entry = (result.facet_counts || []).find(facet => facet && facet.field_name === field)

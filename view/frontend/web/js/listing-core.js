@@ -6,6 +6,9 @@
     const PRICE_PARAM = /^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/;
     const PAGE_PARAM = /^[1-9]\d{0,5}$/;
     const NUMBER_VALUE = /^-?\d+(?:\.\d+)?$/;
+    const INTEGER_VALUE = /^-?\d{1,19}$/;
+    const INT32_MIN = -2147483648;
+    const INT32_MAX = 2147483647;
     const MAX_VALUES_PER_FACET = 50;
     const MAX_SORT_FIELDS = 3;
     const IN_STOCK_SORT = 'in_stock:desc';
@@ -23,8 +26,31 @@
         return value === 'true' || value === 'false';
     }
 
-    function isNumberValue(value) {
-        return NUMBER_VALUE.test(String(value)) && Number.isFinite(Number(value));
+    // kind is the Typesense field type: int32, int64 or float (anything else is treated as float).
+    function isNumberValue(value, kind) {
+        const text = String(value);
+        if (kind === 'int32') {
+            return INTEGER_VALUE.test(text) && Number(text) >= INT32_MIN && Number(text) <= INT32_MAX;
+        }
+        if (kind === 'int64') {
+            // Compared as BigInt: int64 values beyond 2^53 lose precision as numbers.
+            return INTEGER_VALUE.test(text) && BigInt(text) >= -(2n ** 63n) && BigInt(text) < 2n ** 63n;
+        }
+
+        return NUMBER_VALUE.test(text) && Number.isFinite(Number(text));
+    }
+
+    // Older configs mark numeric facets with `numeric: true` or pass a list of fields; both mean float.
+    function numericKind(numeric) {
+        return ['int32', 'int64', 'float'].includes(numeric) ? numeric : 'float';
+    }
+
+    function numericKinds(numericFields) {
+        if (Array.isArray(numericFields)) {
+            return Object.fromEntries(numericFields.map(field => [field, 'float']));
+        }
+
+        return Object.assign({}, numericFields);
     }
 
     function pricesShown(config) {
@@ -62,22 +88,23 @@
     }
 
     // Typesense answers 400 to any other value on a bool or numeric field, which would fail the whole listing.
-    function validValues(values, isBoolean, isNumeric) {
+    function validValues(values, isBoolean, numeric) {
         const all = valueList(values);
         if (isBoolean) {
             return all.filter(isBooleanValue);
         }
 
-        return isNumeric ? all.filter(isNumberValue) : all;
+        return numeric ? all.filter(value => isNumberValue(value, numeric)) : all;
     }
 
-    function facetClause(field, values, isBoolean, isNumeric) {
-        const list = validValues(values, isBoolean, isNumeric);
+    // numeric: the Typesense type of a numeric field (int32, int64, float), else undefined.
+    function facetClause(field, values, isBoolean, numeric) {
+        const list = validValues(values, isBoolean, numeric);
         if (list.length === 0) {
             return null;
         }
         // Numeric fields reject backtick-quoted values ("Numerical field has an invalid comparator").
-        if (isNumeric && !isBoolean) {
+        if (numeric && !isBoolean) {
             return field + ':=[' + list.join(',') + ']';
         }
 
@@ -94,7 +121,7 @@
     function buildFilterBy(baseFilter, filters, price, exclude, booleanFields, numericFields) {
         const excluded = [].concat(exclude || []);
         const booleans = [].concat(booleanFields || []);
-        const numerics = [].concat(numericFields || []);
+        const numerics = numericKinds(numericFields);
         const parts = [];
         const base = String(baseFilter || '').trim();
 
@@ -107,7 +134,7 @@
             if (field === 'price' || excluded.includes(field) || !FIELD_NAME.test(field)) {
                 continue;
             }
-            const clause = facetClause(field, values, booleans.includes(field), numerics.includes(field));
+            const clause = facetClause(field, values, booleans.includes(field), numerics[field]);
             if (clause !== null) {
                 parts.push(clause);
             }
@@ -139,10 +166,16 @@
             .map(facet => facet.field);
     }
 
+    // field => int32 | int64 | float, for the facets on numeric fields.
     function numericFacetFields(config) {
-        return (config.facets || [])
-            .filter(facet => facet && typeof facet === 'object' && facet.numeric === true && facet.field !== 'price')
-            .map(facet => facet.field);
+        const kinds = {};
+        const facets = (config.facets || [])
+            .filter(facet => facet && typeof facet === 'object' && facet.numeric && facet.field !== 'price');
+        for (const facet of facets) {
+            kinds[facet.field] = numericKind(facet.numeric);
+        }
+
+        return kinds;
     }
 
     function sortValues(config) {
@@ -309,7 +342,7 @@
         for (const field of fields) {
             const active = field === 'price'
                 ? price !== null
-                : validValues(filters[field], booleans.includes(field), numerics.includes(field)).length > 0;
+                : validValues(filters[field], booleans.includes(field), numerics[field]).length > 0;
             const valueSearch = String(facetQueries[field] || '').trim() !== '';
             (active || valueSearch ? own : rest).push(field);
         }
@@ -494,8 +527,8 @@
                 let accept = value => quoteValue(value) !== null;
                 if (booleans.includes(key)) {
                     accept = isBooleanValue;
-                } else if (numerics.includes(key)) {
-                    accept = isNumberValue;
+                } else if (numerics[key]) {
+                    accept = value => isNumberValue(value, numerics[key]);
                 }
                 // Values are encoded one by one, so a literal | can only be the separator.
                 const values = valueList(rawValue.split('|').map(decode))
@@ -781,7 +814,7 @@
             return isBooleanValue(value) ? String((labels || {})[value] || value) : null;
         }
 
-        return facet.numeric === true && !isNumberValue(value) ? null : value;
+        return facet.numeric && !isNumberValue(value, numericKind(facet.numeric)) ? null : value;
     }
 
     // Selected values stay listed without a count, so they can still be unchecked when a value search

@@ -256,3 +256,30 @@ test('a facet value search response is dropped once a full request has started',
 
     assert.deepEqual(listing.facets.find(f => f.field_name === 'color').counts.map(c => c.value), ['Fresh']);
 });
+
+test('a value search on one facet does not drop the pending value search of another', async () => {
+    const env = createEnvironment();
+    env.responder = results(1, [hit(1)]);
+    const listing = env.listing();
+    const twoFacets = Object.assign({}, listingConfig, {
+        facets: [{ field: 'color', type: 'dropdown' }, { field: 'size', type: 'dropdown' }],
+    });
+    listing.$root.querySelector = () => ({ textContent: JSON.stringify(twoFacets) });
+    listing.init();
+    await settle();
+
+    const pending = {};
+    env.responder = body => new Promise(resolve => {
+        const field = body.searches[0].facet_by;
+        pending[field] = () => resolve({ results: [{ facet_counts: [{ field_name: field, counts: [{ value: field + '-hit', count: 1 }] }] }] });
+    });
+    listing.applyFilterChange({ field: 'color', facetQuery: 'r' });
+    await settle();
+    listing.applyFilterChange({ field: 'size', facetQuery: 'l' });
+    await settle();
+    pending.color();
+    pending.size();
+    await settle();
+
+    assert.deepEqual(listing.facets.map(f => [f.field_name, f.counts[0].value]), [['color', 'color-hit'], ['size', 'size-hit']]);
+});

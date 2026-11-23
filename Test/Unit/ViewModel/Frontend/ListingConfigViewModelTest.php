@@ -184,7 +184,7 @@ final class ListingConfigViewModelTest extends TestCase
             ['field' => 'categories.lvl0', 'label' => 'Category', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => false],
             ['field' => 'color', 'label' => 'Farbe', 'type' => 'dropdown', 'searchable' => true, 'boolean' => false, 'numeric' => false],
             ['field' => 'in_stock', 'label' => 'Availability', 'type' => 'dropdown', 'searchable' => false, 'boolean' => true, 'numeric' => false],
-            ['field' => 'price', 'label' => 'Price', 'type' => 'slider', 'searchable' => false, 'boolean' => false, 'numeric' => true],
+            ['field' => 'price', 'label' => 'Price', 'type' => 'slider', 'searchable' => false, 'boolean' => false, 'numeric' => 'float'],
         ], $facets);
     }
 
