@@ -117,7 +117,7 @@ class AutocompleteConfigViewModel implements ArgumentInterface
             'groupBy'              => $this->getGroupByField($storeId),
             'highlight'            => $this->config->isHighlightEnabled($storeId),
             'showPrices'           => $this->canShowPrices(),
-            'productFields'        => $this->getProductFields(),
+            'productFields'        => array_values($this->getProductFields()),
             'requestParams'        => $this->requestParamsBuilder->build(SearchRequestParamsBuilder::CONTEXT_AUTOCOMPLETE, $storeId),
             'directMatchesFirst'   => $this->config->isDirectMatchesFirstEnabled($storeId),
             'cacheParams'          => $this->searchParametersProvider->getCacheParameters($storeId),
