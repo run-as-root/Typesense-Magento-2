@@ -13,10 +13,14 @@ use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
 /**
  * The search page is a static shell whose results come from Typesense in the browser. Skipping the core action
- * avoids the popularity write and the no-cache headers, so the full page cache can store one page per query.
+ * avoids the popularity write and the no-cache headers, so the full page cache can store one page per query;
+ * the handle makes the page log the term from the browser instead.
  */
 class CacheableSearchResultPlugin
 {
+    public const string CACHEABLE_PAGE_HANDLE = 'typesense_cacheable_search_result';
+    private const array LISTING_STATE_PARAMS = ['q', 'page', 'sort', 'limit', 'price'];
+
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
         private readonly RequestInterface $request,
@@ -36,7 +40,7 @@ class CacheableSearchResultPlugin
         }
 
         $queryText = trim((string) $this->request->getParam(QueryFactory::QUERY_VAR_NAME));
-        if ($queryText === '') {
+        if ($queryText === '' || !$this->hasOnlyListingStateParams()) {
             return $proceed();
         }
 
@@ -46,7 +50,21 @@ class CacheableSearchResultPlugin
         }
 
         $this->layerResolver->create(Resolver::CATALOG_LAYER_SEARCH);
+        $page = $this->pageFactory->create();
+        $page->addHandle(self::CACHEABLE_PAGE_HANDLE);
 
-        return $this->pageFactory->create();
+        return $page;
+    }
+
+    // Each extra param would be its own cache entry, so unknown params get the uncached core page.
+    private function hasOnlyListingStateParams(): bool
+    {
+        $facetFields = $this->config->getFacetFilters();
+        // PHP turns dots in query keys into underscores (categories.lvl0 -> categories_lvl0).
+        $facetParams = str_replace('.', '_', $facetFields);
+        $allowed = array_merge(self::LISTING_STATE_PARAMS, $facetFields, $facetParams);
+        $params = array_map('strval', array_keys($this->request->getParams()));
+
+        return array_diff($params, $allowed) === [];
     }
 }

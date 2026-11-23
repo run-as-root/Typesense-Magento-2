@@ -29,6 +29,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
         const config = <?= /* @noEscape */ $viewModel->getJsonClientConfig() ?>;
         const LIBRARY_URL = 'https://cdn.jsdelivr.net/npm/typesense@1.8.2/dist/typesense.min.js';
         const LIBRARY_SRI = 'sha384-b1Uj2Udv6vFZ+nH6F6SaFpWpjpTqGXdfReSsqJhHUVr8yp2AehtZG/2EpA1dw0SN';
+        const RETRY_AFTER_MS = 30000;
         let clientPromise = null;
 
         const loadLibrary = () => new Promise((resolve, reject) => {
@@ -45,7 +46,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                 ? resolve(window.Typesense)
                 : reject(new Error('typesense-js loaded without defining window.Typesense'));
             script.onerror = () => {
-                // Drop the failed tag so the next getClient() call can inject a fresh one.
+                // Drop the failed tag so a later getClient() call can inject a fresh one.
                 script.remove();
                 reject(new Error('typesense-js could not be loaded'));
             };
@@ -59,9 +60,10 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     apiKey: config.apiKey,
                     connectionTimeoutSeconds: 10,
                 }));
-                clientPromise.catch(() => {
+                // Keep the rejection for a while so every autocomplete keystroke doesn't re-inject the script.
+                clientPromise.catch(() => setTimeout(() => {
                     clientPromise = null;
-                });
+                }, RETRY_AFTER_MS));
             }
 
             return clientPromise;

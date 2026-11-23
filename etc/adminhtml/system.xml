@@ -334,7 +334,7 @@
                        sortOrder="35" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Cacheable Search Page</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Serve the search page as a full-page-cacheable shell (results load from TypeSense in the browser). Magento then no longer records search terms: popularity, the Search Terms report and the autocomplete suggestions built from them stop updating. Search terms with a redirect URL still redirect.</comment>
+                    <comment>Serve the search page as a full-page-cacheable shell (results load from TypeSense in the browser) when the URL holds only the query, listing state (page, sort, limit, price) and configured facet parameters. The browser still records each search term (Search Terms report and popularity), but Magento no longer stores the number of results for it. Search terms with a redirect URL still redirect; a redirect added later applies to an already cached query after the page cache is flushed.</comment>
                     <depends>
                         <field id="enabled">1</field>
                     </depends>

@@ -25,6 +25,7 @@ if (!$viewModel->isEnabled()) {
 $hyvaCsp = $viewModels->require(HyvaCsp::class);
 
 $titleTemplate = (string) __("Search results for: '%1'", '%1');
+$searchTermsLogUrl = $block->getData('log_search_term') ? $block->getUrl('catalogsearch/searchTermsLog/save') : '';
 ?>
 <script>
     (() => {
@@ -39,6 +40,14 @@ $titleTemplate = (string) __("Search results for: '%1'", '%1');
         document.querySelectorAll('h1.page-title').forEach((heading) => {
             (heading.querySelector('.base') || heading).textContent = title;
         });
+
+        // The cached page skips the core action, so the term is recorded like core's search_terms_log does.
+        const logUrl = '<?= $escaper->escapeJs($searchTermsLogUrl) ?>';
+        if (logUrl) {
+            const url = new URL(logUrl, window.location.origin);
+            url.searchParams.set('q', query);
+            fetch(url.toString(), { credentials: 'same-origin' }).catch(() => {});
+        }
     })();
 </script>
 <?php $hyvaCsp->registerInlineScript() ?>
