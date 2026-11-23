@@ -7,6 +7,7 @@ namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 use Magento\Catalog\Api\CategoryRepositoryInterface;
 use Magento\Catalog\Api\Data\CategoryInterface;
 use Magento\Catalog\Model\Product;
+use Magento\Framework\Model\AbstractModel;
 
 class CategoryResolver implements CategoryResolverInterface
 {
@@ -25,6 +26,7 @@ class CategoryResolver implements CategoryResolverInterface
      * Hierarchical facet paths: every assigned category adds its own path and the paths of all its
      * ancestors, each at its own level (level 2 as a name in lvl0, level 3 as "A > B" in lvl1, level 4
      * and deeper as full paths in lvl2), so a parent's facet value counts the products of its whole subtree.
+     * category_ids also holds the anchor ancestors, so `category_ids:=<anchor>` lists the anchor's subtree.
      *
      * @return array{
      *     categories: string[],
@@ -39,6 +41,7 @@ class CategoryResolver implements CategoryResolverInterface
         $categoryIds = $product->getCategoryIds();
         $categories = [];
         $categoryIdsInt = [];
+        $anchorIds = [];
         $paths = [0 => [], 1 => [], 2 => []];
 
         foreach ($categoryIds as $categoryId) {
@@ -55,16 +58,28 @@ class CategoryResolver implements CategoryResolverInterface
             foreach ($ancestry as $node) {
                 $names[] = (string) $node->getName();
                 $paths[min((int) $node->getLevel() - self::TOP_LEVEL, 2)][] = implode(self::PATH_SEPARATOR, $names);
+                if ($node !== $category && $this->listsSubtree($node) && $category->getIsActive()) {
+                    $anchorIds[] = (int) $node->getId();
+                }
             }
         }
 
         return [
             'categories' => array_values(array_unique($categories)),
-            'category_ids' => array_values(array_unique($categoryIdsInt)),
+            'category_ids' => array_values(array_unique([...$categoryIdsInt, ...$anchorIds])),
             'categories.lvl0' => array_values(array_unique($paths[0])),
             'categories.lvl1' => array_values(array_unique($paths[1])),
             'categories.lvl2' => array_values(array_unique($paths[2])),
         ];
+    }
+
+    // Magento's anchor index (catalog_category_product_index) lists a product in every active anchor ancestor
+    // of an active assigned category, whether or not the categories in between are anchors.
+    private function listsSubtree(CategoryInterface $category): bool
+    {
+        return $category instanceof AbstractModel
+            && (bool) $category->getData('is_anchor')
+            && (bool) $category->getIsActive();
     }
 
     private function loadCategory(int $categoryId): ?CategoryInterface

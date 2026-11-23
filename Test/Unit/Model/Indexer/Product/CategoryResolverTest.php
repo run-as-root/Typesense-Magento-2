@@ -14,15 +14,21 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\CategoryResolver;
 
 final class CategoryResolverTest extends TestCase
 {
-    // id => [name, level, parent id]
+    // id => [name, level, parent id, is_anchor, is_active]
     private const array TREE = [
-        1 => ['Root Catalog', 0, 0],
-        2 => ['Default Category', 1, 1],
-        10 => ['Fruit', 2, 2],
-        20 => ['Stone Fruit', 3, 10],
-        30 => ['Plum', 4, 20],
-        31 => ['Cherry', 4, 20],
-        40 => ['Damson', 5, 30],
+        1 => ['Root Catalog', 0, 0, true, true],
+        2 => ['Default Category', 1, 1, true, true],
+        10 => ['Fruit', 2, 2, true, true],
+        20 => ['Stone Fruit', 3, 10, true, true],
+        30 => ['Plum', 4, 20, true, true],
+        31 => ['Cherry', 4, 20, true, true],
+        40 => ['Damson', 5, 30, true, true],
+        50 => ['Vegetables', 2, 2, true, true],
+        60 => ['Roots', 3, 50, false, true],
+        70 => ['Carrot', 4, 60, true, true],
+        80 => ['Seasonal', 2, 2, true, false],
+        81 => ['Pumpkin', 3, 80, true, true],
+        82 => ['Hidden', 3, 50, true, false],
     ];
 
     private CategoryRepositoryInterface&MockObject $categoryRepository;
@@ -35,8 +41,13 @@ final class CategoryResolverTest extends TestCase
             if (!isset(self::TREE[$id])) {
                 throw new NoSuchEntityException();
             }
-            [$name, $level, $parentId] = self::TREE[$id];
+            [$name, $level, $parentId, $isAnchor, $isActive] = self::TREE[$id];
             $category = $this->createMock(Category::class);
+            $category->method('getId')->willReturn((string) $id);
+            $category->method('getData')->willReturnCallback(
+                static fn (string $key = '') => $key === 'is_anchor' ? (int) $isAnchor : null,
+            );
+            $category->method('getIsActive')->willReturn($isActive);
             $category->method('getName')->willReturn($name);
             $category->method('getLevel')->willReturn($level);
             $category->method('getParentId')->willReturn($parentId);
@@ -51,7 +62,7 @@ final class CategoryResolverTest extends TestCase
         $data = $this->sut->getCategoryData($this->product([30]));
 
         self::assertSame(['Plum'], $data['categories']);
-        self::assertSame([30], $data['category_ids']);
+        self::assertSame([30, 10, 20], $data['category_ids']);
         self::assertSame(['Fruit'], $data['categories.lvl0']);
         self::assertSame(['Fruit > Stone Fruit'], $data['categories.lvl1']);
         self::assertSame(['Fruit > Stone Fruit > Plum'], $data['categories.lvl2']);
@@ -68,6 +79,18 @@ final class CategoryResolverTest extends TestCase
             'Fruit > Stone Fruit > Plum > Damson',
             'Fruit > Stone Fruit > Cherry',
         ], $data['categories.lvl2']);
+    }
+
+    public function test_anchor_ancestors_are_added_to_category_ids_like_magentos_anchor_index(): void
+    {
+        // Magento lists a product in every active anchor ancestor of an active assigned category, also above a
+        // non-anchor one (Roots); the store root is not a listing.
+        self::assertSame([70, 50], $this->sut->getCategoryData($this->product([70]))['category_ids']);
+        // Inactive anchor ancestors (Seasonal) are skipped.
+        self::assertSame([81], $this->sut->getCategoryData($this->product([81]))['category_ids']);
+        // An inactive assigned category passes nothing up.
+        self::assertSame([82], $this->sut->getCategoryData($this->product([82]))['category_ids']);
+        self::assertSame([40, 31, 10, 20, 30], $this->sut->getCategoryData($this->product([40, 31]))['category_ids']);
     }
 
     public function test_root_categories_and_missing_categories_add_no_path(): void
