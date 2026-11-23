@@ -316,3 +316,41 @@ test('the sort listbox closes when focus leaves it, not when it moves inside or 
     sorting.onSortFocusOut();
     assert.equal(sorting.isOpen, false);
 });
+
+test('a native sort select dispatches only a changed value', () => {
+    const env = createEnvironment();
+    const sorting = env.component('initTypesenseSorting');
+
+    sorting.$event = { target: { value: '' } };
+    sorting.selectSort();
+    assert.equal(env.events.length, 0, 'the current sort sends nothing');
+
+    sorting.$event = { target: { value: 'price:asc' } };
+    sorting.selectSort();
+    assert.deepEqual([env.lastEvent().type, { ...env.lastEvent().detail }], ['typesense-sort-change', { sort: 'price:asc' }]);
+});
+
+test('the price range text is the chip value without the label', () => {
+    const env = createEnvironment();
+    const chips = env.component('initTypesenseActiveFilters');
+    chips.$event = { detail: snapshot({ state: Object.assign(snapshot().state, { price: { min: 10, max: 50 } }) }) };
+    chips.onListingState();
+
+    assert.equal(chips.priceRangeText(), 'EUR 10 – EUR 50');
+    assert.equal(chips.priceChipText(), 'Price: EUR 10 – EUR 50');
+});
+
+test('the filter content is always visible on desktop and toggles below md', () => {
+    const env = createEnvironment();
+    const desktop = env.component('initTypesenseFilterBar');
+    assert.equal(desktop.filtersExpanded, false);
+    assert.equal(desktop.isFilterContentVisible(), true);
+
+    env.desktop = false;
+    const mobile = env.component('initTypesenseFilterBar');
+    assert.equal(mobile.isFilterContentVisible(), false);
+    mobile.toggleFiltersExpanded();
+    assert.equal(mobile.isFilterContentVisible(), true);
+    mobile.toggleFiltersExpanded();
+    assert.equal(mobile.isFilterContentVisible(), false);
+});

@@ -69,6 +69,7 @@ $heroicons = $viewModels->require(HeroiconsOutline::class);
             ...typesenseFilterDrawer(),
             openPanels: {},
             isDesktop: true,
+            filtersExpanded: false,
 
             init() {
                 this.initListingState();
@@ -89,6 +90,14 @@ $heroicons = $viewModels->require(HeroiconsOutline::class);
                 } else if (this.isDesktop) {
                     this.openPanels = {};
                 }
+            },
+
+            // For a filter block that is collapsible below md and always open from md.
+            toggleFiltersExpanded() {
+                this.filtersExpanded = !this.filtersExpanded;
+            },
+            isFilterContentVisible() {
+                return this.isDesktop || this.filtersExpanded;
             },
 
             booleanLabels() {
