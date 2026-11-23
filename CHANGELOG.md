@@ -23,6 +23,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Each store view's category collection held the categories of every root category, so on a multi-brand install the header search offered another brand's categories, with URLs that did not work in that store. It now holds only the active categories below the store's root category, with the URL of that store view; a partial reindex deletes categories of another root from the collection. Upgrade note: run a full category reindex (`bin/magento typesense:reindex --entity=category`); without Zero-Downtime Reindex delete the category collections first (`typesense:collection:delete`), because a full reindex into an existing collection does not remove the foreign categories.
 - A quantity typed into a grouped tile's size row is rounded up to the next multiple of that size's quantity increment (on `change`, written back into the input); a non-multiple was rejected by the cart, which redirected to the product page.
 - A malformed "Facet Types" or "Searchable Attributes" config value (not valid JSON, e.g. hand-edited or PHP-serialized) is treated as unset instead of throwing, which failed every listing and search page with a 500.
 - A configured facet whose field is missing from the product schema or not faceted (e.g. an attribute removed from "Additional Attributes to Index") is left out of the listing config: Typesense rejected the facet search with a 400, so every other facet disappeared, and with its URL parameter set the whole listing showed the error state.

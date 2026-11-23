@@ -115,6 +115,25 @@ Navigate to **Stores > Configuration > TypeSense > TypeSense Search**.
 | Index Prefix | rar | Prefix for all collection names |
 | Enable Logging | No | Logs search queries and indexing activity |
 
+#### Search-only key scope
+
+The search-only key is sent to every visitor's browser, so it must allow only `documents:search` on the storefront collections: `product`, `category`, `cms_page` and `suggestion`. The module also indexes customers, orders, stores and system config into the same Typesense server for the admin search; a key with `"collections": ["*"]` would let anyone read those.
+
+Create the key with the admin key (replace `rar` with your Index Prefix):
+
+```bash
+curl "https://typesense.example.com/keys" -X POST \
+  -H "X-TYPESENSE-API-KEY: ${TYPESENSE_ADMIN_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Storefront search",
+    "actions": ["documents:search"],
+    "collections": ["rar_(product|category|cms_page|suggestion)_.*"]
+  }'
+```
+
+Typesense treats each `collections` entry as a regular expression that must match the whole requested name, so this entry matches the live aliases (`<prefix>_<entity>_<store code>`, e.g. `rar_category_de`) and the versioned collections behind them (`rar_category_de_v3`), but not `rar_customer_de` or `rar_order_de`. Use one entry per prefix when store views use different Index Prefixes. Instead of a pattern you can list the alias names explicitly (`rar_product_de`, `rar_category_de`, `rar_cms_page_de`, `rar_suggestion_de`, … for every store view); the browser always searches the alias, but the key then has to be recreated whenever a store view is added.
+
 ### Indexing Settings
 
 | Setting | Default | Description |
@@ -267,7 +286,7 @@ Choose which sort options are available to customers on search results and categ
 
 | Command | Description |
 |---|---|
-| `bin/magento typesense:reindex [--entity=TYPE]` | Reindex all or a specific entity type into Typesense. Valid types: `product`, `category`, `cms_page`, `suggestion` |
+| `bin/magento typesense:reindex [--entity=TYPE]` | Reindex all or a specific entity type into Typesense. Storefront types: `product`, `category`, `cms_page`, `suggestion`; admin search types: `customer`, `order`, `store`, `system_config`. Without `--entity` every type is reindexed, including the admin search collections with customer and order data (see [Search-only key scope](#search-only-key-scope)) |
 | `bin/magento typesense:collection:list` | List all Typesense collections with document count and alias mappings |
 | `bin/magento typesense:collection:delete <name>` | Delete a named Typesense collection |
 | `bin/magento typesense:health` | Check the health status of the Typesense server |
@@ -275,7 +294,7 @@ Choose which sort options are available to customers on search results and categ
 ### Examples
 
 ```bash
-# Full reindex of all entity types
+# Full reindex of all entity types (storefront and admin search)
 bin/magento typesense:reindex
 
 # Reindex only products
@@ -314,6 +333,8 @@ The indexer pipeline is split into three layers:
 | System Config | `<prefix>_system_config_v<n>` | `typesense_system_config` |
 
 Collections are suffixed with a version number (e.g., `rar_product_v2`) so that the live collection pointed to by the alias is never written to during a reindex.
+
+Every store view gets its own collections, behind the alias `<prefix>_<entity>_<store code>`. A store view's category collection holds only the active categories below that store's root category, with the names, URLs and status of that store view; its CMS page collection holds the pages assigned to the store view or to all store views, and its suggestion collection the store view's own search terms.
 
 ### Zero-Downtime Reindexing
 
