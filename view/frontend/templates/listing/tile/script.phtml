@@ -2,7 +2,9 @@
 /**
  * Alpine component `typesenseTile`, one per product tile. It reads `item` (a prepared hit) from the x-for scope and
  * the listing's `config`, `state`, `currentLimit`, `hits` and `wishlistIds` from the parent `typesenseListing`; cart
- * and wishlist requests come from the `typesenseTileRequests` mixin (child block).
+ * and wishlist requests come from the `typesenseTileRequests` mixin (child block). The tile root may set
+ * `data-visible-variants` (rows shown before the variants panel, default all) and `data-notify-hash-prefix`
+ * (default `notify-`).
  */
 
 declare(strict_types=1);
@@ -25,6 +27,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
         const strings = {
             rating: '<?= $escaper->escapeJs(__('Rating: %1 out of 5')) ?>',
             quantityFor: '<?= $escaper->escapeJs(__('Quantity for %1')) ?>',
+            outOfStock: '<?= $escaper->escapeJs(__('Out of stock')) ?>',
         };
         // Types whose tile can add one unit directly; others need the product page to choose options.
         const DIRECT_ADD_TYPES = ['simple', 'virtual', 'downloadable'];
@@ -35,6 +38,9 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             const step = stepOf(child);
             return quantity > 0 ? Number((Math.ceil(quantity / step - 1e-9) * step).toFixed(4)) : 0;
         };
+        const stockTextOf = entity => String((entity && entity.stock_text) || '') || strings.outOfStock;
+        // short_description is indexed without tags but with HTML entities; decoded to text, never inserted as HTML.
+        let parsedDescription = { source: '', text: '' };
 
         return {
             ...typesenseTileRequests(),
@@ -43,7 +49,21 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             childQuantities: {},
             // iOS Safari can fire the add-to-cart click before the input's change event, so keystrokes are kept here too.
             typedQuantities: {},
+            isAddedToCart: false,
+            variantsPanelOpen: false,
+            visibleVariantsLimit: null,
+            notifyHashPrefix: 'notify-',
 
+            init() {
+                const dataset = (this.$root && this.$root.dataset) || {};
+                const limit = Number(dataset.visibleVariants);
+                if (dataset.visibleVariants !== undefined && dataset.visibleVariants !== '' && Number.isInteger(limit) && limit >= 0) {
+                    this.visibleVariantsLimit = limit;
+                }
+                if (dataset.notifyHashPrefix !== undefined) {
+                    this.notifyHashPrefix = dataset.notifyHashPrefix;
+                }
+            },
             doc() {
                 return (this.item && this.item.document) || {};
             },
@@ -101,11 +121,39 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             isNew() {
                 return this.doc().is_new === true;
             },
+            labels() {
+                return Array.isArray(this.doc().labels) ? this.doc().labels.map(String) : [];
+            },
+            hasLabels() {
+                return this.labels().length > 0;
+            },
+            shortDescription() {
+                const source = String(this.doc().short_description || '');
+                if (source !== parsedDescription.source) {
+                    const text = source === '' ? '' : new DOMParser().parseFromString(source, 'text/html').body.textContent;
+                    parsedDescription = { source, text: String(text || '').trim() };
+                }
+                return parsedDescription.text;
+            },
+            hasShortDescription() {
+                return this.shortDescription() !== '';
+            },
             isInStock() {
                 return this.doc().in_stock !== false;
             },
             isOutOfStock() {
                 return !this.isInStock();
+            },
+            stockText() {
+                return stockTextOf(this.doc());
+            },
+            notifyUrl() {
+                const children = this.children();
+                const child = children.find(candidate => candidate.in_stock === false) || children[0];
+                return this.notifyUrlFor(child ? child.id : this.doc().id);
+            },
+            notifyUrlFor(id) {
+                return (this.doc().url || '') + '#' + this.notifyHashPrefix + id;
             },
 
             showRating() {
@@ -158,17 +206,46 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             variants() {
                 return this.children();
             },
+            visibleVariants() {
+                return this.visibleVariantsLimit === null ? this.children() : this.children().slice(0, this.visibleVariantsLimit);
+            },
+            hasMoreVariants() {
+                return this.visibleVariantsLimit !== null && this.children().length > this.visibleVariantsLimit;
+            },
+            isVariantsPanelOpen() {
+                return this.variantsPanelOpen;
+            },
+            openVariantsPanel() {
+                this.variantsPanelOpen = true;
+            },
+            closeVariantsPanel() {
+                this.variantsPanelOpen = false;
+            },
+            toggleVariantsPanel() {
+                this.variantsPanelOpen = !this.variantsPanelOpen;
+            },
+            // Same rule as the name details of Magento's grouped product rows: the parts after the product name.
+            sizeParts() {
+                return String(this.child.name || '').split(' - ').slice(1).map(part => part.trim()).filter(Boolean);
+            },
             childName() {
                 return this.child.name || '';
             },
             childInputId() {
                 return 'typesense-qty-' + this.doc().id + '-' + this.child.id;
             },
+            // The panel repeats the visible rows, so its inputs need ids of their own.
+            childPanelInputId() {
+                return this.childInputId() + '-panel';
+            },
             childQtyLabel() {
                 return hyva.str(strings.quantityFor, this.child.name || '');
             },
             childQty() {
                 return this.childQuantities[this.child.id] || 0;
+            },
+            isChildQtyEmpty() {
+                return this.childQty() <= 0;
             },
             childQtyStep() {
                 return stepOf(this.child);
@@ -212,6 +289,38 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             },
             childPriceText() {
                 return this.formatPrice(this.child.final_price);
+            },
+            // A preformatted string from the index, shown as it is.
+            hasChildBasePrice() {
+                return this.config.showPrices !== false && Boolean(this.child.base_price);
+            },
+            childBasePrice() {
+                return String(this.child.base_price || '');
+            },
+            childStockText() {
+                return stockTextOf(this.child);
+            },
+            childNotifyUrl() {
+                return this.notifyUrlFor(this.child.id);
+            },
+            totalQty() {
+                const quantities = Object.values(this.cartQuantities());
+                return quantities.reduce((sum, quantity) => sum + quantity, 0);
+            },
+            hasTotalQty() {
+                return this.totalQty() > 0;
+            },
+            showTotal() {
+                return this.config.showPrices !== false && this.hasVariants();
+            },
+            totalPriceText() {
+                if (this.config.showPrices === false) {
+                    return '';
+                }
+                const quantities = this.cartQuantities();
+                const children = this.children();
+                const total = children.reduce((sum, child) => sum + quantities[child.id] * (Number(child.final_price) || 0), 0);
+                return this.formatPrice(total);
             },
 
             canAddToCart() {

@@ -24,6 +24,8 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             chooseQuantity: '<?= $escaper->escapeJs(__('Please specify the quantity of product(s).')) ?>',
         };
         const core = () => window.runAsRootTypesense.listing;
+        const ADDED_TO_CART_MS = 1500;
+        let addedToCartTimer = null;
         const message = (type, text) => {
             if (typeof window.dispatchMessages !== 'undefined') {
                 window.dispatchMessages([{ type, text }], 5000);
@@ -43,6 +45,8 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     message('warning', strings.chooseQuantity);
                     return;
                 }
+                clearTimeout(addedToCartTimer);
+                this.isAddedToCart = false;
                 this.isAddingToCart = true;
                 try {
                     const response = await fetch(this.config.addToCartUrl, {
@@ -66,6 +70,10 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     }
                     this.childQuantities = {};
                     this.typedQuantities = {};
+                    this.isAddedToCart = true;
+                    addedToCartTimer = setTimeout(() => {
+                        this.isAddedToCart = false;
+                    }, ADDED_TO_CART_MS);
                     window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
                 } catch (error) {
                     console.error(error);
