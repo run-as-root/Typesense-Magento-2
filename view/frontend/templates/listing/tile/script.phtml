@@ -165,8 +165,12 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             childQtyStep() {
                 return Number(this.child.qty_increment) > 0 ? Number(this.child.qty_increment) : 1;
             },
+            // The cart rejects a quantity that is not a multiple of the increment and redirects to the product page.
             setChildQty() {
-                const value = Math.max(0, Math.floor(hyva.safeParseNumber(this.$event.target.value) || 0));
+                const typed = hyva.safeParseNumber(this.$event.target.value) || 0;
+                const step = this.childQtyStep();
+                const value = typed > 0 ? Number((Math.ceil(typed / step - 1e-9) * step).toFixed(4)) : 0;
+                this.$event.target.value = value;
                 this.childQuantities = Object.assign({}, this.childQuantities, { [this.child.id]: value });
             },
             incrementChildQty() {

@@ -352,3 +352,31 @@ test('a tile click dispatches select-item with the GA4 item at its listing posit
     suggested.trackSelect();
     assert.equal(tracked(env, 'typesense:select-item').length, 2, 'no-results suggestions are not the tracked list');
 });
+
+test('a typed child quantity is rounded up to the next multiple of its quantity increment', () => {
+    const env = createEnvironment();
+    const tile = Object.assign(env.context.initTypesenseTile(), {
+        config: listingConfig, wishlistIds: [],
+        item: hit(9, { type_id: 'grouped', children: [{ id: 21, qty_increment: 6 }, { id: 22, qty_increment: 0 }] }),
+    });
+    const type = (child, value) => {
+        const target = { value };
+        Object.assign(tile, { child, $event: { target } }).setChildQty();
+        return [tile.childQty(), target.value];
+    };
+    const [sixPack, single] = tile.variants();
+
+    assert.deepEqual(type(sixPack, '5'), [6, 6]);
+    assert.deepEqual(type(sixPack, '7'), [12, 12]);
+    assert.deepEqual(type(sixPack, '12'), [12, 12]);
+    assert.deepEqual(type(sixPack, '0'), [0, 0]);
+    assert.deepEqual(type(sixPack, '-3'), [0, 0]);
+    assert.deepEqual(type(single, '2.4'), [3, 3]);
+});
+
+test('the child quantity input is normalised on change, not on every keystroke', () => {
+    const source = readFileSync(templates + 'tile/variants.phtml', 'utf8');
+
+    assert.match(source, /@change="setChildQty"/);
+    assert.doesNotMatch(source, /@input="setChildQty"/);
+});

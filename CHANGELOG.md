@@ -23,6 +23,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- A quantity typed into a grouped tile's size row is rounded up to the next multiple of that size's quantity increment (on `change`, written back into the input); a non-multiple was rejected by the cart, which redirected to the product page.
 - A malformed "Facet Types" or "Searchable Attributes" config value (not valid JSON, e.g. hand-edited or PHP-serialized) is treated as unset instead of throwing, which failed every listing and search page with a 500.
 - A configured facet whose field is missing from the product schema or not faceted (e.g. an attribute removed from "Additional Attributes to Index") is left out of the listing config: Typesense rejected the facet search with a 400, so every other facet disappeared, and with its URL parameter set the whole listing showed the error state.
 - The CSP `connect-src` allowlist now includes the search node the browser actually connects to (`general/search_host`/`search_port`/`search_protocol`, falling back to the indexing node) besides the indexing node; with a separate public search host, storefront Typesense requests were blocked under a restrictive CSP.
