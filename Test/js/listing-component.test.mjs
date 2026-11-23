@@ -38,10 +38,10 @@ function hit(id, extra = {}) {
 }
 
 function createEnvironment(search = '') {
-    const env = { events: [], history: [], seo: { style: { display: 'flex' } }, responder: null };
+    const env = { events: [], history: [], parsed: [], seo: { style: { display: 'flex' } }, responder: null };
     const context = {
         console: { error() {}, warn() {}, log: console.log }, URLSearchParams, JSON, Math, Number, String, Object,
-        Array, Promise, setTimeout, Intl, Map,
+        Array, Promise, setTimeout, clearTimeout, Intl, Map,
         CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } },
         location: { pathname: '/gin.html', search, hash: '' },
         history: {
@@ -59,6 +59,15 @@ function createEnvironment(search = '') {
             getFormKey: () => 'FK',
             getUenc: () => 'UENC',
             safeParseNumber: value => Number(value),
+        },
+        // Like the browser's parser for what the tile relies on: tags dropped, then entities decoded once.
+        DOMParser: class {
+            parseFromString(source, type) {
+                env.parsed.push(type);
+                const entities = { amp: '&', nbsp: '\u00a0', lt: '<', gt: '>', quot: '"', '#39': "'" };
+                const text = source.replace(/<[^>]*>/g, '').replace(/&(#?\w+);/g, (entity, name) => entities[name] ?? entity);
+                return { body: { textContent: text } };
+            }
         },
         Alpine: { data() {} },
         dispatchEvent: event => env.events.push(event),
@@ -401,4 +410,220 @@ test('add to cart sends a typed quantity rounded to its increment even when no c
 
     assert.equal(sent['super_group[21]'], '12');
     assert.equal(sent['super_group[22]'], '2');
+});
+
+function tile(env, document, dataset = {}, config = listingConfig) {
+    const component = Object.assign(env.context.initTypesenseTile(), {
+        config, wishlistIds: [], item: hit(9, document), $root: { dataset },
+    });
+    component.init();
+    return component;
+}
+
+const sizes = [
+    { id: 21, name: 'Gin - 0.5 l - 40 %', final_price: 2.5, qty_increment: 6, in_stock: true },
+    { id: 22, name: 'Gin - 1 l', final_price: 10, in_stock: false, stock_text: 'Back in May', base_price: 'EUR 10 / l' },
+    { id: 23, name: 'Gin', final_price: 30, in_stock: false },
+];
+
+test('tile getters return defaults when the optional fields are absent', () => {
+    const env = createEnvironment();
+    const plain = tile(env, { type_id: 'simple', url: '/gin.html' });
+
+    assert.deepEqual([...plain.labels()], []);
+    assert.equal(plain.hasLabels(), false);
+    assert.equal(plain.shortDescription(), '');
+    assert.equal(plain.hasShortDescription(), false);
+    assert.deepEqual([...plain.visibleVariants()], []);
+    assert.equal(plain.hasMoreVariants(), false);
+    assert.equal(plain.stockText(), 'Out of stock');
+    assert.equal(plain.notifyUrl(), '/gin.html#notify-9');
+    assert.equal(plain.totalQty(), 0);
+    assert.equal(plain.hasTotalQty(), false);
+    assert.equal(plain.showTotal(), false);
+    assert.equal(plain.isVariantsPanelOpen(), false);
+    assert.equal(plain.isAddedToCart, false);
+
+    plain.child = { id: 5 };
+    assert.deepEqual([...plain.sizeParts()], []);
+    assert.equal(plain.hasChildBasePrice(), false);
+    assert.equal(plain.childBasePrice(), '');
+    assert.equal(plain.childStockText(), 'Out of stock');
+    assert.equal(plain.isChildQtyEmpty(), true);
+    assert.equal(env.parsed.length, 0, 'an absent description is not parsed');
+});
+
+test('labels are strings and a non-array labels field is ignored', () => {
+    const env = createEnvironment();
+
+    assert.deepEqual([...tile(env, { labels: ['New', 5] }).labels()], ['New', '5']);
+    assert.equal(tile(env, { labels: ['New'] }).hasLabels(), true);
+    assert.deepEqual([...tile(env, { labels: 'New' }).labels()], []);
+});
+
+test('the short description is plain text with entities decoded and markup never parsed back', () => {
+    const env = createEnvironment();
+    const described = tile(env, { short_description: ' <p>Gin &amp; Tonic&nbsp;</p> ' });
+
+    assert.equal(described.shortDescription(), 'Gin & Tonic');
+    assert.equal(described.hasShortDescription(), true);
+    assert.deepEqual(env.parsed, ['text/html']);
+
+    const hostile = tile(env, { short_description: 'Dry &lt;script&gt;alert(1)&lt;/script&gt; <b>gin</b>' });
+    assert.equal(hostile.shortDescription(), 'Dry <script>alert(1)</script> gin');
+    assert.equal(typeof hostile.shortDescription(), 'string');
+    assert.equal(tile(env, { short_description: '<p> </p>' }).hasShortDescription(), false);
+});
+
+test('visible variants follow data-visible-variants and default to every child', () => {
+    const env = createEnvironment();
+    const grouped = { type_id: 'grouped', children: sizes };
+
+    const all = tile(env, grouped);
+    assert.deepEqual(all.visibleVariants().map(child => child.id), [21, 22, 23]);
+    assert.equal(all.hasMoreVariants(), false);
+
+    const two = tile(env, grouped, { visibleVariants: '2' });
+    assert.deepEqual(two.visibleVariants().map(child => child.id), [21, 22]);
+    assert.equal(two.hasMoreVariants(), true);
+
+    assert.equal(tile(env, grouped, { visibleVariants: '3' }).hasMoreVariants(), false);
+    assert.equal(tile(env, grouped, { visibleVariants: 'all' }).visibleVariants().length, 3);
+    assert.equal(tile(env, grouped, { visibleVariants: '0' }).visibleVariants().length, 0);
+});
+
+test('the variants panel opens, closes and toggles', () => {
+    const env = createEnvironment();
+    const panel = tile(env, { type_id: 'grouped', children: sizes });
+
+    panel.openVariantsPanel();
+    assert.equal(panel.isVariantsPanelOpen(), true);
+    panel.closeVariantsPanel();
+    assert.equal(panel.isVariantsPanelOpen(), false);
+    panel.toggleVariantsPanel();
+    assert.equal(panel.variantsPanelOpen, true);
+    panel.toggleVariantsPanel();
+    assert.equal(panel.variantsPanelOpen, false);
+});
+
+test('child rows expose size parts, panel input ids, base prices and stock texts', () => {
+    const env = createEnvironment();
+    const rows = tile(env, { type_id: 'grouped', children: sizes });
+    const [sixPack, litre, bare] = rows.variants();
+
+    rows.child = sixPack;
+    assert.deepEqual([...rows.sizeParts()], ['0.5 l', '40 %']);
+    assert.equal(rows.childPanelInputId(), 'typesense-qty-9-21-panel');
+    assert.equal(rows.isChildQtyEmpty(), true);
+    rows.incrementChildQty();
+    assert.equal(rows.isChildQtyEmpty(), false);
+    assert.equal(rows.hasChildBasePrice(), false);
+
+    rows.child = litre;
+    assert.deepEqual([...rows.sizeParts()], ['1 l']);
+    assert.equal(rows.hasChildBasePrice(), true);
+    assert.equal(rows.childBasePrice(), 'EUR 10 / l');
+    assert.equal(rows.childStockText(), 'Back in May');
+
+    rows.child = bare;
+    assert.deepEqual([...rows.sizeParts()], []);
+    assert.equal(rows.childStockText(), 'Out of stock');
+
+    const hidden = tile(env, { type_id: 'grouped', children: sizes }, {}, Object.assign({}, listingConfig, { showPrices: false }));
+    hidden.child = litre;
+    assert.equal(hidden.hasChildBasePrice(), false);
+});
+
+test('the parent stock text prefers stock_text', () => {
+    const env = createEnvironment();
+
+    assert.equal(tile(env, { in_stock: false, stock_text: 'Sold out until May' }).stockText(), 'Sold out until May');
+    assert.equal(tile(env, { in_stock: false, stock_text: '' }).stockText(), 'Out of stock');
+});
+
+test('notify URLs use the hash prefix and fall back from the first sold-out child to the first child to the product', () => {
+    const env = createEnvironment();
+    const grouped = { type_id: 'grouped', url: '/gin.html', children: sizes };
+
+    const custom = tile(env, grouped, { notifyHashPrefix: 'alert-' });
+    custom.child = sizes[0];
+    assert.equal(custom.childNotifyUrl(), '/gin.html#alert-21');
+    assert.equal(custom.notifyUrl(), '/gin.html#alert-22');
+
+    const allInStock = tile(env, Object.assign({}, grouped, { children: [sizes[0]] }));
+    assert.equal(allInStock.notifyUrl(), '/gin.html#notify-21');
+    assert.equal(tile(env, { url: '/gin.html' }).notifyUrl(), '/gin.html#notify-9');
+    assert.equal(tile(env, {}).notifyUrl(), '#notify-9');
+});
+
+test('totals use the quantities rounded to each increment and respect hidden prices', () => {
+    const env = createEnvironment();
+    const grouped = { type_id: 'grouped', children: sizes };
+    const totals = tile(env, grouped);
+    const [sixPack, litre] = totals.variants();
+
+    Object.assign(totals, { child: sixPack, $event: { target: { value: '7' } } }).recordChildQty();
+    Object.assign(totals, { child: litre, $event: { target: { value: '2' } } }).setChildQty();
+
+    assert.equal(totals.totalQty(), 14);
+    assert.equal(totals.hasTotalQty(), true);
+    assert.equal(totals.totalPriceText(), 'EUR 50');
+    assert.equal(totals.showTotal(), true);
+
+    const hidden = tile(env, grouped, {}, Object.assign({}, listingConfig, { showPrices: false }));
+    Object.assign(hidden, { child: sixPack, $event: { target: { value: '6' } } }).setChildQty();
+    assert.equal(hidden.totalQty(), 6);
+    assert.equal(hidden.showTotal(), false);
+    assert.equal(hidden.totalPriceText(), '');
+});
+
+test('isAddedToCart is set for 1.5 s after a successful add and its timer is cleared by a new add', async () => {
+    const env = createEnvironment();
+    const timers = new Map();
+    let nextTimer = 0;
+    env.context.setTimeout = (callback, delay) => {
+        timers.set(++nextTimer, { callback, delay });
+        return nextTimer;
+    };
+    env.context.clearTimeout = id => timers.delete(id);
+    let ok = true;
+    env.context.fetch = () => Promise.resolve({ ok, status: ok ? 200 : 500, redirected: false, json: async () => ({}) });
+    const adding = tile(env, { type_id: 'simple' });
+
+    await adding.addToCart();
+    assert.equal(adding.isAddedToCart, true);
+    assert.deepEqual([...timers.values()].map(timer => timer.delay), [1500]);
+
+    const pending = adding.addToCart();
+    assert.equal(adding.isAddedToCart, false, 'a new add resets the label');
+    assert.equal(timers.size, 0, 'and clears the previous timer');
+    await pending;
+    assert.equal(timers.size, 1);
+    [...timers.values()][0].callback();
+    assert.equal(adding.isAddedToCart, false);
+
+    ok = false;
+    timers.clear();
+    await adding.addToCart();
+    assert.equal(adding.isAddedToCart, false);
+    assert.equal(timers.size, 0);
+});
+
+test('item numbers cover the current page and are 0 without results', async () => {
+    const env = createEnvironment('?page=2');
+    env.responder = results(30, Array.from({ length: 12 }, (_, i) => hit(i + 1)));
+    const listing = env.listing();
+    listing.init();
+    await settle();
+    assert.deepEqual([listing.firstItemNumber(), listing.lastItemNumber()], [13, 24]);
+
+    env.responder = results(30, Array.from({ length: 6 }, (_, i) => hit(i + 1)));
+    listing.setPage(3);
+    await settle();
+    assert.deepEqual([listing.firstItemNumber(), listing.lastItemNumber()], [25, 30]);
+
+    env.responder = results(0, []);
+    listing.setPage(1);
+    await settle();
+    assert.deepEqual([listing.firstItemNumber(), listing.lastItemNumber()], [0, 0]);
 });

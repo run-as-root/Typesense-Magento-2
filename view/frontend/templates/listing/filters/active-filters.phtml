@@ -82,12 +82,14 @@ $chipClasses = 'inline-flex shrink-0 items-center gap-2 rounded border border-gr
             showActiveFilters() {
                 return this.showPriceChip() || this.activeChips().length > 0;
             },
-            priceChipText() {
+            priceRangeText() {
                 const price = this.listing.state.price || { min: 0, max: 0 };
-                const range = hyva.formatPrice(price.min, false, wholeAmounts()) + ' – '
-                    + hyva.formatPrice(price.max, false, wholeAmounts());
 
-                return hyva.str(strings.chip, strings.price, range);
+                return hyva.formatPrice(price.min, false, wholeAmounts()) + ' – '
+                    + hyva.formatPrice(price.max, false, wholeAmounts());
+            },
+            priceChipText() {
+                return hyva.str(strings.chip, strings.price, this.priceRangeText());
             },
             removePriceChipLabel() {
                 return hyva.str(strings.remove, this.priceChipText());

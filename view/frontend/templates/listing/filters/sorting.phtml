@@ -170,6 +170,13 @@ $heroicons = $viewModels->require(HeroiconsOutline::class);
                     this.dispatchListingEvent('typesense-sort-change', { sort: value });
                 }
             },
+            // For a native <select>; selectSortOption() needs the x-for option scope.
+            selectSort() {
+                const value = String(this.$event.target.value);
+                if (value !== this.currentSort()) {
+                    this.dispatchListingEvent('typesense-sort-change', { sort: value });
+                }
+            },
             chooseSortOption() {
                 this.selectSortOption();
                 this.closeSortMenuAndFocus();
