@@ -54,8 +54,6 @@ class SkipProductCollectionPlugin
         }
 
         $collection = $this->collectionFactory->create();
-        $collection->setPageSize(0);
-        // The filter empties the collection; a page size of 0 means "no limit" to Magento.
         $collection->addFieldToFilter('entity_id', ['eq' => 0]);
         $subject->setCollection($collection);
         $this->emptyCollections[$subject] = $collection;

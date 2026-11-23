@@ -40,17 +40,10 @@
         return NUMBER_VALUE.test(text) && Number.isFinite(Number(text));
     }
 
-    // Older configs mark numeric facets with `numeric: true` or pass a list of fields; both mean float.
+    const NUMERIC_KINDS = ['int32', 'int64', 'float'];
+
     function numericKind(numeric) {
-        return ['int32', 'int64', 'float'].includes(numeric) ? numeric : 'float';
-    }
-
-    function numericKinds(numericFields) {
-        if (Array.isArray(numericFields)) {
-            return Object.fromEntries(numericFields.map(field => [field, 'float']));
-        }
-
-        return Object.assign({}, numericFields);
+        return NUMERIC_KINDS.includes(numeric) ? numeric : null;
     }
 
     function pricesShown(config) {
@@ -121,7 +114,7 @@
     function buildFilterBy(baseFilter, filters, price, exclude, booleanFields, numericFields) {
         const excluded = [].concat(exclude || []);
         const booleans = [].concat(booleanFields || []);
-        const numerics = numericKinds(numericFields);
+        const numerics = Object.assign({}, numericFields);
         const parts = [];
         const base = String(baseFilter || '').trim();
 
@@ -170,9 +163,9 @@
     function numericFacetFields(config) {
         const kinds = {};
         const facets = (config.facets || [])
-            .filter(facet => facet && typeof facet === 'object' && facet.numeric && facet.field !== 'price');
+            .filter(facet => facet && typeof facet === 'object' && numericKind(facet.numeric) && facet.field !== 'price');
         for (const facet of facets) {
-            kinds[facet.field] = numericKind(facet.numeric);
+            kinds[facet.field] = facet.numeric;
         }
 
         return kinds;
@@ -383,27 +376,6 @@
         return fields.includes(field) ? ownFacetSearch(searchContext(state, config), config, field) : null;
     }
 
-    function activeFacets(state) {
-        const active = [];
-        const filterEntries = Object.entries(state.filters || {});
-        for (const [field, values] of filterEntries) {
-            if (valueList(values).length > 0) {
-                active.push(field);
-            }
-        }
-        const queryEntries = Object.entries(state.facetQueries || {});
-        for (const [field, text] of queryEntries) {
-            if (String(text || '').trim() !== '') {
-                active.push(field);
-            }
-        }
-        if (priceRange(state.price) !== null) {
-            active.push('price');
-        }
-
-        return active;
-    }
-
     function facetEntries(result) {
         if (result && Array.isArray(result.facet_counts)) {
             return result.facet_counts;
@@ -423,33 +395,14 @@
         return Boolean(searches && searches.facetSources);
     }
 
-    // Pass the buildSearches() list to read each facet from the search built for it; without it, a
-    // single-facet result counts as the facet's own disjunctive search.
+    // Reads each facet from the search buildSearches() built for it (its facetSources).
     function mergeFacetCounts(results, state, searches) {
-        if (hasFacetSources(searches)) {
-            const fields = Object.keys(searches.facetSources);
-
-            return fields.map(field => sourceEntry(results, searches, field)).filter(facet => facet !== null);
+        if (!hasFacetSources(searches)) {
+            return [];
         }
+        const fields = Object.keys(searches.facetSources);
 
-        const active = activeFacets(state || {});
-        const merged = new Map();
-
-        for (const result of results || []) {
-            const entries = facetEntries(result);
-            const isOwnSearch = Array.isArray(result && result.facet_counts) && entries.length === 1;
-            for (const facet of entries) {
-                const field = facet && facet.field_name;
-                if (typeof field !== 'string') {
-                    continue;
-                }
-                if (!merged.has(field) || (isOwnSearch && active.includes(field))) {
-                    merged.set(field, facet);
-                }
-            }
-        }
-
-        return Array.from(merged.values());
+        return fields.map(field => sourceEntry(results, searches, field)).filter(facet => facet !== null);
     }
 
     function statsOf(facet) {
@@ -459,25 +412,13 @@
         return Number.isFinite(min) && Number.isFinite(max) ? { min: Math.floor(min), max: Math.ceil(max) } : null;
     }
 
+    // The facet's own search ignores the active price filter, so it holds the full range.
     function facetStats(results, field, searches) {
-        if (hasFacetSources(searches)) {
-            return Object.keys(searches.facetSources).includes(field) ? statsOf(sourceEntry(results, searches, field)) : null;
+        if (!hasFacetSources(searches) || !Object.keys(searches.facetSources).includes(field)) {
+            return null;
         }
 
-        let stats = null;
-
-        for (const result of results || []) {
-            const entries = facetEntries(result);
-            for (const facet of entries) {
-                const facetRange = facet && facet.field_name === field ? statsOf(facet) : null;
-                // The facet's own search ignores the active price filter, so it holds the full range.
-                if (facetRange !== null && (stats === null || entries.length === 1)) {
-                    stats = facetRange;
-                }
-            }
-        }
-
-        return stats;
+        return statsOf(sourceEntry(results, searches, field));
     }
 
     function rawPairs(search) {
@@ -832,7 +773,9 @@
             return isBooleanValue(value) ? String((labels || {})[value] || value) : null;
         }
 
-        return facet.numeric && !isNumberValue(value, numericKind(facet.numeric)) ? null : value;
+        const kind = numericKind(facet.numeric);
+
+        return kind && !isNumberValue(value, kind) ? null : value;
     }
 
     // Selected values stay listed without a count, so they can still be unchecked when a value search

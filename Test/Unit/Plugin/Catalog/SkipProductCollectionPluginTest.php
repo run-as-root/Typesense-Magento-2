@@ -152,7 +152,7 @@ final class SkipProductCollectionPluginTest extends TestCase
     private function expectEmptyCollection(): Collection&MockObject
     {
         $empty = $this->createMock(Collection::class);
-        $empty->expects(self::once())->method('setPageSize')->with(0)->willReturnSelf();
+        $empty->expects(self::never())->method('setPageSize');
         $empty->expects(self::once())->method('addFieldToFilter')->with('entity_id', ['eq' => 0])->willReturnSelf();
         $this->collectionFactory->expects(self::once())->method('create')->willReturn($empty);
 

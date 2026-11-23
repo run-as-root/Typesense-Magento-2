@@ -170,7 +170,7 @@ test('buildSearches adds disjunctive facet searches with facet_query and search 
     assert.equal(core.buildSearches(state({ q: 'gin' }), searchConfig({ directMatchesFirst: false })).length, 2);
 });
 
-test('mergeFacetCounts prefers each facet own disjunctive counts', () => {
+test('mergeFacetCounts reads each facet from its own disjunctive search', () => {
     const filteredColor = { field_name: 'color', counts: [{ value: 'Red', count: 3 }] };
     const ownColor = { field_name: 'color', counts: [{ value: 'Red', count: 3 }, { value: 'Blue', count: 5 }] };
     const size = { field_name: 'size', counts: [{ value: 'L', count: 3 }] };
@@ -183,13 +183,8 @@ test('mergeFacetCounts prefers each facet own disjunctive counts', () => {
         { code: 400, error: 'failed' },
     ];
 
-    const merged = core.mergeFacetCounts(results, state({ filters: { color: ['Red'] } }));
-
-    assert.deepEqual(merged.map(facet => facet.field_name).sort(), ['color', 'in_stock', 'size']);
-    assert.deepEqual(merged.find(facet => facet.field_name === 'color'), ownColor);
-
-    // With the search list, each facet is read from the search built for it, in configured order,
-    // even when the main search also returns a single facet.
+    // Each facet is read from the search built for it, in configured order, even when the main search also
+    // returns a single facet.
     const config = searchConfig({ facets: ['color', 'size', 'in_stock'] });
     const current = state({ q: 'gin', filters: { color: ['Red'] } });
     const searches = core.buildSearches(current, config);
@@ -199,18 +194,10 @@ test('mergeFacetCounts prefers each facet own disjunctive counts', () => {
     assert.deepEqual(mapped, [ownColor, size, inStock]);
     assert.deepEqual(core.mergeFacetCounts([results[0], results[1], { code: 500, error: 'down' }, results[3]], current, searches),
         [size, inStock]);
+    assert.deepEqual(core.mergeFacetCounts(results, current), [], 'without the search list nothing is guessed');
 });
 
 test('facetStats floors min and ceils max', () => {
-    const results = [
-        { facet_counts: [] },
-        { facet_counts: [{ field_name: 'price', counts: [], stats: { min: 9.99, max: 120.01, avg: 40 } }] },
-    ];
-
-    assert.deepEqual(core.facetStats(results, 'price'), { min: 9, max: 121 });
-    assert.equal(core.facetStats(results, 'weight'), null);
-    assert.equal(core.facetStats([{ facet_counts: [{ field_name: 'price', counts: [] }] }], 'price'), null);
-
     const config = searchConfig();
     const searches = core.buildSearches(state({ q: 'gin', price: { min: 20, max: 30 } }), config);
     const ownPrice = { field_name: 'price', counts: [], stats: { min: 4.5, max: 99.2 } };
@@ -224,6 +211,9 @@ test('facetStats floors min and ceils max', () => {
     assert.equal(searches.facetSources.price, 2);
     assert.deepEqual(core.facetStats(mapped, 'price', searches), { min: 4, max: 100 });
     assert.equal(core.facetStats(mapped, 'weight', searches), null);
+    const noStats = [{ facet_counts: [] }, { facet_counts: [] }, { facet_counts: [{ field_name: 'price', counts: [] }] }];
+    assert.equal(core.facetStats(noStats, 'price', searches), null);
+    assert.equal(core.facetStats(mapped, 'price'), null, 'without the search list nothing is guessed');
 });
 
 test('buildSortBy puts in_stock first and never exceeds three fields', () => {
@@ -675,4 +665,12 @@ test('integer facets accept only whole numbers in their range, float facets deci
     });
     const entry = { field_name: 'visibility', counts: [{ value: '4', count: 3 }, { value: '4.5', count: 1 }] };
     assert.deepEqual(core.facetOptions(config.facets[0], entry, [], {}).map(option => option.value), ['4']);
+});
+
+test('only the Typesense numeric kinds mark a facet numeric', () => {
+    const config = searchConfig({ facets: [{ field: 'volume', label: 'Volume', type: 'dropdown', numeric: true }] });
+
+    assert.deepEqual(core.parseUrlState('?volume=0.7|x', config).filters, { volume: ['0.7', 'x'] });
+    assert.equal(core.buildSearches(state({ filters: { volume: ['0.7'] } }), config)[0].filter_by,
+        'visibility:[3,4] && volume:=[`0.7`]');
 });

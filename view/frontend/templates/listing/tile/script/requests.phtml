@@ -75,10 +75,6 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             },
 
             async addToWishlist() {
-                if (this.isWished()) {
-                    window.location.href = this.config.wishlistUrl;
-                    return;
-                }
                 const productId = String(this.doc().id);
                 let isRedirecting = false;
                 this.isAddingToWishlist = true;
