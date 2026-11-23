@@ -104,9 +104,9 @@ $config = $viewModel->getJsonConfig($product);
 
                 let html = '';
                 for (const doc of this.recommendations) {
-                    const price = doc.price ? '$' + Number(doc.price).toFixed(2) : '';
-                    const specialPrice = doc.special_price ? '$' + Number(doc.special_price).toFixed(2) : '';
-                    const hasDiscount = specialPrice && doc.special_price < doc.price;
+                    const price = doc.final_price ? '$' + Number(doc.final_price).toFixed(2) : '';
+                    const regularPrice = doc.regular_price ? '$' + Number(doc.regular_price).toFixed(2) : '';
+                    const hasDiscount = price && doc.regular_price > doc.final_price;
 
                     const imgHtml = doc.image_url
                         ? '<img src="' + this.esc(doc.image_url) + '" alt="' + this.esc(doc.name) + '" class="w-full h-full object-contain" loading="lazy"/>'
@@ -114,8 +114,8 @@ $config = $viewModel->getJsonConfig($product);
 
                     let priceHtml = '';
                     if (hasDiscount) {
-                        priceHtml = '<span class="text-sm font-bold text-red-600">' + this.esc(specialPrice) + '</span>'
-                            + ' <span class="text-xs text-gray-400 line-through">' + this.esc(price) + '</span>';
+                        priceHtml = '<span class="text-sm font-bold text-red-600">' + this.esc(price) + '</span>'
+                            + ' <span class="text-xs text-gray-400 line-through">' + this.esc(regularPrice) + '</span>';
                     } else {
                         priceHtml = '<span class="text-sm font-bold text-gray-800">' + this.esc(price) + '</span>';
                     }

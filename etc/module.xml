@@ -4,6 +4,9 @@
     <module name="RunAsRoot_TypeSense">
         <sequence>
             <module name="Magento_Catalog"/>
+            <module name="Magento_GroupedProduct"/>
+            <module name="Magento_InventorySalesApi"/>
+            <module name="Magento_InventoryConfigurationApi"/>
             <module name="Magento_CatalogRule"/>
             <module name="Magento_Cms"/>
             <module name="Magento_Search"/>

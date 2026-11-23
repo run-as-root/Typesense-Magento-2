@@ -11,6 +11,7 @@ use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product as ProductResource;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Eav\Model\Entity\Attribute\AbstractAttribute;
+use Magento\GroupedProduct\Model\Product\Type\Grouped;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -26,9 +27,10 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\SplitterProvider;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ImageResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\PriceCalculatorInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductDataBuilder;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\GroupedChildrenResolver;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\SalableResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ReviewResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\SalesCountResolverInterface;
-use RunAsRoot\TypeSense\Model\Indexer\Product\StockResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\UrlResolverInterface;
 
 final class ProductDataBuilderTest extends TestCase
@@ -36,7 +38,7 @@ final class ProductDataBuilderTest extends TestCase
     private AttributeResolverInterface&MockObject $attributeResolver;
     private PriceCalculatorInterface&MockObject $priceCalculator;
     private ImageResolverInterface&MockObject $imageResolver;
-    private StockResolverInterface&MockObject $stockResolver;
+    private SalableResolverInterface&MockObject $salableResolver;
     private CategoryResolverInterface&MockObject $categoryResolver;
     private UrlResolverInterface&MockObject $urlResolver;
     private ProductCollectionFactory&MockObject $collectionFactory;
@@ -47,6 +49,7 @@ final class ProductDataBuilderTest extends TestCase
     private SplitterProvider&MockObject $splitterProvider;
     private CatalogWordsProvider&MockObject $catalogWordsProvider;
     private NameDecompounder $nameDecompounder;
+    private GroupedChildrenResolver $groupedChildrenResolver;
     private ProductDataBuilder $sut;
 
     protected function setUp(): void
@@ -54,7 +57,7 @@ final class ProductDataBuilderTest extends TestCase
         $this->attributeResolver = $this->createMock(AttributeResolverInterface::class);
         $this->priceCalculator = $this->createMock(PriceCalculatorInterface::class);
         $this->imageResolver = $this->createMock(ImageResolverInterface::class);
-        $this->stockResolver = $this->createMock(StockResolverInterface::class);
+        $this->salableResolver = $this->createMock(SalableResolverInterface::class);
         $this->categoryResolver = $this->createMock(CategoryResolverInterface::class);
         $this->urlResolver = $this->createMock(UrlResolverInterface::class);
         $this->collectionFactory = $this->createMock(ProductCollectionFactory::class);
@@ -78,6 +81,8 @@ final class ProductDataBuilderTest extends TestCase
             $this->catalogWordsProvider,
         );
 
+        $this->groupedChildrenResolver = new GroupedChildrenResolver($this->priceCalculator, $this->salableResolver);
+
         $this->sut = $this->buildSut();
     }
 
@@ -94,9 +99,8 @@ final class ProductDataBuilderTest extends TestCase
         );
 
         $this->priceCalculator->method('getFinalPrice')->with($product)->willReturn(99.99);
-        $this->priceCalculator->method('getSpecialPrice')->with($product)->willReturn(null);
         $this->imageResolver->method('getImageUrl')->with($product)->willReturn('https://example.com/image.jpg');
-        $this->stockResolver->method('isInStock')->with($product)->willReturn(true);
+        $this->salableResolver->method('isSalable')->with($product, 1)->willReturn(true);
         $this->urlResolver->method('getProductUrl')->with($product)->willReturn('https://example.com/test-product.html');
         $this->categoryResolver->method('getCategoryData')->with($product)->willReturn([
             'categories' => ['Electronics', 'Phones'],
@@ -130,62 +134,13 @@ final class ProductDataBuilderTest extends TestCase
         self::assertSame(['Electronics > Phones'], $document['categories.lvl1']);
     }
 
-    public function test_build_includes_special_price_when_set(): void
-    {
-        $product = $this->createProductMock();
-
-        $this->priceCalculator->method('getFinalPrice')->willReturn(79.99);
-        $this->priceCalculator->method('getSpecialPrice')->willReturn(59.99);
-        $this->imageResolver->method('getImageUrl')->willReturn('');
-        $this->stockResolver->method('isInStock')->willReturn(false);
-        $this->urlResolver->method('getProductUrl')->willReturn('');
-        $this->categoryResolver->method('getCategoryData')->willReturn([
-            'categories' => [],
-            'category_ids' => [],
-            'categories.lvl0' => [],
-            'categories.lvl1' => [],
-            'categories.lvl2' => [],
-        ]);
-        $this->attributeResolver->method('getExtraAttributes')->willReturn([]);
-        $product->method('getData')->willReturn(null);
-
-        $document = $this->sut->build($product, 1);
-
-        self::assertSame(59.99, $document['special_price']);
-    }
-
-    public function test_build_omits_special_price_when_null(): void
-    {
-        $product = $this->createProductMock();
-
-        $this->priceCalculator->method('getFinalPrice')->willReturn(99.99);
-        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
-        $this->imageResolver->method('getImageUrl')->willReturn('');
-        $this->stockResolver->method('isInStock')->willReturn(true);
-        $this->urlResolver->method('getProductUrl')->willReturn('');
-        $this->categoryResolver->method('getCategoryData')->willReturn([
-            'categories' => [],
-            'category_ids' => [],
-            'categories.lvl0' => [],
-            'categories.lvl1' => [],
-            'categories.lvl2' => [],
-        ]);
-        $this->attributeResolver->method('getExtraAttributes')->willReturn([]);
-        $product->method('getData')->willReturn(null);
-
-        $document = $this->sut->build($product, 1);
-
-        self::assertArrayNotHasKey('special_price', $document);
-    }
-
     public function test_build_merges_extra_attributes(): void
     {
         $product = $this->createProductMock();
 
         $this->priceCalculator->method('getFinalPrice')->willReturn(99.99);
-        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
         $this->imageResolver->method('getImageUrl')->willReturn('');
-        $this->stockResolver->method('isInStock')->willReturn(true);
+        $this->salableResolver->method('isSalable')->willReturn(true);
         $this->urlResolver->method('getProductUrl')->willReturn('');
         $this->categoryResolver->method('getCategoryData')->willReturn([
             'categories' => [],
@@ -214,9 +169,8 @@ final class ProductDataBuilderTest extends TestCase
         );
 
         $this->priceCalculator->method('getFinalPrice')->willReturn(0.0);
-        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
         $this->imageResolver->method('getImageUrl')->willReturn('');
-        $this->stockResolver->method('isInStock')->willReturn(false);
+        $this->salableResolver->method('isSalable')->willReturn(false);
         $this->urlResolver->method('getProductUrl')->willReturn('');
         $this->categoryResolver->method('getCategoryData')->willReturn([
             'categories' => [],
@@ -241,9 +195,8 @@ final class ProductDataBuilderTest extends TestCase
         $product = $this->createProductMock();
 
         $this->priceCalculator->method('getFinalPrice')->willReturn(99.99);
-        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
         $this->imageResolver->method('getImageUrl')->willReturn('');
-        $this->stockResolver->method('isInStock')->willReturn(true);
+        $this->salableResolver->method('isSalable')->willReturn(true);
         $this->urlResolver->method('getProductUrl')->willReturn('');
         $this->categoryResolver->method('getCategoryData')->willReturn([
             'categories' => [],
@@ -268,9 +221,8 @@ final class ProductDataBuilderTest extends TestCase
         $product = $this->createProductMock();
 
         $this->priceCalculator->method('getFinalPrice')->willReturn(99.99);
-        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
         $this->imageResolver->method('getImageUrl')->willReturn('');
-        $this->stockResolver->method('isInStock')->willReturn(true);
+        $this->salableResolver->method('isSalable')->willReturn(true);
         $this->urlResolver->method('getProductUrl')->willReturn('');
         $this->categoryResolver->method('getCategoryData')->willReturn([
             'categories' => [],
@@ -311,7 +263,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->attributeResolver,
             $this->priceCalculator,
             $this->imageResolver,
-            $this->stockResolver,
+            $this->salableResolver,
             $this->categoryResolver,
             $this->urlResolver,
             $this->collectionFactory,
@@ -320,6 +272,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->storeManager,
             $this->config,
             $this->nameDecompounder,
+            $this->groupedChildrenResolver,
         );
     }
 
@@ -461,9 +414,8 @@ final class ProductDataBuilderTest extends TestCase
         $product = $this->createProductMock(id: 10);
 
         $this->priceCalculator->method('getFinalPrice')->willReturn(0.0);
-        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
         $this->imageResolver->method('getImageUrl')->willReturn('');
-        $this->stockResolver->method('isInStock')->willReturn(true);
+        $this->salableResolver->method('isSalable')->willReturn(true);
         $this->urlResolver->method('getProductUrl')->willReturn('');
         $this->categoryResolver->method('getCategoryData')->willReturn([
             'categories' => [], 'category_ids' => [],
@@ -483,7 +435,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->attributeResolver,
             $this->priceCalculator,
             $this->imageResolver,
-            $this->stockResolver,
+            $this->salableResolver,
             $this->categoryResolver,
             $this->urlResolver,
             $this->collectionFactory,
@@ -492,6 +444,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->storeManager,
             $this->config,
             $this->nameDecompounder,
+            $this->groupedChildrenResolver,
         );
 
         $document = $sut->build($product, 1);
@@ -504,9 +457,8 @@ final class ProductDataBuilderTest extends TestCase
         $product = $this->createProductMock(id: 10);
 
         $this->priceCalculator->method('getFinalPrice')->willReturn(0.0);
-        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
         $this->imageResolver->method('getImageUrl')->willReturn('');
-        $this->stockResolver->method('isInStock')->willReturn(true);
+        $this->salableResolver->method('isSalable')->willReturn(true);
         $this->urlResolver->method('getProductUrl')->willReturn('');
         $this->categoryResolver->method('getCategoryData')->willReturn([
             'categories' => [], 'category_ids' => [],
@@ -526,7 +478,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->attributeResolver,
             $this->priceCalculator,
             $this->imageResolver,
-            $this->stockResolver,
+            $this->salableResolver,
             $this->categoryResolver,
             $this->urlResolver,
             $this->collectionFactory,
@@ -535,6 +487,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->storeManager,
             $this->config,
             $this->nameDecompounder,
+            $this->groupedChildrenResolver,
         );
 
         $document = $sut->build($product, 2);
@@ -547,9 +500,8 @@ final class ProductDataBuilderTest extends TestCase
         $product = $this->createProductMock(id: 10);
 
         $this->priceCalculator->method('getFinalPrice')->willReturn(0.0);
-        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
         $this->imageResolver->method('getImageUrl')->willReturn('');
-        $this->stockResolver->method('isInStock')->willReturn(true);
+        $this->salableResolver->method('isSalable')->willReturn(true);
         $this->urlResolver->method('getProductUrl')->willReturn('');
         $this->categoryResolver->method('getCategoryData')->willReturn([
             'categories' => [], 'category_ids' => [],
@@ -569,7 +521,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->attributeResolver,
             $this->priceCalculator,
             $this->imageResolver,
-            $this->stockResolver,
+            $this->salableResolver,
             $this->categoryResolver,
             $this->urlResolver,
             $this->collectionFactory,
@@ -578,6 +530,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->storeManager,
             $this->config,
             $this->nameDecompounder,
+            $this->groupedChildrenResolver,
         );
 
         $document = $sut->build($product, 2);
@@ -674,13 +627,135 @@ final class ProductDataBuilderTest extends TestCase
         $this->buildSut()->build($product, 3);
     }
 
+    public function test_simple_document_has_final_and_regular_price_and_no_children(): void
+    {
+        $product = $this->createProductMock();
+        $this->stubNonPriceData($product);
+        $this->priceCalculator->method('getFinalPrice')->with($product)->willReturn(17.9);
+        $this->priceCalculator->method('getRegularPrice')->with($product)->willReturn(19.9);
+        $this->salableResolver->method('isSalable')->with($product, 1)->willReturn(true);
+
+        $document = $this->sut->build($product, 1);
+
+        self::assertNotNull($document);
+        self::assertSame(17.9, $document['final_price']);
+        self::assertSame(17.9, $document['price']);
+        self::assertSame(19.9, $document['regular_price']);
+        self::assertTrue($document['in_stock']);
+        self::assertArrayNotHasKey('children', $document);
+        self::assertArrayNotHasKey('special_price', $document);
+    }
+
+    public function test_grouped_document_has_children_in_position_order_with_prices_and_stock(): void
+    {
+        $parent = $this->createGroupedProduct([[39.9, 44.9, true, 1.0], [21.5, 21.5, false, 6.0]]);
+
+        $document = $this->sut->build($parent, 1);
+
+        self::assertNotNull($document);
+        self::assertSame(
+            [
+                [
+                    'id' => 100,
+                    'sku' => 'CHILD-0',
+                    'name' => 'Child 0',
+                    'final_price' => 39.9,
+                    'regular_price' => 44.9,
+                    'in_stock' => true,
+                    'qty_increment' => 1.0,
+                ],
+                [
+                    'id' => 101,
+                    'sku' => 'CHILD-1',
+                    'name' => 'Child 1',
+                    'final_price' => 21.5,
+                    'regular_price' => 21.5,
+                    'in_stock' => false,
+                    'qty_increment' => 6.0,
+                ],
+            ],
+            $document['children'],
+        );
+    }
+
+    public function test_grouped_parent_is_in_stock_when_any_child_is_salable(): void
+    {
+        $parent = $this->createGroupedProduct([[10.0, 12.0, false], [25.0, 29.0, true], [30.0, 30.0, false]]);
+
+        $document = $this->sut->build($parent, 1);
+
+        self::assertNotNull($document);
+        self::assertTrue($document['in_stock']);
+        self::assertSame(25.0, $document['final_price']);
+        self::assertSame(25.0, $document['price']);
+        self::assertSame(29.0, $document['regular_price']);
+    }
+
+    public function test_grouped_parent_with_all_children_out_of_stock_is_out_of_stock_with_min_price_of_all_children(): void
+    {
+        $parent = $this->createGroupedProduct([[30.0, 35.0, false], [20.0, 24.0, false]]);
+
+        $document = $this->sut->build($parent, 1);
+
+        self::assertNotNull($document);
+        self::assertFalse($document['in_stock']);
+        self::assertSame(20.0, $document['final_price']);
+        self::assertSame(20.0, $document['price']);
+        self::assertSame(24.0, $document['regular_price']);
+    }
+
+    public function test_grouped_parent_without_enabled_children_is_not_indexed(): void
+    {
+        $parent = $this->createGroupedProduct([]);
+
+        self::assertNull($this->sut->build($parent, 1));
+    }
+
+    /**
+     * @param list<array{0: float, 1: float, 2: bool, 3?: float}> $children final price, regular price, salable,
+     *     qty increment, in link position order
+     */
+    private function createGroupedProduct(array $children): Product&MockObject
+    {
+        $associatedProducts = [];
+        $finalPrices = [];
+        $regularPrices = [];
+        $salable = [];
+        $qtyIncrements = [];
+        foreach ($children as $index => $child) {
+            $product = $this->createProductMock(id: 100 + $index, sku: 'CHILD-' . $index, name: 'Child ' . $index);
+            $associatedProducts[] = $product;
+            $finalPrices[] = [$product, $child[0]];
+            $regularPrices[] = [$product, $child[1]];
+            $salable[] = [$product, 1, $child[2]];
+            $qtyIncrements[] = [$product, 1, $child[3] ?? 1.0];
+        }
+        $this->priceCalculator->method('getFinalPrice')->willReturnMap($finalPrices);
+        $this->priceCalculator->method('getRegularPrice')->willReturnMap($regularPrices);
+        $this->salableResolver->method('isSalable')->willReturnMap($salable);
+        $this->salableResolver->method('getQtyIncrement')->willReturnMap($qtyIncrements);
+
+        $typeInstance = $this->createMock(Grouped::class);
+        $typeInstance->method('getAssociatedProducts')->willReturn($associatedProducts);
+        $parent = $this->createProductMock(id: 10, typeId: Grouped::TYPE_CODE);
+        $parent->method('getTypeInstance')->willReturn($typeInstance);
+        $this->stubNonPriceData($parent);
+
+        return $parent;
+    }
+
     /** @param array<string, mixed> $data */
     private function stubEmptyProductData(Product&MockObject $product, array $data = []): void
     {
         $this->priceCalculator->method('getFinalPrice')->willReturn(0.0);
-        $this->priceCalculator->method('getSpecialPrice')->willReturn(null);
+        $this->salableResolver->method('isSalable')->willReturn(true);
+        $this->stubNonPriceData($product, $data);
+    }
+
+    /** @param array<string, mixed> $data */
+    private function stubNonPriceData(Product&MockObject $product, array $data = []): void
+    {
         $this->imageResolver->method('getImageUrl')->willReturn('');
-        $this->stockResolver->method('isInStock')->willReturn(true);
         $this->urlResolver->method('getProductUrl')->willReturn('');
         $this->categoryResolver->method('getCategoryData')->willReturn([
             'categories' => [], 'category_ids' => [],

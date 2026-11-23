@@ -10,5 +10,5 @@ interface PriceCalculatorInterface
 {
     public function getFinalPrice(Product $product): float;
 
-    public function getSpecialPrice(Product $product): ?float;
+    public function getRegularPrice(Product $product): float;
 }

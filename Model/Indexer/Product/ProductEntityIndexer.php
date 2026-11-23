@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 
 use Magento\Catalog\Model\Product;
+use RunAsRoot\TypeSense\Api\CollectionSettingsProviderInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 
-class ProductEntityIndexer implements EntityIndexerInterface
+class ProductEntityIndexer implements EntityIndexerInterface, CollectionSettingsProviderInterface
 {
     public function __construct(
         private readonly ProductDataBuilder $dataBuilder,
@@ -30,13 +31,22 @@ class ProductEntityIndexer implements EntityIndexerInterface
         return $this->schemaProvider->getFields();
     }
 
+    public function getCollectionSettings(): array
+    {
+        return $this->schemaProvider->getCollectionSettings();
+    }
+
     public function buildDocuments(array $entityIds, int $storeId): iterable
     {
         $collection = $this->dataBuilder->getProductCollection($entityIds, $storeId);
 
         /** @var Product $product */
         foreach ($collection as $product) {
-            yield $this->dataBuilder->build($product, $storeId);
+            // Not yielding a product makes a partial reindex delete its stale document.
+            $document = $this->dataBuilder->build($product, $storeId);
+            if ($document !== null) {
+                yield $document;
+            }
         }
     }
 

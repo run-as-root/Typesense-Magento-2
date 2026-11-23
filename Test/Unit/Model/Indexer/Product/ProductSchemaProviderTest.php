@@ -73,13 +73,23 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertSame('float', $field['type']);
     }
 
-    public function test_get_fields_contains_special_price_as_optional_float(): void
+    public function test_get_fields_contains_final_and_regular_price_as_float_without_special_price(): void
     {
         $fields = $this->sut->getFields();
 
-        $field = $this->findField($fields, 'special_price');
-        self::assertSame('float', $field['type']);
+        self::assertSame('float', $this->findField($fields, 'final_price')['type']);
+        self::assertSame('float', $this->findField($fields, 'regular_price')['type']);
+        self::assertNotContains('special_price', array_column($fields, 'name'));
+    }
+
+    public function test_schema_enables_nested_fields_and_declares_children_unindexed(): void
+    {
+        $field = $this->findField($this->sut->getFields(), 'children');
+
+        self::assertSame(['enable_nested_fields' => true], $this->sut->getCollectionSettings());
+        self::assertSame('object[]', $field['type']);
         self::assertTrue($field['optional']);
+        self::assertFalse($field['index']);
     }
 
     public function test_get_fields_contains_categories_as_string_array(): void
@@ -242,10 +252,10 @@ final class ProductSchemaProviderTest extends TestCase
         $fieldNames = array_column($sut->getFields(), 'name');
 
         $coreNames = ['id', 'product_id', 'name', 'sku', 'url', 'image_url', 'price',
-            'special_price', 'description', 'short_description', 'categories', 'category_ids',
+            'final_price', 'regular_price', 'description', 'short_description', 'categories', 'category_ids',
             'categories.lvl0', 'categories.lvl1', 'categories.lvl2', 'in_stock', 'type_id',
             'visibility', 'created_at', 'updated_at', 'sales_count', 'rating_summary', 'review_count',
-            'categories_text'];
+            'children', 'categories_text'];
 
         self::assertSame($coreNames, $fieldNames);
     }

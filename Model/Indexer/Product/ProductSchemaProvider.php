@@ -20,6 +20,11 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
     ) {
     }
 
+    public function getCollectionSettings(): array
+    {
+        return ['enable_nested_fields' => true];
+    }
+
     /** @return array<int, array<string, mixed>> */
     public function getFields(): array
     {
@@ -36,7 +41,8 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'url', 'type' => 'string'],
             ['name' => 'image_url', 'type' => 'string'],
             ['name' => 'price', 'type' => 'float'],
-            ['name' => 'special_price', 'type' => 'float', 'optional' => true],
+            ['name' => 'final_price', 'type' => 'float'],
+            ['name' => 'regular_price', 'type' => 'float'],
             ['name' => 'description', 'type' => 'string', 'optional' => true],
             ['name' => 'short_description', 'type' => 'string', 'optional' => true],
             ['name' => 'categories', 'type' => 'string[]'],
@@ -52,6 +58,8 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'sales_count', 'type' => 'int32'],
             ['name' => 'rating_summary', 'type' => 'int32'],
             ['name' => 'review_count', 'type' => 'int32'],
+            // Display-only listing data for grouped products; filtering and sorting use the parent's fields.
+            ['name' => 'children', 'type' => 'object[]', 'optional' => true, 'index' => false],
         ];
 
         foreach ($this->config->getAdditionalAttributes() as $attrCode) {

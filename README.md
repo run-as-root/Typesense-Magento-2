@@ -63,6 +63,7 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 |---|---|
 | PHP | 8.3+ |
 | Magento 2 / Mage-OS | 2.4.7+ |
+| Magento Inventory (MSI) modules | enabled (product stock comes from `IsProductSalableInterface`) |
 | Typesense | 27+ |
 | Hyva Theme | 1.3+ |
 | typesense/typesense-php | ^6.0 |
