@@ -137,6 +137,13 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertTrue($field['facet']);
     }
 
+    public function test_in_stock_is_sortable_for_out_of_stock_last_listings(): void
+    {
+        $field = $this->findField($this->sut->getFields(), 'in_stock');
+
+        self::assertTrue($field['sort'] ?? false);
+    }
+
     public function test_get_fields_contains_type_id_as_string_facet(): void
     {
         $fields = $this->sut->getFields();

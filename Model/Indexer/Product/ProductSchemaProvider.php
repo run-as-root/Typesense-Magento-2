@@ -51,7 +51,8 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
             ['name' => 'categories.lvl1', 'type' => 'string[]', 'facet' => true],
             ['name' => 'categories.lvl2', 'type' => 'string[]', 'facet' => true],
-            ['name' => 'in_stock', 'type' => 'bool', 'facet' => true],
+            // Sortable so listings can put out-of-stock products last (sort_by in_stock:desc).
+            ['name' => 'in_stock', 'type' => 'bool', 'facet' => true, 'sort' => true],
             ['name' => 'type_id', 'type' => 'string', 'facet' => true],
             ['name' => 'visibility', 'type' => 'int32'],
             ['name' => 'created_at', 'type' => 'int64'],
