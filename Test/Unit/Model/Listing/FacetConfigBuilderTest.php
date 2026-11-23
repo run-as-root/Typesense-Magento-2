@@ -30,7 +30,7 @@ final class FacetConfigBuilderTest extends TestCase
     public function test_unsupported_facet_types_fall_back_to_dropdown_price_is_always_a_slider_and_labels_use_store_label_or_code(): void
     {
         $this->config->method('getFacetFilters')->willReturn([
-            'color', 'size', 'volume', 'weight', 'in_stock', 'price', 'visibility', 'category_ids', 'sales_count',
+            'color', 'size', 'volume', 'in_stock', 'price', 'visibility', 'sales_count',
         ]);
         $this->config->method('getFacetTypes')->with(1)->willReturn([
             'color' => ['type' => 'slider', 'searchable' => true],
@@ -64,12 +64,24 @@ final class FacetConfigBuilderTest extends TestCase
             ['field' => 'color', 'label' => 'Farbe', 'type' => 'dropdown', 'searchable' => true, 'boolean' => false, 'numeric' => false],
             ['field' => 'size', 'label' => 'Size', 'type' => 'dropdown', 'searchable' => true, 'boolean' => false, 'numeric' => false],
             ['field' => 'volume', 'label' => 'Volume', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => 'float'],
-            ['field' => 'weight', 'label' => 'Weight', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => false],
             ['field' => 'in_stock', 'label' => 'Availability', 'type' => 'checkbox', 'searchable' => false, 'boolean' => true, 'numeric' => false],
             ['field' => 'price', 'label' => 'Price', 'type' => 'slider', 'searchable' => false, 'boolean' => false, 'numeric' => 'float'],
             ['field' => 'visibility', 'label' => 'Visibility', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => 'int32'],
-            ['field' => 'category_ids', 'label' => 'Category Ids', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => 'int32'],
             ['field' => 'sales_count', 'label' => 'Sales Count', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => 'int64'],
         ], $this->sut->build(1));
+    }
+
+    public function test_facets_missing_from_the_schema_or_not_faceted_are_dropped(): void
+    {
+        // Typesense answers facet_by or filter_by on such a field with a 400, which fails the whole listing search.
+        $this->config->method('getFacetFilters')->willReturn(['weight', 'color', 'category_ids']);
+        $this->config->method('getFacetTypes')->willReturn([]);
+        $this->schemaProvider->method('getFields')->willReturn([
+            ['name' => 'color', 'type' => 'string', 'facet' => true],
+            ['name' => 'category_ids', 'type' => 'int32[]'],
+        ]);
+        $this->eavConfig->method('getAttribute')->willReturn($this->createMock(Attribute::class));
+
+        self::assertSame(['color'], array_column($this->sut->build(1), 'field'));
     }
 }

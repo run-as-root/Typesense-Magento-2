@@ -171,6 +171,7 @@ final class ListingConfigViewModelTest extends TestCase
             ['name' => 'price', 'type' => 'float', 'facet' => true],
             ['name' => 'in_stock', 'type' => 'bool', 'facet' => true],
             ['name' => 'color', 'type' => 'string', 'facet' => true],
+            ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
         ]);
         $color = $this->createMock(Attribute::class);
         $color->method('getId')->willReturn(93);
@@ -294,7 +295,11 @@ final class ListingConfigViewModelTest extends TestCase
     {
         $category = $this->givenCategory(42, 'Gin', 'position');
         $this->config->method('getFacetFilters')->willReturn(['categories.lvl0', 'color', 'categories.lvl1']);
-        $this->schemaProvider->method('getFields')->willReturn([]);
+        $this->schemaProvider->method('getFields')->willReturn([
+            ['name' => 'color', 'type' => 'string', 'facet' => true],
+            ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
+            ['name' => 'categories.lvl1', 'type' => 'string[]', 'facet' => true],
+        ]);
         $this->eavConfig->method('getAttribute')->willReturn($this->createMock(Attribute::class));
         $subcategory = [
             'field' => 'categories.lvl1',
@@ -318,7 +323,9 @@ final class ListingConfigViewModelTest extends TestCase
     {
         $this->subcategoryFacetResolver->expects(self::never())->method('resolve');
         $this->config->method('getFacetFilters')->willReturn(['categories.lvl0']);
-        $this->schemaProvider->method('getFields')->willReturn([]);
+        $this->schemaProvider->method('getFields')->willReturn([
+            ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
+        ]);
         $this->givenCatalogLimits('12', '12');
 
         $facets = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH)['facets'];

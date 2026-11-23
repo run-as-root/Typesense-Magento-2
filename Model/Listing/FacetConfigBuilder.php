@@ -28,6 +28,7 @@ class FacetConfigBuilder
      * `numeric` is the Typesense type of a numeric field (int32, int64 or float, also for arrays), else false:
      * the listing core filters those values unquoted and accepts only numbers that fit the type, because
      * Typesense answers backtick-quoted or out-of-range values with a 400 that would fail the whole listing.
+     * A facet whose field is missing from the schema or not faceted is dropped for the same reason.
      *
      * @return list<array{
      *     field: string, label: string, type: string, searchable: bool, boolean: bool, numeric: string|false
@@ -36,12 +37,15 @@ class FacetConfigBuilder
     public function build(int $storeId): array
     {
         $types = $this->config->getFacetTypes($storeId);
-        $schemaTypes = $this->getSchemaTypes();
+        $schemaTypes = $this->getFacetedSchemaTypes();
         $fields = $this->config->getFacetFilters($storeId);
 
         $facets = [];
         foreach ($fields as $field) {
-            $schemaType = $schemaTypes[$field] ?? 'string';
+            if (!isset($schemaTypes[$field])) {
+                continue;
+            }
+            $schemaType = $schemaTypes[$field];
             $isBoolean = $schemaType === 'bool';
             $type = $field === 'price' ? 'slider' : ($types[$field]['type'] ?? 'dropdown');
 
@@ -63,12 +67,14 @@ class FacetConfigBuilder
     }
 
     /** @return array<string, string> */
-    private function getSchemaTypes(): array
+    private function getFacetedSchemaTypes(): array
     {
         $types = [];
         $fields = $this->schemaProvider->getFields();
         foreach ($fields as $field) {
-            $types[(string) $field['name']] = (string) $field['type'];
+            if (($field['facet'] ?? false) === true) {
+                $types[(string) $field['name']] = (string) $field['type'];
+            }
         }
 
         return $types;
