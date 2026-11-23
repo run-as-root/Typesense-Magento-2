@@ -67,7 +67,9 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
         ];
 
         $multiselectCodes = $this->attributeResolver->getMultiselectAttributeCodes();
-        $additionalAttributes = $this->config->getAdditionalAttributes();
+        // Config imported from files bypasses the admin source that hides core attributes, and Typesense
+        // rejects a schema with duplicate field names.
+        $additionalAttributes = array_diff($this->config->getAdditionalAttributes(), array_column($fields, 'name'));
         foreach ($additionalAttributes as $attrCode) {
             $type = in_array($attrCode, $multiselectCodes, true) ? 'string[]' : 'string';
             $fields[] = ['name' => $attrCode, 'type' => $type, 'optional' => true, 'facet' => true];

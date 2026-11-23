@@ -271,6 +271,21 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertTrue($sizeField['facet']);
     }
 
+    public function test_additional_attributes_named_like_core_fields_do_not_duplicate_them(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn(['short_description', 'color', 'price']);
+
+        $sut = new ProductSchemaProvider($config, $this->attributeResolver);
+        $fields = $sut->getFields();
+        $fieldNames = array_column($fields, 'name');
+
+        self::assertSame($fieldNames, array_values(array_unique($fieldNames)));
+        self::assertSame('string', $this->findField($fields, 'short_description')['type']);
+        self::assertSame('float', $this->findField($fields, 'price')['type']);
+        self::assertContains('color', $fieldNames);
+    }
+
     public function test_get_fields_returns_no_additional_attribute_fields_when_none_configured(): void
     {
         $config = $this->createMock(TypeSenseConfigInterface::class);
