@@ -1,0 +1,51 @@
+<?php
+/**
+ * GA4 dataLayer tracking (run_as_root_typesense/tracking/ga4_datalayer). It only listens to the module's window
+ * events, so header-search and no-results suggestion requests never count as list views:
+ * typesense:results -> view_item_list (once per listing state), typesense:select-item -> select_item,
+ * typesense:suggestion-click -> search_suggestion_click, typesense:sort-change -> sorting_interaction,
+ * typesense:filter-change -> filter_interaction. Every push is preceded by {ecommerce: null}. Projects with their
+ * own item shape disable this setting and listen to the same events.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\View\Element\Template;
+use RunAsRoot\TypeSense\ViewModel\Frontend\ClientConfigViewModel;
+
+/** @var Template $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var ClientConfigViewModel $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel->isEnabled()) {
+    return;
+}
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<script>
+    (() => {
+        const EVENTS = ['typesense:results', 'typesense:select-item', 'typesense:suggestion-click',
+            'typesense:sort-change', 'typesense:filter-change'];
+        let tracker = null;
+
+        // The event sources (listing, header search) require js/listing-core.phtml, so the core exists once they fire.
+        const push = (event) => {
+            const listing = window.runAsRootTypesense && window.runAsRootTypesense.listing;
+            if (!listing) {
+                return;
+            }
+            tracker = tracker || listing.createGa4Tracker();
+            const pushes = tracker.events(event.type, event.detail);
+            const dataLayer = window.dataLayer = window.dataLayer || [];
+            pushes.forEach(entry => dataLayer.push(entry));
+        };
+
+        EVENTS.forEach(name => window.addEventListener(name, push));
+    })();
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

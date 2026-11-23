@@ -8,12 +8,21 @@ use Magento\Framework\Data\OptionSourceInterface;
 
 class ImageType implements OptionSourceInterface
 {
+    public const array LABELS = [
+        'category_page_grid' => 'Category Page Grid',
+        'category_page_list' => 'Category Page List',
+        'product_small_image' => 'Small Image',
+        'product_thumbnail_image' => 'Thumbnail',
+        'product_base_image' => 'Base Image',
+    ];
+
     public function toOptionArray(): array
     {
-        return [
-            ['value' => 'image', 'label' => __('Base Image')],
-            ['value' => 'small_image', 'label' => __('Small Image')],
-            ['value' => 'thumbnail', 'label' => __('Thumbnail')],
-        ];
+        $options = [];
+        foreach (self::LABELS as $value => $label) {
+            $options[] = ['value' => $value, 'label' => __($label)];
+        }
+
+        return $options;
     }
 }

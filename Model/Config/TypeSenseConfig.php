@@ -8,10 +8,12 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Store\Model\ScopeInterface;
+use RunAsRoot\TypeSense\Model\Config\Source\ImageType;
 
 class TypeSenseConfig implements TypeSenseConfigInterface
 {
     private const string CONFIG_PREFIX = 'run_as_root_typesense';
+    private const string DEFAULT_LISTING_IMAGE_ID = 'category_page_grid';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -251,7 +253,75 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return $this->getFlag('instant_search/replace_category_page', $storeId);
     }
 
+    public function isCacheableSearchPageEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('instant_search/cacheable_search_page', $storeId);
+    }
+
+    public function getListingImageId(?int $storeId = null): string
+    {
+        $value = (string) $this->getValue('instant_search/image_type', $storeId);
+
+        // Values saved before image ids were offered (image, small_image, thumbnail) would yield placeholders.
+        return isset(ImageType::LABELS[$value]) ? $value : self::DEFAULT_LISTING_IMAGE_ID;
+    }
+
     // Autocomplete
+    public function getListingImageWidth(?int $storeId = null): int
+    {
+        return max(0, (int) $this->getValue('instant_search/image_width', $storeId));
+    }
+
+    public function getListingImageHeight(?int $storeId = null): int
+    {
+        return max(0, (int) $this->getValue('instant_search/image_height', $storeId));
+    }
+
+    public function isInStockFirst(?int $storeId = null): bool
+    {
+        return $this->getFlag('instant_search/in_stock_first', $storeId);
+    }
+
+    public function getNoResultsCategoryId(?int $storeId = null): ?int
+    {
+        $categoryId = (int) trim((string) $this->getValue('instant_search/no_results_category_id', $storeId));
+
+        return $categoryId > 0 ? $categoryId : null;
+    }
+
+    public function getSeoTextSelector(?int $storeId = null): string
+    {
+        return trim((string) $this->getValue('instant_search/seo_text_selector', $storeId));
+    }
+
+    public function getFacetTypes(?int $storeId = null): array
+    {
+        $rows = $this->getSerializedRows('instant_search/facet_types', $storeId);
+
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $types = [];
+        foreach ($rows as $row) {
+            $attribute = is_array($row) ? trim((string) ($row['attribute'] ?? '')) : '';
+            if ($attribute === '') {
+                continue;
+            }
+
+            $types[$attribute] = [
+                'type' => match ($row['type'] ?? '') {
+                    'checkbox' => 'checkbox',
+                    'slider' => 'slider',
+                    default => 'dropdown',
+                },
+                'searchable' => (bool) ($row['searchable'] ?? false),
+            ];
+        }
+
+        return $types;
+    }
+
     public function isAutocompleteEnabled(?int $storeId = null): bool
     {
         return $this->getFlag('autocomplete/enabled', $storeId);
@@ -260,6 +330,26 @@ class TypeSenseConfig implements TypeSenseConfigInterface
     public function getAutocompleteProductCount(?int $storeId = null): int
     {
         return (int) $this->getValue('autocomplete/product_count', $storeId);
+    }
+
+    public function getAutocompleteCategoryCount(?int $storeId = null): int
+    {
+        return max(0, (int) $this->getValue('autocomplete/category_count', $storeId));
+    }
+
+    public function getAutocompleteCmsPageCount(?int $storeId = null): int
+    {
+        return max(0, (int) $this->getValue('autocomplete/cms_page_count', $storeId));
+    }
+
+    public function getAutocompleteSuggestionCount(?int $storeId = null): int
+    {
+        return max(0, (int) $this->getValue('autocomplete/suggestion_count', $storeId));
+    }
+
+    public function getAutocompleteGroupBy(?int $storeId = null): string
+    {
+        return trim((string) $this->getValue('autocomplete/group_by', $storeId));
     }
 
     // Merchandising
@@ -286,8 +376,7 @@ class TypeSenseConfig implements TypeSenseConfigInterface
 
     public function getSearchableAttributes(?int $storeId = null): array
     {
-        $value = (string) $this->getValue('search/searchable_attributes', $storeId);
-        $rows = $value === '' ? null : $this->serializer->unserialize($value);
+        $rows = $this->getSerializedRows('search/searchable_attributes', $storeId);
 
         if (!is_array($rows)) {
             return [];
@@ -463,5 +552,20 @@ class TypeSenseConfig implements TypeSenseConfigInterface
             ScopeInterface::SCOPE_STORE,
             $storeId,
         );
+    }
+
+    // A malformed value (hand-edited, or PHP-serialized from an old install) must not fail every storefront page.
+    private function getSerializedRows(string $path, ?int $storeId): mixed
+    {
+        $value = (string) $this->getValue($path, $storeId);
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return $this->serializer->unserialize($value);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
     }
 }

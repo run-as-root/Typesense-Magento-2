@@ -11,13 +11,13 @@ export class AutocompletePage {
 
   constructor(page: Page) {
     this.page = page;
-    const wrapper = page.locator('[x-data="initTypesenseAutocomplete"]');
-    this.searchInput = wrapper.locator('input[type="text"]');
-    this.dropdown = wrapper.locator('.absolute.z-50');
-    this.productResults = this.dropdown.locator('h4:has-text("Products")').locator('..').locator('a');
-    this.categoryResults = this.dropdown.locator('h4:has-text("Categories")').locator('..').locator('a');
-    this.suggestionResults = this.dropdown.locator('h4:has-text("Suggestions")').locator('..').locator('button');
-    this.noResults = this.dropdown.locator('text=No results found');
+    const wrapper = page.locator('[x-data="typesenseHeaderSearch"]');
+    this.searchInput = wrapper.locator('#search');
+    this.dropdown = wrapper.locator('#typesense-autocomplete');
+    this.productResults = this.dropdown.locator('[aria-labelledby="typesense-ac-product-title"] a[role="option"]');
+    this.categoryResults = this.dropdown.locator('[aria-labelledby="typesense-ac-category-title"] a[role="option"]');
+    this.suggestionResults = this.dropdown.locator('[aria-labelledby="typesense-ac-suggestion-title"] a[role="option"]');
+    this.noResults = this.dropdown.locator('text=No products for');
   }
 
   async goto() {

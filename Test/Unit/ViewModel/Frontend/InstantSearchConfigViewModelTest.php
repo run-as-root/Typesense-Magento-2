@@ -4,52 +4,20 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Test\Unit\ViewModel\Frontend;
 
-use Magento\Store\Api\Data\StoreInterface;
-use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
-use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
-use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
-use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 use RunAsRoot\TypeSense\ViewModel\Frontend\InstantSearchConfigViewModel;
 
 final class InstantSearchConfigViewModelTest extends TestCase
 {
     private TypeSenseConfigInterface&MockObject $config;
-    private StoreManagerInterface&MockObject $storeManager;
-    private CollectionNameResolverInterface&MockObject $collectionNameResolver;
-    private ConversationModelManager&MockObject $conversationModelManager;
-    private StoreInterface&MockObject $store;
-    private SearchRequestParamsBuilder&MockObject $requestParamsBuilder;
-    private SearchParametersProvider&MockObject $searchParametersProvider;
     private InstantSearchConfigViewModel $sut;
 
     protected function setUp(): void
     {
-        $this->config                    = $this->createMock(TypeSenseConfigInterface::class);
-        $this->storeManager              = $this->createMock(StoreManagerInterface::class);
-        $this->collectionNameResolver    = $this->createMock(CollectionNameResolverInterface::class);
-        $this->conversationModelManager  = $this->createMock(ConversationModelManager::class);
-        $this->conversationModelManager->method('getModelId')->willReturn('rar-product-assistant');
-
-        $this->store = $this->createMock(StoreInterface::class);
-        $this->store->method('getCode')->willReturn('default');
-        $this->store->method('getId')->willReturn(1);
-        $this->storeManager->method('getStore')->willReturn($this->store);
-
-        $this->requestParamsBuilder = $this->createMock(SearchRequestParamsBuilder::class);
-        $this->searchParametersProvider = $this->createMock(SearchParametersProvider::class);
-
-        $this->sut = new InstantSearchConfigViewModel(
-            $this->config,
-            $this->storeManager,
-            $this->collectionNameResolver,
-            $this->conversationModelManager,
-            $this->requestParamsBuilder,
-            $this->searchParametersProvider,
-        );
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->sut = new InstantSearchConfigViewModel($this->config);
     }
 
     public function test_is_enabled_returns_true_when_both_module_and_instant_search_are_enabled(): void
@@ -74,128 +42,5 @@ final class InstantSearchConfigViewModelTest extends TestCase
         $this->config->method('isInstantSearchEnabled')->willReturn(true);
 
         self::assertFalse($this->sut->isEnabled());
-    }
-
-    public function test_get_config_returns_array_with_expected_keys(): void
-    {
-        $this->config->method('getSearchHost')->willReturn('search.example.com');
-        $this->config->method('getSearchPort')->willReturn(8108);
-        $this->config->method('getSearchProtocol')->willReturn('https');
-        $this->config->method('getSearchOnlyApiKey')->willReturn('xyz-search-key');
-        $this->config->method('getProductsPerPage')->willReturn(24);
-        $this->config->method('getEnabledSortOptions')->willReturn([]);
-        $this->config->method('getTileAttributes')->willReturn([]);
-
-        $this->collectionNameResolver
-            ->method('resolve')
-            ->with('product', 'default', 1)
-            ->willReturn('prefix_product_default');
-
-        $result = $this->sut->getConfig();
-
-        self::assertArrayHasKey('typesenseHost', $result);
-        self::assertArrayHasKey('typesensePort', $result);
-        self::assertArrayHasKey('typesenseProtocol', $result);
-        self::assertArrayHasKey('typesenseSearchOnlyApiKey', $result);
-        self::assertArrayHasKey('productCollection', $result);
-        self::assertArrayHasKey('productsPerPage', $result);
-        self::assertArrayHasKey('facetAttributes', $result);
-        self::assertArrayHasKey('sortOptions', $result);
-        self::assertArrayHasKey('tileAttributes', $result);
-
-        self::assertSame('search.example.com', $result['typesenseHost']);
-        self::assertSame(8108, $result['typesensePort']);
-        self::assertSame('https', $result['typesenseProtocol']);
-        self::assertSame('xyz-search-key', $result['typesenseSearchOnlyApiKey']);
-        self::assertSame('prefix_product_default', $result['productCollection']);
-        self::assertSame(24, $result['productsPerPage']);
-    }
-
-    public function test_get_sort_options_returns_array_from_config(): void
-    {
-        $sortOptions = [
-            ['label' => 'Relevance', 'value' => ''],
-            ['label' => 'Price: Low to High', 'value' => 'price:asc'],
-        ];
-        $this->config->method('getEnabledSortOptions')->willReturn($sortOptions);
-
-        $result = $this->sut->getSortOptions();
-
-        self::assertSame($sortOptions, $result);
-    }
-
-    public function test_get_facet_attributes_returns_configured_filters(): void
-    {
-        $this->config->method('getFacetFilters')->willReturn(['color', 'size']);
-
-        $result = $this->sut->getFacetAttributes();
-
-        self::assertSame(['color', 'size'], $result);
-    }
-
-    public function test_get_config_includes_conversational_search_when_enabled(): void
-    {
-        $this->config->method('isConversationalSearchEnabled')->willReturn(true);
-        $this->config->method('getSearchHost')->willReturn('localhost');
-        $this->config->method('getSearchPort')->willReturn(8108);
-        $this->config->method('getSearchProtocol')->willReturn('https');
-        $this->config->method('getSearchOnlyApiKey')->willReturn('key');
-        $this->config->method('getProductsPerPage')->willReturn(24);
-        $this->config->method('getEnabledSortOptions')->willReturn([]);
-        $this->config->method('getTileAttributes')->willReturn([]);
-        $this->config->method('getFacetFilters')->willReturn([]);
-
-        $this->collectionNameResolver->method('resolve')->willReturn('test_collection');
-
-        $result = $this->sut->getConfig();
-
-        self::assertArrayHasKey('conversationalSearch', $result);
-        self::assertTrue($result['conversationalSearch']['enabled']);
-        self::assertSame('rar-product-assistant', $result['conversationalSearch']['modelId']);
-    }
-
-    public function test_config_contains_request_and_cache_params(): void
-    {
-        $this->collectionNameResolver->method('resolve')->willReturn('collection');
-        $this->requestParamsBuilder->method('build')
-            ->with(SearchRequestParamsBuilder::CONTEXT_SEARCH, 1)
-            ->willReturn(['query_by' => 'name,sku,description', 'num_typos' => 2]);
-        $this->requestParamsBuilder->method('getRelevanceSortBy')
-            ->with(SearchRequestParamsBuilder::CONTEXT_SEARCH, 1)
-            ->willReturn(null);
-        $this->searchParametersProvider->method('getCacheParameters')
-            ->with(1)
-            ->willReturn(['use_cache' => true, 'cache_ttl' => 300]);
-
-        $result = $this->sut->getConfig();
-
-        self::assertSame(['query_by' => 'name,sku,description', 'num_typos' => 2], $result['requestParams']);
-        self::assertSame(['use_cache' => true, 'cache_ttl' => 300], $result['cacheParams']);
-        self::assertArrayHasKey('relevanceSortBy', $result);
-        self::assertNull($result['relevanceSortBy']);
-    }
-
-    public function test_view_models_expose_direct_matches_flag(): void
-    {
-        $this->collectionNameResolver->method('resolve')->willReturn('collection');
-        $this->config->method('isDirectMatchesFirstEnabled')->with(1)->willReturn(true);
-
-        $result = $this->sut->getConfig();
-
-        self::assertTrue($result['directMatchesFirst']);
-    }
-
-    public function test_json_config_escapes_markup_in_admin_supplied_values(): void
-    {
-        $this->collectionNameResolver->method('resolve')->willReturn('collection');
-        $sortBy = "_eval([(name:=`</script><!--<script>a & 'b' \"c\"`):5]):desc";
-        $this->requestParamsBuilder->method('getRelevanceSortBy')->willReturn($sortBy);
-
-        $json = $this->sut->getJsonConfig();
-
-        foreach (['<', '>', '&', "'"] as $character) {
-            self::assertStringNotContainsString($character, $json);
-        }
-        self::assertSame($sortBy, json_decode($json, true)['relevanceSortBy']);
     }
 }

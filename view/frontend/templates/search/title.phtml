@@ -1,0 +1,53 @@
+<?php
+/**
+ * Magento's search.result block, which titles the page with the query, is removed, so the title comes from ?q here.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+use RunAsRoot\TypeSense\ViewModel\Frontend\InstantSearchConfigViewModel;
+
+/** @var Escaper $escaper */
+/** @var Template $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var InstantSearchConfigViewModel $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel->isEnabled()) {
+    return;
+}
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+
+$titleTemplate = (string) __("Search results for: '%1'", '%1');
+$searchTermsLogUrl = $block->getData('log_search_term') ? $block->getUrl('catalogsearch/searchTermsLog/save') : '';
+?>
+<script>
+    (() => {
+        const query = (new URLSearchParams(window.location.search).get('q') || '').trim();
+        if (!query) {
+            return;
+        }
+
+        const title = '<?= $escaper->escapeJs($titleTemplate) ?>'.replace('%1', () => query);
+        document.title = title;
+        // Luma-style headings wrap the text in span.base, the Hyvä heading holds it directly.
+        document.querySelectorAll('h1.page-title').forEach((heading) => {
+            (heading.querySelector('.base') || heading).textContent = title;
+        });
+
+        // The cached page skips the core action, so the term is recorded like core's search_terms_log does.
+        const logUrl = '<?= $escaper->escapeJs($searchTermsLogUrl) ?>';
+        if (logUrl) {
+            const url = new URL(logUrl, window.location.origin);
+            url.searchParams.set('q', query);
+            fetch(url.toString(), { credentials: 'same-origin' }).catch(() => {});
+        }
+    })();
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

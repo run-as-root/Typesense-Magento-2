@@ -1,0 +1,15 @@
+<?php
+/**
+ * Conversational search answer (search page, only when conversational search is enabled).
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+?>
+<div x-cloak x-show="hasAiAnswer" id="typesense-ai-answer" class="typesense-ai-answer mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+    <p class="mb-1 text-xs font-semibold uppercase text-gray-500"><?= $escaper->escapeHtml(__('AI Shopping Assistant')) ?></p>
+    <p class="text-sm text-gray-800" x-text="aiAnswer"></p>
+</div>

@@ -1,0 +1,165 @@
+<?php
+/**
+ * Mixin of `typesenseListing`: the argument-free getters and click handlers the slot templates bind to.
+ * Loop variables of x-for (e.g. `pageNumber`) are read from `this`.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<script>
+    function typesenseListingGetters() {
+        const strings = {
+            product: '<?= $escaper->escapeJs(__('%1 product')) ?>',
+            products: '<?= $escaper->escapeJs(__('%1 products')) ?>',
+            page: '<?= $escaper->escapeJs(__('Page %1')) ?>',
+            noResultsForQuery: '<?= $escaper->escapeJs(__('We couldn\'t find any results for "%1".')) ?>',
+            noFilteredResultsForQuery: '<?= $escaper->escapeJs(__('We couldn\'t find any results for "%1" with the selected filters.')) ?>',
+        };
+        const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
+
+        return {
+            showSkeleton() {
+                return !this.hasLoaded;
+            },
+            showOverlay() {
+                return this.isLoading && this.hasLoaded;
+            },
+            hasHits() {
+                return this.hits.length > 0;
+            },
+            showGrid() {
+                return this.showSkeleton() || this.hasHits();
+            },
+            showCount() {
+                return this.hasLoaded && this.error === null;
+            },
+            showCountSkeleton() {
+                return !this.hasLoaded;
+            },
+            countText() {
+                return hyva.str(this.found === 1 ? strings.product : strings.products, this.found);
+            },
+            showNoResults() {
+                return this.hasLoaded && this.hits.length === 0;
+            },
+            hasError() {
+                return this.error !== null;
+            },
+            hasActiveFilters() {
+                return Object.keys(this.state.filters).length > 0 || this.state.price !== null;
+            },
+            showFilteredMessage() {
+                return !this.hasError() && this.hasActiveFilters();
+            },
+            showUnfilteredMessage() {
+                return !this.hasError() && !this.hasActiveFilters();
+            },
+            searchQuery() {
+                return this.state.q;
+            },
+            noResultsForQueryText() {
+                return hyva.str(strings.noResultsForQuery, this.state.q);
+            },
+            noFilteredResultsForQueryText() {
+                return hyva.str(strings.noFilteredResultsForQuery, this.state.q);
+            },
+            hasSuggestedHits() {
+                return this.suggestedHits.length > 0;
+            },
+            showSuggestedOverlay() {
+                return this.isLoadingSuggested;
+            },
+            hasAiAnswer() {
+                return this.aiAnswer !== '';
+            },
+            totalPages() {
+                const limit = this.currentLimit || Number(this.config.perPage) || 1;
+
+                return Math.max(1, Math.ceil((Number(this.found) || 0) / limit));
+            },
+            showPagination() {
+                return this.hasLoaded && this.hits.length > 0 && this.totalPages() > 1;
+            },
+            pages() {
+                return core() ? core().paginationWindow(this.state.page, this.totalPages(), 5) : [];
+            },
+            isFirstPage() {
+                return this.state.page <= 1;
+            },
+            isLastPage() {
+                return this.state.page >= this.totalPages();
+            },
+            isCurrentPage() {
+                return this.pageNumber === this.state.page;
+            },
+            pageClasses() {
+                return this.isCurrentPage() ? 'bg-gray-900 text-white' : 'hover:bg-gray-100';
+            },
+            prevPageClasses() {
+                return this.isFirstPage() ? 'pointer-events-none opacity-40' : '';
+            },
+            nextPageClasses() {
+                return this.isLastPage() ? 'pointer-events-none opacity-40' : '';
+            },
+            currentPageMarker() {
+                return this.isCurrentPage() ? 'page' : false;
+            },
+            pageLabel() {
+                return hyva.str(strings.page, this.pageNumber);
+            },
+            pageHref() {
+                return this.hrefForPage(this.pageNumber);
+            },
+            prevPageHref() {
+                return this.hrefForPage(Math.max(1, this.state.page - 1));
+            },
+            nextPageHref() {
+                return this.hrefForPage(Math.min(this.totalPages(), this.state.page + 1));
+            },
+            hrefForPage(page) {
+                const state = Object.assign({}, this.state, { page });
+
+                return window.location.pathname + (core() ? core().serializeUrlState(state, this.config) : '');
+            },
+            prevPageTabindex() {
+                return this.isFirstPage() ? '-1' : false;
+            },
+            nextPageTabindex() {
+                return this.isLastPage() ? '-1' : false;
+            },
+            goToPage() {
+                this.navigateToPage(this.pageNumber, false);
+            },
+            goToPrevPage() {
+                this.navigateToPage(this.state.page - 1, this.isFirstPage());
+            },
+            goToNextPage() {
+                this.navigateToPage(this.state.page + 1, this.isLastPage());
+            },
+            // Modified clicks (new tab/window) keep the browser default; a disabled link does nothing.
+            navigateToPage(page, isDisabled) {
+                const event = this.$event;
+                if (!isDisabled && event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0)) {
+                    return;
+                }
+                if (event) {
+                    event.preventDefault();
+                }
+                if (!isDisabled) {
+                    this.setPage(page);
+                }
+            },
+        };
+    }
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

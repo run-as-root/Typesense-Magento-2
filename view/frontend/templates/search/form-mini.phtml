@@ -1,0 +1,326 @@
+<?php
+/**
+ * Header search with Typesense autocomplete (Alpine component `typesenseHeaderSearch`), set on the `header-search`
+ * block by the typesense_autocomplete handle. The form is a plain GET to catalogsearch/result, so Enter always
+ * submits it, also when Typesense fails. Dropdown sections are child blocks: suggestion, product, category, page,
+ * see-all. Row clicks dispatch `typesense:suggestion-click` ({type, term, name, url, index, item?}).
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Hyva\Theme\ViewModel\LucideIcons;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+use RunAsRoot\TypeSense\ViewModel\Frontend\AutocompleteConfigViewModel;
+
+/** @var Template $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var AutocompleteConfigViewModel $viewModel */
+$viewModel = $block->getData('typesense_autocomplete');
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+/** @var LucideIcons $lucideIcons */
+$lucideIcons = $viewModels->require(LucideIcons::class);
+?>
+<script>
+    function initTypesenseHeaderSearch() {
+        const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
+        const strings = {
+            minLength: '<?= $escaper->escapeJs(__('Minimum Search query length is %1')) ?>',
+            seeAll: '<?= $escaper->escapeJs(__('See all (%1)')) ?>',
+            noResults: '<?= $escaper->escapeJs(__('No products for "%1"')) ?>',
+        };
+        const DEBOUNCE_MS = 300;
+        const EMPTY_SECTIONS = { suggestions: [], products: [], categories: [], pages: [] };
+        // Kept out of the reactive data: they only decide which response may still render.
+        let sequencer = null;
+        let debounceTimer = null;
+        const sequence = () => {
+            if (!sequencer && core()) {
+                sequencer = core().createSequencer();
+            }
+
+            return sequencer;
+        };
+
+        return {
+            config: {},
+            query: '',
+            searchedTerm: '',
+            isOpen: false,
+            sections: EMPTY_SECTIONS,
+            rows: [],
+            found: 0,
+            activeIndex: -1,
+
+            init() {
+                const configElement = this.$root.querySelector('[data-typesense-autocomplete-config]');
+                try {
+                    this.config = JSON.parse(configElement ? configElement.textContent : '{}');
+                } catch (e) {
+                    this.config = {};
+                }
+                this.query = this.$refs.input.value;
+                // typesense-js is only fetched once the shopper shows intent to search.
+                const warmUp = () => window.runAsRootTypesense.getClient().catch(() => {});
+                this.$refs.input.addEventListener('focus', warmUp, { once: true });
+                this.$refs.input.addEventListener('pointerenter', warmUp, { once: true });
+            },
+
+            minQueryLength() {
+                return Number(this.config.minQueryLength) || 1;
+            },
+            isQueryLongEnough() {
+                return this.query.trim().length >= this.minQueryLength();
+            },
+
+            onInput() {
+                this.query = this.$event.target.value;
+                this.$refs.input.setCustomValidity('');
+                clearTimeout(debounceTimer);
+                if (!this.isQueryLongEnough()) {
+                    // A pending response for a longer query must not reopen the dropdown.
+                    if (sequence()) {
+                        sequence().next();
+                    }
+                    this.reset();
+                    return;
+                }
+                debounceTimer = setTimeout(() => this.search(), DEBOUNCE_MS);
+            },
+
+            onFocus() {
+                const term = this.query.trim();
+                if (this.searchedTerm !== '' && this.searchedTerm === term) {
+                    this.isOpen = true;
+                } else if (this.isQueryLongEnough()) {
+                    this.search();
+                }
+            },
+
+            async search() {
+                const listing = core();
+                const requests = sequence();
+                if (!listing || !requests) {
+                    this.reset();
+                    return;
+                }
+                const term = this.query.trim();
+                const id = requests.next();
+                try {
+                    const plan = listing.buildAutocompleteSearches(term, this.config);
+                    const client = await window.runAsRootTypesense.getClient();
+                    const response = await client.multiSearch.perform({ searches: plan.searches }, this.config.cacheParams);
+                    if (!requests.isCurrent(id)) {
+                        return;
+                    }
+                    const result = listing.autocompleteResults((response && response.results) || [], plan.sources, term, this.config);
+                    this.sections = result.sections;
+                    this.rows = result.rows;
+                    this.found = result.found;
+                    this.searchedTerm = term;
+                    this.activeIndex = -1;
+                    this.isOpen = this.$root.contains(document.activeElement);
+                } catch (error) {
+                    if (!requests.isCurrent(id)) {
+                        return;
+                    }
+                    // The dropdown disappears; the form still submits to the search page.
+                    console.error('Typesense autocomplete request failed', error);
+                    this.reset();
+                }
+            },
+
+            reset() {
+                this.isOpen = false;
+                this.sections = EMPTY_SECTIONS;
+                this.rows = [];
+                this.found = 0;
+                this.searchedTerm = '';
+                this.activeIndex = -1;
+            },
+
+            close() {
+                this.isOpen = false;
+                this.activeIndex = -1;
+            },
+
+            onKeydown() {
+                const event = this.$event;
+                const total = this.rows.length;
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    if (!this.isOpen && total > 0 && this.searchedTerm === this.query.trim()) {
+                        // Reopens the results closed with Escape while the input kept focus.
+                        event.preventDefault();
+                        this.isOpen = true;
+                        return;
+                    }
+                    if (!this.isOpen || total === 0) {
+                        return;
+                    }
+                    event.preventDefault();
+                    const step = event.key === 'ArrowDown' ? 1 : -1;
+                    this.activeIndex = this.activeIndex < 0 && step < 0
+                        ? total - 1
+                        : (this.activeIndex + step + total) % total;
+                } else if (event.key === 'Enter') {
+                    const row = this.activeRow();
+                    // Without a highlighted row Enter falls through to the form's native submit.
+                    if (this.isOpen && row) {
+                        event.preventDefault();
+                        this.trackRow(row);
+                        window.location.href = row.url;
+                    }
+                } else if (event.key === 'Escape' && this.isOpen) {
+                    // Closes only the dropdown, not the theme's search panel around it.
+                    event.preventDefault();
+                    event.stopPropagation();
+                    this.close();
+                }
+            },
+
+            onSubmit() {
+                const input = this.$refs.input;
+                if (!this.isQueryLongEnough()) {
+                    this.$event.preventDefault();
+                    input.setCustomValidity(hyva.str(strings.minLength, this.minQueryLength()));
+                    input.reportValidity();
+                    return;
+                }
+                input.setCustomValidity('');
+                this.close();
+            },
+
+            focusInput() {
+                this.$refs.input.focus();
+                this.$refs.input.select();
+            },
+
+            activeRow() {
+                return this.rows[this.activeIndex] || null;
+            },
+            trackRow(row) {
+                window.dispatchEvent(new CustomEvent('typesense:suggestion-click', {
+                    detail: core().suggestionClickDetail(row, this.searchedTerm),
+                }));
+            },
+            onRowClick() {
+                this.trackRow(this.row);
+            },
+            onSeeAllClick() {
+                window.dispatchEvent(new CustomEvent('typesense:suggestion-click', {
+                    detail: { type: 'see_all', term: this.searchedTerm, name: this.searchedTerm, url: this.seeAllUrl(), index: 0 },
+                }));
+            },
+            activateRow() {
+                this.activeIndex = this.row.position;
+            },
+
+            ariaExpanded() {
+                return this.isOpen ? 'true' : 'false';
+            },
+            activeDescendant() {
+                const row = this.isOpen ? this.activeRow() : null;
+
+                return row ? row.domId : false;
+            },
+            rowSelected() {
+                return this.row.position === this.activeIndex ? 'true' : 'false';
+            },
+            rowClasses() {
+                return this.row.position === this.activeIndex ? 'bg-gray-100' : '';
+            },
+            rowPriceText() {
+                return hyva.formatPrice(this.row.price);
+            },
+
+            hasSuggestions() {
+                return this.sections.suggestions.length > 0;
+            },
+            hasProducts() {
+                return this.sections.products.length > 0;
+            },
+            hasCategories() {
+                return this.sections.categories.length > 0;
+            },
+            hasPages() {
+                return this.sections.pages.length > 0;
+            },
+            hasFound() {
+                return this.found > 0;
+            },
+            hasNoProducts() {
+                return this.found === 0 && this.searchedTerm !== '';
+            },
+            seeAllUrl() {
+                return core() ? core().searchResultUrl(this.config.searchUrl, this.searchedTerm) : '#';
+            },
+            seeAllText() {
+                return hyva.str(strings.seeAll, this.found);
+            },
+            noResultsText() {
+                return hyva.str(strings.noResults, this.searchedTerm);
+            },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => Alpine.data('typesenseHeaderSearch', initTypesenseHeaderSearch), { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>
+<div class="typesense-header-search container relative py-2 mx-auto text-black"
+     x-data="typesenseHeaderSearch"
+     @click.outside="close">
+    <script type="application/json" data-typesense-autocomplete-config><?= /* @noEscape */ $viewModel->getJsonConfig() ?></script>
+    <search title="<?= $escaper->escapeHtmlAttr(__('Store')) ?>" role="search">
+        <form id="search_mini_form"
+              class="form minisearch input-group"
+              action="<?= $escaper->escapeUrl($viewModel->getResultUrl()) ?>"
+              method="get"
+              @submit="onSubmit">
+            <div class="input-group relative grow">
+                <input id="search"
+                       x-ref="input"
+                       type="search"
+                       name="<?= $escaper->escapeHtmlAttr($viewModel->getQueryParamName()) ?>"
+                       value="<?= /* @noEscape */ $viewModel->getEscapedQueryText() ?>"
+                       placeholder="<?= $escaper->escapeHtmlAttr(__('Search entire store here...')) ?>"
+                       maxlength="<?= (int) $viewModel->getMaxQueryLength() ?>"
+                       autocomplete="off"
+                       role="combobox"
+                       aria-autocomplete="list"
+                       aria-controls="typesense-autocomplete"
+                       :aria-expanded="ariaExpanded"
+                       :aria-activedescendant="activeDescendant"
+                       class="form-input grow w-full"
+                       @input="onInput"
+                       @focus="onFocus"
+                       @click="onFocus"
+                       @keydown="onKeydown"
+                       @search-open.window.debounce.10="focusInput">
+                <label class="sr-only" for="search"><?= $escaper->escapeHtml(__('Search')) ?></label>
+            </div>
+            <button type="submit"
+                    class="btn btn-primary p-2.5 rounded-s-none shrink-0"
+                    title="<?= $escaper->escapeHtmlAttr(__('Search')) ?>"
+                    aria-label="<?= $escaper->escapeHtmlAttr(__('Search')) ?>">
+                <?= $lucideIcons->searchHtml('', 20, 20, ['aria-hidden' => 'true']) ?>
+            </button>
+        </form>
+    </search>
+    <div id="typesense-autocomplete"
+         x-show="isOpen"
+         x-cloak
+         role="listbox"
+         aria-label="<?= $escaper->escapeHtmlAttr(__('Search suggestions')) ?>"
+         class="typesense-autocomplete absolute inset-x-0 z-50 mt-1 max-h-[70vh] overflow-y-auto border border-gray-200 bg-white shadow-lg">
+        <?= $block->getChildHtml('typesense_suggestion') ?>
+        <?= $block->getChildHtml('typesense_product') ?>
+        <?= $block->getChildHtml('typesense_category') ?>
+        <?= $block->getChildHtml('typesense_page') ?>
+        <?= $block->getChildHtml('typesense_see_all') ?>
+    </div>
+</div>

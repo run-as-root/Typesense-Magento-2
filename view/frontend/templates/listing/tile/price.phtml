@@ -1,0 +1,13 @@
+<?php
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+?>
+<div x-show="showPrice" class="typesense-tile-price flex flex-wrap items-baseline gap-x-2 text-sm">
+    <span x-show="showFromLabel" class="text-gray-600"><?= $escaper->escapeHtml(__('From')) ?></span>
+    <span class="font-bold text-gray-900" x-text="finalPriceText"></span>
+    <span x-show="showRegularPrice" class="text-gray-500 line-through" x-text="regularPriceText"></span>
+</div>

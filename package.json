@@ -1,0 +1,8 @@
+{
+  "name": "run-as-root-magento2-typesense",
+  "private": true,
+  "description": "Unit tests for the RunAsRoot TypeSense storefront JavaScript",
+  "scripts": {
+    "test": "node --test \"Test/js/**/*.test.mjs\""
+  }
+}

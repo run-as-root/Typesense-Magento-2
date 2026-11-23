@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+?>
+<div class="typesense-tile-actions mt-auto flex min-h-10 items-end pt-2">
+    <button type="button"
+            x-show="canAddToCart"
+            @click="addToCart"
+            :disabled="isAddingToCart"
+            :aria-busy="isAddingToCart"
+            :class="cartButtonClasses"
+            class="btn btn-primary w-full justify-center">
+        <svg x-show="isAddingToCart" class="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <?= $escaper->escapeHtml(__('Add to Cart')) ?>
+    </button>
+    <button type="button"
+            x-show="canAddGroupedToCart"
+            @click="addToCart"
+            :disabled="isAddingToCart"
+            :aria-busy="isAddingToCart"
+            :class="cartButtonClasses"
+            class="btn btn-primary w-full justify-center">
+        <svg x-show="isAddingToCart" class="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <?= $escaper->escapeHtml(__('Add to Cart')) ?>
+    </button>
+    <a x-show="needsProductPage" :href="productUrl" class="btn w-full justify-center">
+        <?= $escaper->escapeHtml(__('View Options')) ?>
+    </a>
+    <span x-show="isOutOfStock" class="flex items-center gap-2 text-sm text-gray-600">
+        <span class="h-2.5 w-2.5 rounded-full bg-red-500" aria-hidden="true"></span>
+        <?= $escaper->escapeHtml(__('Out of stock')) ?>
+    </span>
+</div>

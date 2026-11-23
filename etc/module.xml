@@ -4,12 +4,17 @@
     <module name="RunAsRoot_TypeSense">
         <sequence>
             <module name="Magento_Catalog"/>
+            <module name="Magento_GroupedProduct"/>
+            <module name="Magento_InventorySalesApi"/>
+            <module name="Magento_InventoryConfigurationApi"/>
             <module name="Magento_CatalogRule"/>
             <module name="Magento_Cms"/>
             <module name="Magento_Search"/>
             <module name="Magento_Indexer"/>
             <module name="Magento_Store"/>
             <module name="Magento_Csp"/>
+            <!-- Our layout_load_before observer must run after Hyva's, see Test/Unit/Etc/ModuleXmlTest. -->
+            <module name="Hyva_Theme"/>
         </sequence>
     </module>
 </config>

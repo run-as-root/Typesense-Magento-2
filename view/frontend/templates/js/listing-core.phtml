@@ -1,0 +1,19 @@
+<?php
+/**
+ * The one include of listing-core.js, in the head so the deferred script runs before Alpine's (before.body.end).
+ * Rendered only where a handle needs it: typesense_listing and typesense_autocomplete set `is_required`.
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+/** @var Escaper $escaper */
+
+if (!$block->getData('is_required')) {
+    return;
+}
+?>
+<script src="<?= $escaper->escapeUrl($block->getViewFileUrl('RunAsRoot_TypeSense::js/listing-core.js')) ?>" defer></script>

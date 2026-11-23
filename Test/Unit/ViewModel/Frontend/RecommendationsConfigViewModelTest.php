@@ -53,51 +53,44 @@ final class RecommendationsConfigViewModelTest extends TestCase
         self::assertFalse($this->sut->isEnabled());
     }
 
-    public function test_get_config_returns_expected_keys_and_values(): void
+    public function test_get_config_holds_only_what_the_shared_client_does_not_know(): void
     {
-        $this->config->method('getSearchHost')->willReturn('search.example.com');
-        $this->config->method('getSearchPort')->willReturn(443);
-        $this->config->method('getSearchProtocol')->willReturn('https');
-        $this->config->method('getSearchOnlyApiKey')->willReturn('xyz-key');
         $this->config->method('getRecommendationsLimit')->willReturn(8);
-
         $this->collectionNameResolver
             ->method('resolve')
             ->with('product', 'default', 1)
             ->willReturn('rar_product_default');
-
         $product = $this->createMock(ProductInterface::class);
         $product->method('getId')->willReturn(42);
 
-        $result = $this->sut->getConfig($product);
-
-        self::assertSame('search.example.com', $result['typesenseHost']);
-        self::assertSame(443, $result['typesensePort']);
-        self::assertSame('https', $result['typesenseProtocol']);
-        self::assertSame('xyz-key', $result['typesenseSearchOnlyApiKey']);
-        self::assertSame('rar_product_default', $result['productCollection']);
-        self::assertSame('42', $result['productId']);
-        self::assertSame(8, $result['limit']);
+        self::assertSame(
+            ['productCollection' => 'rar_product_default', 'productId' => '42', 'limit' => 8, 'showPrices' => true],
+            $this->sut->getConfig($product),
+        );
     }
 
-    public function test_get_json_config_returns_valid_json(): void
+    public function test_show_prices_follows_can_show_prices(): void
     {
-        $this->config->method('getSearchHost')->willReturn('localhost');
-        $this->config->method('getSearchPort')->willReturn(8108);
-        $this->config->method('getSearchProtocol')->willReturn('http');
-        $this->config->method('getSearchOnlyApiKey')->willReturn('key');
+        $sut = $this->getMockBuilder(RecommendationsConfigViewModel::class)
+            ->setConstructorArgs([$this->config, $this->storeManager, $this->collectionNameResolver])
+            ->onlyMethods(['canShowPrices'])
+            ->getMock();
+        $sut->method('canShowPrices')->willReturn(false);
+
+        self::assertFalse($sut->getConfig($this->createMock(ProductInterface::class))['showPrices']);
+    }
+
+    public function test_get_json_config_escapes_markup(): void
+    {
         $this->config->method('getRecommendationsLimit')->willReturn(6);
-
-        $this->collectionNameResolver->method('resolve')->willReturn('test_collection');
-
+        $this->collectionNameResolver->method('resolve')->willReturn('</script><b>');
         $product = $this->createMock(ProductInterface::class);
         $product->method('getId')->willReturn(10);
 
         $json = $this->sut->getJsonConfig($product);
-        $decoded = json_decode($json, true);
 
-        self::assertIsArray($decoded);
-        self::assertSame('10', $decoded['productId']);
-        self::assertSame(6, $decoded['limit']);
+        self::assertStringNotContainsString('<', $json);
+        self::assertSame('</script><b>', json_decode($json, true)['productCollection']);
+        self::assertSame('10', json_decode($json, true)['productId']);
     }
 }

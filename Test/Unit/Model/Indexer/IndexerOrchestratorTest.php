@@ -13,6 +13,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\AliasManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
+use RunAsRoot\TypeSense\Api\CollectionSettingsProviderInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
 use RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService;
@@ -258,6 +259,41 @@ final class IndexerOrchestratorTest extends TestCase
         $this->sut->reindex('product');
     }
 
+    public function test_full_reindex_creates_collection_with_indexer_collection_settings(): void
+    {
+        $this->useIndexerWithCollectionSettings();
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
+        $this->collectionManager->method('collectionExists')->willReturn(false);
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+
+        $this->collectionManager->expects(self::once())
+            ->method('createCollection')
+            ->with('rar_product_de', [
+                'name' => 'rar_product_de',
+                'fields' => [['name' => 'children', 'type' => 'object[]']],
+                'enable_nested_fields' => true,
+            ]);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_zero_downtime_reindex_builds_collection_with_indexer_collection_settings(): void
+    {
+        $this->useIndexerWithCollectionSettings();
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+
+        $this->zeroDowntimeService->expects(self::once())
+            ->method('startReindex')
+            ->with('product', 'de', [
+                'fields' => [['name' => 'children', 'type' => 'object[]']],
+                'enable_nested_fields' => true,
+            ], 3)
+            ->willReturn('rar_product_de_v2');
+
+        $this->sut->reindex('product');
+    }
+
     public function test_reindex_skips_inactive_and_disabled_stores(): void
     {
         $this->storeRepository = $this->createMock(StoreRepositoryInterface::class);
@@ -371,6 +407,19 @@ final class IndexerOrchestratorTest extends TestCase
             ->with('rar_product_nl', ['9'], 8);
 
         $this->sut->reindex('product', [9]);
+    }
+
+    private function useIndexerWithCollectionSettings(): void
+    {
+        $indexer = $this->createMockForIntersectionOfInterfaces([
+            EntityIndexerInterface::class,
+            CollectionSettingsProviderInterface::class,
+        ]);
+        $indexer->method('getSchemaFields')->willReturn([['name' => 'children', 'type' => 'object[]']]);
+        $indexer->method('getCollectionSettings')->willReturn(['enable_nested_fields' => true]);
+        $indexer->method('buildDocuments')->willReturn([['id' => '5']]);
+        $this->indexer = $indexer;
+        $this->sut = $this->buildSut();
     }
 
     private function createStore(int $id, string $code, bool $active): StoreInterface&MockObject

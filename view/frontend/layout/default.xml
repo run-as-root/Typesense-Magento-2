@@ -2,19 +2,38 @@
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <body>
-        <referenceBlock name="header-search">
+        <referenceContainer name="head.additional">
             <block class="Magento\Framework\View\Element\Template"
-                   name="typesense.direct.matches"
-                   template="RunAsRoot_TypeSense::search/direct-matches.phtml"
-                   before="typesense.autocomplete"/>
-            <block class="Magento\Framework\View\Element\Template"
-                   name="typesense.autocomplete"
-                   template="RunAsRoot_TypeSense::search/autocomplete.phtml"
-                   after="-">
+                   name="typesense.preconnect"
+                   template="RunAsRoot_TypeSense::head/typesense-preconnect.phtml">
                 <arguments>
-                    <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\AutocompleteConfigViewModel</argument>
+                    <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\ClientConfigViewModel</argument>
                 </arguments>
             </block>
-        </referenceBlock>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.client.loader"
+                   template="RunAsRoot_TypeSense::js/client-loader.phtml"
+                   after="typesense.preconnect">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\ClientConfigViewModel</argument>
+                </arguments>
+            </block>
+            <!-- listing-core.js, loaded once; handles that use it set is_required. -->
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.listing.core"
+                   template="RunAsRoot_TypeSense::js/listing-core.phtml"
+                   after="typesense.client.loader"/>
+        </referenceContainer>
+
+        <referenceContainer name="before.body.end">
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.tracking.ga4"
+                   template="RunAsRoot_TypeSense::tracking/ga4.phtml"
+                   ifconfig="run_as_root_typesense/tracking/ga4_datalayer">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\ClientConfigViewModel</argument>
+                </arguments>
+            </block>
+        </referenceContainer>
     </body>
 </page>

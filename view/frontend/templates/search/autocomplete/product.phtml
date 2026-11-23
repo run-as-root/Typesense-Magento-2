@@ -1,0 +1,37 @@
+<?php
+/**
+ * Header search dropdown: products section of `typesenseHeaderSearch`. Names are split into highlight segments
+ * rendered with x-text; prices (only when the config allows them and above 0) via hyva.formatPrice.
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+?>
+<div x-show="hasProducts" role="group" aria-labelledby="typesense-ac-product-title" class="border-b border-gray-200 p-2">
+    <p id="typesense-ac-product-title" class="mb-1 px-2 text-xs font-bold uppercase tracking-wide text-gray-500"><?= $escaper->escapeHtml(__('Products')) ?></p>
+    <template x-for="row in sections.products" :key="row.key">
+        <a :href="row.url"
+           :id="row.domId"
+           role="option"
+           :aria-selected="rowSelected"
+           :class="rowClasses"
+           @click="onRowClick"
+           @mouseenter="activateRow"
+           class="flex items-center gap-3 rounded px-2 py-2 hover:bg-gray-100">
+            <span class="h-10 w-10 shrink-0 bg-gray-100">
+                <template x-if="row.hasImage">
+                    <img :src="row.imageUrl" alt="" loading="lazy" width="40" height="40" class="h-10 w-10 object-contain bg-white">
+                </template>
+            </span>
+            <span class="min-w-0 grow">
+                <span class="block truncate text-sm font-medium text-gray-800"><template x-for="segment in row.segments" :key="segment.key"><span><template x-if="segment.mark"><mark class="bg-transparent font-bold text-inherit" x-text="segment.text"></mark></template><template x-if="segment.plain"><span x-text="segment.text"></span></template></span></template></span>
+                <template x-if="row.hasPrice">
+                    <span class="block text-sm text-gray-600" x-text="rowPriceText"></span>
+                </template>
+            </span>
+        </a>
+    </template>
+</div>

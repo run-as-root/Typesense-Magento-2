@@ -27,6 +27,9 @@ final class CspDynamicCollectorTest extends TestCase
         $this->config->method('getHost')->willReturn('search.example.com');
         $this->config->method('getPort')->willReturn(8108);
         $this->config->method('getProtocol')->willReturn('https');
+        $this->config->method('getSearchHost')->willReturn('search.example.com');
+        $this->config->method('getSearchPort')->willReturn(8108);
+        $this->config->method('getSearchProtocol')->willReturn('https');
 
         $result = $this->subject->collect([]);
 
@@ -34,6 +37,38 @@ final class CspDynamicCollectorTest extends TestCase
         $this->assertInstanceOf(FetchPolicy::class, $result[0]);
         $this->assertSame('connect-src', $result[0]->getId());
         $this->assertContains('https://search.example.com:8108', $result[0]->getHostSources());
+    }
+
+    public function test_collect_allows_the_search_node_the_browser_connects_to(): void
+    {
+        $this->config->method('isEnabled')->willReturn(true);
+        $this->config->method('getHost')->willReturn('typesense.internal');
+        $this->config->method('getPort')->willReturn(8108);
+        $this->config->method('getProtocol')->willReturn('http');
+        $this->config->method('getSearchHost')->willReturn('search.example.com');
+        $this->config->method('getSearchPort')->willReturn(443);
+        $this->config->method('getSearchProtocol')->willReturn('https');
+
+        $result = $this->subject->collect([]);
+
+        $this->assertCount(1, $result);
+        $this->assertSame(
+            ['http://typesense.internal:8108', 'https://search.example.com'],
+            $result[0]->getHostSources(),
+        );
+    }
+
+    public function test_collect_lists_a_shared_indexing_and_search_node_once(): void
+    {
+        $this->config->method('isEnabled')->willReturn(true);
+        $this->config->method('getHost')->willReturn('search.example.com');
+        $this->config->method('getPort')->willReturn(443);
+        $this->config->method('getProtocol')->willReturn('https');
+        $this->config->method('getSearchHost')->willReturn('search.example.com');
+        $this->config->method('getSearchPort')->willReturn(443);
+        $this->config->method('getSearchProtocol')->willReturn('https');
+
+        $this->assertSame(['https://search.example.com'], $this->subject->collect([])[0]->getHostSources());
     }
 
     public function test_collect_returns_default_policies_when_disabled(): void
@@ -53,6 +88,9 @@ final class CspDynamicCollectorTest extends TestCase
         $this->config->method('getHost')->willReturn('search.example.com');
         $this->config->method('getPort')->willReturn(443);
         $this->config->method('getProtocol')->willReturn('https');
+        $this->config->method('getSearchHost')->willReturn('search.example.com');
+        $this->config->method('getSearchPort')->willReturn(443);
+        $this->config->method('getSearchProtocol')->willReturn('https');
 
         $result = $this->subject->collect([]);
 
@@ -69,6 +107,9 @@ final class CspDynamicCollectorTest extends TestCase
         $this->config->method('getHost')->willReturn('search.example.com');
         $this->config->method('getPort')->willReturn(80);
         $this->config->method('getProtocol')->willReturn('http');
+        $this->config->method('getSearchHost')->willReturn('search.example.com');
+        $this->config->method('getSearchPort')->willReturn(80);
+        $this->config->method('getSearchProtocol')->willReturn('http');
 
         $result = $this->subject->collect([]);
 

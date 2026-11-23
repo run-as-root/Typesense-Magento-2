@@ -36,7 +36,9 @@ class AttributeResolver implements AttributeResolverInterface
         $extra = [];
         foreach ($collection as $attribute) {
             $code = $attribute->getAttributeCode();
-            if (in_array($code, self::CORE_FIELDS, true)) {
+            if (in_array($code, self::CORE_FIELDS, true)
+                || in_array($code, ProductSchemaProvider::RESERVED_FIELDS, true)
+            ) {
                 continue;
             }
 
@@ -45,11 +47,14 @@ class AttributeResolver implements AttributeResolverInterface
             // For select/multiselect/boolean, resolve option labels instead of IDs
             if (in_array($frontendInput, ['select', 'multiselect', 'boolean'], true)) {
                 $text = $product->getAttributeText($code);
-                if ($text === false || $text === '' || $text === null) {
+                if ($text === false || $text === '' || $text === null || $text === []) {
                     continue;
                 }
-                // getAttributeText returns string for select, array for multiselect
-                $extra[$code] = is_array($text) ? implode(', ', $text) : (string) $text;
+                // Multiselect values are facet-filtered one by one, so they stay an array of labels.
+                // getAttributeText returns a plain string when only one option is selected.
+                $extra[$code] = $frontendInput === 'multiselect'
+                    ? array_values(array_map('strval', (array) $text))
+                    : (string) $text;
             } else {
                 $value = $product->getData($code);
                 if ($value === null || $value === '') {
@@ -60,6 +65,19 @@ class AttributeResolver implements AttributeResolverInterface
         }
 
         return $extra;
+    }
+
+    public function getMultiselectAttributeCodes(): array
+    {
+        $collection = $this->getAttributeCollection();
+        $codes = [];
+        foreach ($collection as $attribute) {
+            if ($attribute->getFrontendInput() === 'multiselect') {
+                $codes[] = $attribute->getAttributeCode();
+            }
+        }
+
+        return $codes;
     }
 
     private function getAttributeCollection(): AttributeCollection

@@ -7,11 +7,13 @@ namespace RunAsRoot\TypeSense\Test\Unit\Model\Indexer\Product;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Indexer\Product\AttributeResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProvider;
 
 final class ProductSchemaProviderTest extends TestCase
 {
     private TypeSenseConfigInterface&MockObject $config;
+    private AttributeResolverInterface&MockObject $attributeResolver;
     private ProductSchemaProvider $sut;
 
     protected function setUp(): void
@@ -19,7 +21,9 @@ final class ProductSchemaProviderTest extends TestCase
         $this->config = $this->createMock(TypeSenseConfigInterface::class);
         $this->config->method('getAdditionalAttributes')->willReturn([]);
 
-        $this->sut = new ProductSchemaProvider($this->config);
+        $this->attributeResolver = $this->createMock(AttributeResolverInterface::class);
+        $this->attributeResolver->method('getMultiselectAttributeCodes')->willReturn(['material']);
+        $this->sut = new ProductSchemaProvider($this->config, $this->attributeResolver);
     }
 
     public function test_get_fields_returns_array(): void
@@ -73,13 +77,23 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertSame('float', $field['type']);
     }
 
-    public function test_get_fields_contains_special_price_as_optional_float(): void
+    public function test_get_fields_contains_final_and_regular_price_as_float_without_special_price(): void
     {
         $fields = $this->sut->getFields();
 
-        $field = $this->findField($fields, 'special_price');
-        self::assertSame('float', $field['type']);
+        self::assertSame('float', $this->findField($fields, 'final_price')['type']);
+        self::assertSame('float', $this->findField($fields, 'regular_price')['type']);
+        self::assertNotContains('special_price', array_column($fields, 'name'));
+    }
+
+    public function test_schema_enables_nested_fields_and_declares_children_unindexed(): void
+    {
+        $field = $this->findField($this->sut->getFields(), 'children');
+
+        self::assertSame(['enable_nested_fields' => true], $this->sut->getCollectionSettings());
+        self::assertSame('object[]', $field['type']);
         self::assertTrue($field['optional']);
+        self::assertFalse($field['index']);
     }
 
     public function test_get_fields_contains_categories_as_string_array(): void
@@ -121,6 +135,30 @@ final class ProductSchemaProviderTest extends TestCase
         $field = $this->findField($fields, 'in_stock');
         self::assertSame('bool', $field['type']);
         self::assertTrue($field['facet']);
+    }
+
+    public function test_is_new_is_an_optional_bool_facet_for_the_new_badge(): void
+    {
+        $field = $this->findField($this->sut->getFields(), 'is_new');
+
+        self::assertSame('bool', $field['type']);
+        self::assertTrue($field['facet'] ?? false);
+        self::assertTrue($field['optional'] ?? false);
+    }
+
+    public function test_price_is_a_float_facet_for_the_price_slider_stats(): void
+    {
+        $field = $this->findField($this->sut->getFields(), 'price');
+
+        self::assertSame('float', $field['type']);
+        self::assertTrue($field['facet'] ?? false);
+    }
+
+    public function test_in_stock_is_sortable_for_out_of_stock_last_listings(): void
+    {
+        $field = $this->findField($this->sut->getFields(), 'in_stock');
+
+        self::assertTrue($field['sort'] ?? false);
     }
 
     public function test_get_fields_contains_type_id_as_string_facet(): void
@@ -219,7 +257,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config = $this->createMock(TypeSenseConfigInterface::class);
         $config->method('getAdditionalAttributes')->willReturn(['color', 'size']);
 
-        $sut = new ProductSchemaProvider($config);
+        $sut = new ProductSchemaProvider($config, $this->attributeResolver);
         $fields = $sut->getFields();
 
         $colorField = $this->findField($fields, 'color');
@@ -233,19 +271,65 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertTrue($sizeField['facet']);
     }
 
+    public function test_additional_attributes_named_like_core_fields_do_not_duplicate_them(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn(['short_description', 'color', 'price']);
+
+        $sut = new ProductSchemaProvider($config, $this->attributeResolver);
+        $fields = $sut->getFields();
+        $fieldNames = array_column($fields, 'name');
+
+        self::assertSame($fieldNames, array_values(array_unique($fieldNames)));
+        self::assertSame('string', $this->findField($fields, 'short_description')['type']);
+        self::assertSame('float', $this->findField($fields, 'price')['type']);
+        self::assertContains('color', $fieldNames);
+    }
+
+    public function test_additional_attributes_named_like_late_core_fields_do_not_duplicate_them(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn(
+            ['categories_text', 'name_decompounded', 'embedding', 'is_new', 'category_ids', 'children', 'color'],
+        );
+        $config->method('isGermanDecompoundingEnabled')->willReturn(true);
+        $config->method('isConversationalSearchEnabled')->willReturn(true);
+        $config->method('getEmbeddingFields')->willReturn(['name']);
+
+        $fields = (new ProductSchemaProvider($config, $this->attributeResolver))->getFields();
+        $fieldNames = array_column($fields, 'name');
+
+        self::assertSame($fieldNames, array_values(array_unique($fieldNames)));
+        self::assertSame('bool', $this->findField($fields, 'is_new')['type']);
+        self::assertContains('color', $fieldNames);
+    }
+
+    public function test_reserved_fields_cover_every_core_field_with_all_features_enabled(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn([]);
+        $config->method('isGermanDecompoundingEnabled')->willReturn(true);
+        $config->method('isConversationalSearchEnabled')->willReturn(true);
+        $config->method('getEmbeddingFields')->willReturn(['name']);
+
+        $fieldNames = array_column((new ProductSchemaProvider($config, $this->attributeResolver))->getFields(), 'name');
+
+        self::assertEqualsCanonicalizing($fieldNames, ProductSchemaProvider::RESERVED_FIELDS);
+    }
+
     public function test_get_fields_returns_no_additional_attribute_fields_when_none_configured(): void
     {
         $config = $this->createMock(TypeSenseConfigInterface::class);
         $config->method('getAdditionalAttributes')->willReturn([]);
 
-        $sut = new ProductSchemaProvider($config);
+        $sut = new ProductSchemaProvider($config, $this->attributeResolver);
         $fieldNames = array_column($sut->getFields(), 'name');
 
         $coreNames = ['id', 'product_id', 'name', 'sku', 'url', 'image_url', 'price',
-            'special_price', 'description', 'short_description', 'categories', 'category_ids',
-            'categories.lvl0', 'categories.lvl1', 'categories.lvl2', 'in_stock', 'type_id',
+            'final_price', 'regular_price', 'description', 'short_description', 'categories', 'category_ids',
+            'categories.lvl0', 'categories.lvl1', 'categories.lvl2', 'in_stock', 'is_new', 'type_id',
             'visibility', 'created_at', 'updated_at', 'sales_count', 'rating_summary', 'review_count',
-            'categories_text'];
+            'children', 'categories_text'];
 
         self::assertSame($coreNames, $fieldNames);
     }
@@ -257,7 +341,7 @@ final class ProductSchemaProviderTest extends TestCase
         $this->config->method('getEmbeddingFields')->willReturn(['name', 'description']);
         $this->config->method('getAdditionalAttributes')->willReturn([]);
 
-        $sut = new ProductSchemaProvider($this->config);
+        $sut = new ProductSchemaProvider($this->config, $this->attributeResolver);
         $fields = $sut->getFields();
         $fieldNames = array_column($fields, 'name');
 
@@ -274,7 +358,7 @@ final class ProductSchemaProviderTest extends TestCase
         $this->config->method('isConversationalSearchEnabled')->willReturn(false);
         $this->config->method('getAdditionalAttributes')->willReturn([]);
 
-        $sut = new ProductSchemaProvider($this->config);
+        $sut = new ProductSchemaProvider($this->config, $this->attributeResolver);
         $fields = $sut->getFields();
         $fieldNames = array_column($fields, 'name');
 
@@ -287,7 +371,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config->method('getAdditionalAttributes')->willReturn(['color']);
         $config->method('isStemEnabled')->willReturn(true);
         $config->method('isGermanDecompoundingEnabled')->willReturn(true);
-        $fields = (new ProductSchemaProvider($config))->getFields();
+        $fields = (new ProductSchemaProvider($config, $this->attributeResolver))->getFields();
 
         $stemmed = ['name', 'description', 'short_description', 'categories_text', 'name_decompounded'];
         foreach ($stemmed as $name) {
@@ -314,7 +398,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config->method('getAdditionalAttributes')->willReturn([]);
         $config->method('isInfixEnabled')->willReturn(true);
         $config->method('getInfixFields')->willReturn(['name', 'price']);
-        $fields = (new ProductSchemaProvider($config))->getFields();
+        $fields = (new ProductSchemaProvider($config, $this->attributeResolver))->getFields();
 
         self::assertTrue($this->findField($fields, 'name')['infix']);
         self::assertArrayNotHasKey('infix', $this->findField($fields, 'sku'));
@@ -327,7 +411,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config->method('getAdditionalAttributes')->willReturn([]);
         $config->method('isInfixEnabled')->willReturn(false);
         $config->method('getInfixFields')->willReturn(['name']);
-        $fields = (new ProductSchemaProvider($config))->getFields();
+        $fields = (new ProductSchemaProvider($config, $this->attributeResolver))->getFields();
 
         self::assertArrayNotHasKey('infix', $this->findField($fields, 'name'));
     }
@@ -339,7 +423,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config = $this->createMock(TypeSenseConfigInterface::class);
         $config->method('getAdditionalAttributes')->willReturn([]);
         $config->method('isGermanDecompoundingEnabled')->willReturn(true);
-        $fields = (new ProductSchemaProvider($config))->getFields();
+        $fields = (new ProductSchemaProvider($config, $this->attributeResolver))->getFields();
 
         self::assertSame(
             ['name' => 'name_decompounded', 'type' => 'string', 'optional' => true],
@@ -356,10 +440,24 @@ final class ProductSchemaProviderTest extends TestCase
         $config->method('isInfixEnabled')->willReturn(true);
         $config->method('getInfixFields')->willReturn(['name_decompounded']);
 
-        $field = $this->findField((new ProductSchemaProvider($config))->getFields(), 'name_decompounded');
+        $field = $this->findField((new ProductSchemaProvider($config, $this->attributeResolver))->getFields(), 'name_decompounded');
 
         self::assertTrue($field['stem']);
         self::assertTrue($field['infix']);
+    }
+
+    public function test_multiselect_schema_field_is_string_array(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn(['material', 'color']);
+
+        $fields = (new ProductSchemaProvider($config, $this->attributeResolver))->getFields();
+
+        $material = $this->findField($fields, 'material');
+        self::assertSame('string[]', $material['type']);
+        self::assertTrue($material['facet']);
+        self::assertTrue($material['optional']);
+        self::assertSame('string', $this->findField($fields, 'color')['type']);
     }
 
     /** @param array<int, array<string, mixed>> $fields */

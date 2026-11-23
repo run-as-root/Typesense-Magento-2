@@ -30,8 +30,8 @@
     <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\ImageResolverInterface"
                 type="RunAsRoot\TypeSense\Model\Indexer\Product\ImageResolver"/>
 
-    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\StockResolverInterface"
-                type="RunAsRoot\TypeSense\Model\Indexer\Product\StockResolver"/>
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\SalableResolverInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\SalableResolver"/>
 
     <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\CategoryResolverInterface"
                 type="RunAsRoot\TypeSense\Model\Indexer\Product\CategoryResolver"/>
@@ -47,6 +47,8 @@
 
     <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\ReviewResolverInterface"
                 type="RunAsRoot\TypeSense\Model\Indexer\Product\ReviewResolver"/>
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\NewProductResolverInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Product\NewProductResolver"/>
 
     <preference for="RunAsRoot\TypeSense\Model\Indexer\Category\CategorySchemaProviderInterface"
                 type="RunAsRoot\TypeSense\Model\Indexer\Category\CategorySchemaProvider"/>

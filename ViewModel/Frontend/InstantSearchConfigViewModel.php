@@ -5,81 +5,20 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\ViewModel\Frontend;
 
 use Magento\Framework\View\Element\Block\ArgumentInterface;
-use Magento\Store\Model\StoreManagerInterface;
-use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
-use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
-use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
-use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 
+/**
+ * Listing settings moved to ListingConfigViewModel; this only gates the search page extras (title, term logging).
+ */
 class InstantSearchConfigViewModel implements ArgumentInterface
 {
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
-        private readonly StoreManagerInterface $storeManager,
-        private readonly CollectionNameResolverInterface $collectionNameResolver,
-        private readonly ConversationModelManager $conversationModelManager,
-        private readonly SearchRequestParamsBuilder $requestParamsBuilder,
-        private readonly SearchParametersProvider $searchParametersProvider,
     ) {
     }
 
     public function isEnabled(): bool
     {
         return $this->config->isEnabled() && $this->config->isInstantSearchEnabled();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function getConfig(): array
-    {
-        $store = $this->storeManager->getStore();
-        $storeCode = $store->getCode();
-        $storeId = (int) $store->getId();
-
-        return [
-            'typesenseHost'             => $this->config->getSearchHost(),
-            'typesensePort'             => $this->config->getSearchPort(),
-            'typesenseProtocol'         => $this->config->getSearchProtocol(),
-            'typesenseSearchOnlyApiKey' => $this->config->getSearchOnlyApiKey(),
-            'productCollection'         => $this->collectionNameResolver->resolve('product', $storeCode, $storeId),
-            'productsPerPage'           => $this->config->getProductsPerPage(),
-            'facetAttributes'           => $this->getFacetAttributes(),
-            'sortOptions'               => $this->getSortOptions(),
-            'tileAttributes'            => $this->config->getTileAttributes(),
-            'requestParams'             => $this->requestParamsBuilder->build(SearchRequestParamsBuilder::CONTEXT_SEARCH, $storeId),
-            'directMatchesFirst'        => $this->config->isDirectMatchesFirstEnabled($storeId),
-            'cacheParams'               => $this->searchParametersProvider->getCacheParameters($storeId),
-            'relevanceSortBy'           => $this->requestParamsBuilder->getRelevanceSortBy(SearchRequestParamsBuilder::CONTEXT_SEARCH, $storeId),
-            'conversationalSearch'      => [
-                'enabled' => $this->config->isConversationalSearchEnabled(),
-                'modelId' => $this->conversationModelManager->getModelId(),
-            ],
-        ];
-    }
-
-    public function getJsonConfig(): string
-    {
-        return (string) json_encode(
-            $this->getConfig(),
-            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
-        );
-    }
-
-    /**
-     * @return string[]
-     */
-    public function getFacetAttributes(): array
-    {
-        return $this->config->getFacetFilters();
-    }
-
-    /**
-     * @return array<int, array<string, string>>
-     */
-    public function getSortOptions(): array
-    {
-        return $this->config->getEnabledSortOptions();
     }
 }

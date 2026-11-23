@@ -10,6 +10,7 @@ use Magento\Store\Model\App\Emulation;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\AliasManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
+use RunAsRoot\TypeSense\Api\CollectionSettingsProviderInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 use RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface;
 use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
@@ -103,24 +104,19 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         string $storeCode,
         int $storeId,
     ): void {
-        $schemaFields = $indexer->getSchemaFields();
+        $schema = ['fields' => $indexer->getSchemaFields()];
+        if ($indexer instanceof CollectionSettingsProviderInterface) {
+            $schema += $indexer->getCollectionSettings();
+        }
         $zeroDowntime = $this->config->isZeroDowntimeEnabled($storeId);
 
         if ($zeroDowntime) {
-            $collectionName = $this->zeroDowntimeService->startReindex(
-                $entityType,
-                $storeCode,
-                ['fields' => $schemaFields],
-                $storeId,
-            );
+            $collectionName = $this->zeroDowntimeService->startReindex($entityType, $storeCode, $schema, $storeId);
         } else {
             $collectionName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
 
             if (!$this->collectionManager->collectionExists($collectionName)) {
-                $this->collectionManager->createCollection(
-                    $collectionName,
-                    ['name' => $collectionName, 'fields' => $schemaFields],
-                );
+                $this->collectionManager->createCollection($collectionName, ['name' => $collectionName] + $schema);
             }
         }
 

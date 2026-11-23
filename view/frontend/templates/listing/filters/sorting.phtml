@@ -1,0 +1,182 @@
+<?php
+/**
+ * Desktop sorting: a listbox of the configured sort options (on category pages limited to the category's
+ * "Available Product Listing Sort By"). The `typesenseSorting` component is shared with sorting-mobile.phtml.
+ * A skeleton stands in until the first result, so the control never flashes empty.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+/** @var HeroiconsOutline $heroicons */
+$heroicons = $viewModels->require(HeroiconsOutline::class);
+?>
+<div x-data="typesenseSorting"
+     @typesense-state.window="onListingState"
+     class="typesense-sorting hidden items-center md:flex">
+    <div x-show="showControlsSkeleton" class="flex items-center gap-2" aria-hidden="true">
+        <div class="h-3 w-12 animate-pulse rounded bg-gray-300"></div>
+        <div class="h-10 w-52 animate-pulse rounded bg-gray-300"></div>
+    </div>
+    <div x-cloak
+         x-show="showSortMenu"
+         @click.outside="closeSortMenu"
+         @keydown.escape.stop="closeSortMenuAndFocus"
+         @focusout="onSortFocusOut"
+         class="relative flex items-center gap-2">
+        <span id="typesense-sort-label" class="text-xs"><?= $escaper->escapeHtml(__('Sort By:')) ?></span>
+        <button type="button"
+                x-ref="sortButton"
+                @click="toggleSortMenu"
+                @keydown.down.prevent="openSortMenu"
+                aria-haspopup="listbox"
+                :aria-expanded="isOpen"
+                aria-labelledby="typesense-sort-label typesense-sort-value"
+                class="flex min-w-52 items-center justify-between gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-sm">
+            <span id="typesense-sort-value" x-text="currentSortLabel"></span>
+            <span :class="chevronClasses" class="transition-transform duration-200">
+                <?= $heroicons->chevronDownHtml('h-4 w-4', 16, 16, ['aria-hidden' => 'true']) ?>
+            </span>
+        </button>
+        <ul x-cloak
+            x-show="isOpen"
+            x-ref="sortList"
+            role="listbox"
+            aria-labelledby="typesense-sort-label"
+            @keydown.down.prevent="focusNextSortOption"
+            @keydown.up.prevent="focusPreviousSortOption"
+            class="absolute right-0 top-full z-30 mt-2 min-w-full rounded border border-gray-200 bg-white py-2 shadow-lg">
+            <template x-for="sortOption in sortOptions" :key="sortOption.value">
+                <li role="option"
+                    tabindex="-1"
+                    :aria-selected="isSortOptionSelected"
+                    :class="sortOptionClasses"
+                    @click="chooseSortOption"
+                    @keydown.enter.prevent="chooseSortOption"
+                    @keydown.space.prevent="chooseSortOption"
+                    class="cursor-pointer whitespace-nowrap px-4 py-1.5 text-sm hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                    x-text="sortOptionLabel"></li>
+            </template>
+        </ul>
+    </div>
+</div>
+<script>
+    function initTypesenseSorting() {
+        const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
+
+        return {
+            ...typesenseListingState(),
+            isOpen: false,
+
+            init() {
+                this.initListingState();
+            },
+            sortOptions() {
+                return this.listingConfig.sortOptions || [];
+            },
+            hasSortOptions() {
+                return this.sortOptions().length > 1;
+            },
+            showSortMenu() {
+                return this.showControls() && this.hasSortOptions();
+            },
+            // parseUrlState already resolved an unknown or missing sort to the default.
+            currentSort() {
+                if (this.listing.hasLoaded) {
+                    return String(this.listing.state.sort || '');
+                }
+
+                return core() ? core().defaultSort(this.listingConfig) : '';
+            },
+            currentSortLabel() {
+                const current = this.currentSort();
+                const option = this.sortOptions().find(candidate => String(candidate.value) === current);
+
+                return option ? option.label : '';
+            },
+            chevronClasses() {
+                return this.isOpen ? 'rotate-180' : '';
+            },
+            isSortOptionSelected() {
+                return String(this.sortOption.value) === this.currentSort();
+            },
+            sortOptionLabel() {
+                return this.sortOption.label;
+            },
+            sortOptionClasses() {
+                return this.isSortOptionSelected() ? 'font-semibold' : '';
+            },
+
+            toggleSortMenu() {
+                if (this.isOpen) {
+                    this.isOpen = false;
+                } else {
+                    this.openSortMenu();
+                }
+            },
+            openSortMenu() {
+                this.isOpen = true;
+                this.$nextTick(() => {
+                    const list = this.$refs.sortList;
+                    const option = list && (list.querySelector('[aria-selected="true"]') || list.querySelector('[role="option"]'));
+                    if (option) {
+                        option.focus();
+                    }
+                });
+            },
+            closeSortMenu() {
+                this.isOpen = false;
+            },
+            // Tabbing out of the open listbox closes it. Focus moves without a related target on mouse clicks
+            // (Safari does not focus buttons), which the click-outside handler already covers.
+            onSortFocusOut() {
+                const event = this.$event;
+                if (this.isOpen && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) {
+                    this.isOpen = false;
+                }
+            },
+            closeSortMenuAndFocus() {
+                if (this.isOpen) {
+                    this.isOpen = false;
+                    this.$refs.sortButton.focus();
+                }
+            },
+            moveSortFocus(step) {
+                const options = Array.from(this.$refs.sortList.querySelectorAll('[role="option"]'));
+                const index = options.indexOf(document.activeElement);
+                const next = options[Math.min(options.length - 1, Math.max(0, index + step))];
+                if (next) {
+                    next.focus();
+                }
+            },
+            focusNextSortOption() {
+                this.moveSortFocus(1);
+            },
+            focusPreviousSortOption() {
+                this.moveSortFocus(-1);
+            },
+            selectSortOption() {
+                const value = String(this.sortOption.value);
+                if (value !== this.currentSort()) {
+                    this.dispatchListingEvent('typesense-sort-change', { sort: value });
+                }
+            },
+            chooseSortOption() {
+                this.selectSortOption();
+                this.closeSortMenuAndFocus();
+            },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => Alpine.data('typesenseSorting', initTypesenseSorting), { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

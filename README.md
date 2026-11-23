@@ -63,6 +63,7 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 |---|---|
 | PHP | 8.3+ |
 | Magento 2 / Mage-OS | 2.4.7+ |
+| Magento Inventory (MSI) modules | enabled (product stock comes from `IsProductSalableInterface`) |
 | Typesense | 27+ |
 | Hyva Theme | 1.3+ |
 | typesense/typesense-php | ^6.0 |
@@ -161,12 +162,18 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | Setting | Default | Description |
 |---|---|---|
 | Enable Instant Search | Yes | Replace the Magento search results page |
-| Products Per Page | 20 | Results per page on the search results page |
+| Products Per Page | 12 | Results per page on the search results page |
 | Product Tile Attributes | — | Attributes displayed on product cards (must also be indexed) |
-| Sort Options | — | Sort options available to customers (see below) |
-| Replace Category Pages | No | Use Typesense for category product listings |
-| Image Type | — | Product image type to use on tiles |
-| Image Width / Height | — | Dimensions for product tile images |
+| Sort Options | relevance, price asc/desc, newest | Sort options available to customers (see below) |
+| Facet Filters | — | Facets shown in the filter bar: additional attributes plus Price, Availability (`in_stock`) and New (`is_new`). Category pages always get the subcategory filter |
+| Facet Types | — | Per facet: dropdown, checkbox (Yes/No fields) or slider (Price only), and "Value Search" for dropdowns. Price defaults to a slider |
+| Show Out-of-Stock Products Last | Yes | Sorts by `in_stock:desc` before the chosen sort |
+| Replace Category Pages | No | Use Typesense for category product listings (not for "Static block only" categories) |
+| Cacheable Search Page | Yes | Serve the search page as a full-page-cacheable shell; search terms are logged from the browser |
+| Image Type | `category_page_grid` | Magento image id used for the indexed, resized `image_url` |
+| Image Width / Height | 300 | `width`/`height` attributes of tile images |
+| No Results: Suggested Products Category ID | — | Products of this category are shown below the "no results" message |
+| SEO Text Selector | `.page-bottom .category-description` | Element hidden on category pages after the first page |
 
 ### Autocomplete Settings
 
@@ -177,6 +184,13 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | Category Count | 3 | Max category results |
 | CMS Page Count | 2 | Max CMS page results |
 | Suggestion Count | 4 | Max query suggestion results |
+| Group Products By | — | Faceted product field sent as `group_by` (one product per value); ignored when not a faceted schema field |
+
+### Tracking Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| Push GA4 Events to the dataLayer | No | Maps the `typesense:*` window events to `view_item_list`, `select_item`, `search_suggestion_click`, `sorting_interaction` and `filter_interaction` |
 
 ### Conversational Search (AI) Settings
 
@@ -367,19 +381,105 @@ Limitations:
 
 ## Frontend
 
-All frontend components require the Hyva theme. They use Alpine.js for reactivity and make direct Typesense API calls using the public search-only API key. All components are written to be CSP-compatible — no inline `eval()` or dynamic script injection.
+All frontend components require the Hyva theme. They use Alpine.js for reactivity and make direct Typesense API calls using the public search-only API key. All components are written to be CSP-compatible: Alpine CSP components without `eval()`, inline scripts registered through Hyvä's `HyvaCsp`, and document data rendered only through `x-text` and attribute bindings. The one injected script is typesense-js itself: `js/client-loader.phtml` adds it from jsDelivr with a Subresource Integrity hash on the first `getClient()` call; `etc/csp_whitelist.xml` allows `cdn.jsdelivr.net`.
 
 ### Autocomplete
 
-Injected into the Hyva search form. Opens a dropdown with results from all configured entity collections. Configured via the autocomplete settings in admin.
+Replaces the template of Hyvä's `header-search` block (handle `typesense_autocomplete`, also over Hyva_SmileElasticsuite's) with `search/form-mini.phtml`: a GET form to the search page plus a dropdown with query suggestions, products, categories and CMS pages from one multi search, highlighted matches, "See all (N)" and keyboard navigation. Typesense errors hide the dropdown; Enter still submits the form. Configured via the autocomplete settings in admin.
 
 ### Instant Search Page
 
-Replaces the Magento search results page (`/catalogsearch/result`). Renders a full search results page with facets, pagination, and sorting powered by Typesense. The default Magento search result blocks are removed from the layout to prevent duplicate results.
+Replaces the Magento search results page (`/catalogsearch/result`) with the storefront listing below (handle `typesense_search_result`, added only while the module and instant search are enabled). With "Cacheable Search Page" on, a URL holding only listing parameters (`q`, `page`, `sort`, `limit`, `price` and configured facets) is answered by a cacheable shell instead of the core search action, and the term is logged from the browser through `catalogsearch/searchTermsLog/save`. Search terms with a redirect URL still redirect.
+
+Other `around` plugins on `Magento\CatalogSearch\Controller\Result\Index` that are declared before ours still wrap the shell. Smile ElasticSuite's `search_term_and_single_result_redirect` is one: with "Redirect to product page if only one result" on, it runs an ElasticSuite query on every search page and redirects whenever that query finds a single product, whatever Typesense finds. Turn `smile_elasticsuite_catalogsearch_settings/catalogsearch/redirect_if_one_result` off on Typesense stores.
 
 ### Category Page
 
-When enabled, replaces the Magento category product listing with a Typesense-powered equivalent. Filtering, sorting, and pagination all happen client-side against Typesense.
+When "Replace Category Pages" is on, Typesense category pages (handle `typesense_category_search`) use the same listing, filtered by `category_ids` (anchor categories include their subtree) and visibility catalog/both. Filtering, sorting and pagination happen in the browser against Typesense; Magento's product collection is never loaded for the listing.
+
+### Storefront Listing
+
+The search and category listings share the `typesense_listing` handle: one Alpine CSP component `typesenseListing` (template `listing/listing.phtml`) built from child-block slots. Override a slot by pointing its block at your own template in a theme or module layout (`<referenceBlock name="typesense.listing.tile.price" template="Vendor_Module::listing/tile/price.phtml"/>`), or copy the template into the theme under `RunAsRoot_TypeSense/templates/<path>`.
+
+| Slot (alias) | Block name | Default template |
+|---|---|---|
+| `filters` | `typesense.listing.filters` (container) | `listing/filters/bar.phtml` with `skeleton`, `drawer`, `active-filters` |
+| drawer children | `typesense.listing.filters.{sorting-mobile,subcategory,dropdown,slider,checkbox}` | `listing/filters/*.phtml` (arguments `visible_values`, `group_label`) |
+| `toolbar` | `typesense.listing.toolbar` (container) | `listing/filters/sorting.phtml`, `listing/filters/page-size.phtml` |
+| `ai-answer` | `typesense.listing.ai-answer` | `listing/ai-answer.phtml` |
+| `products-count` | `typesense.listing.products-count` | `listing/products-count.phtml` |
+| `loading-overlay` | `typesense.listing.loading-overlay` | `listing/loading-overlay.phtml` |
+| `grid` | `typesense.listing.grid` with `skeleton` (`placeholder_count`, default 8) and `tile` | `listing/grid.phtml`, `listing/skeleton.phtml` |
+| tile slots | `typesense.listing.tile.{image,badges,wishlist,rating,price,variants,actions}` | `listing/tile/*.phtml` |
+| `no-results` | `typesense.listing.no-results` with its own `tile` tree (`typesense.listing.no-results.tile.*`) | `listing/no-results.phtml` |
+| `pagination` | `typesense.listing.pagination` | `listing/pagination.phtml` |
+| `script` | `typesense.listing.script` (+ `.events`, `.getters`, `.extras`, `.tile`, `.tile.requests`) | `listing/script.phtml`, `listing/script/*.phtml`, `listing/tile/script*.phtml` |
+| `json-ld` | `typesense.listing.json-ld` | `listing/json-ld.phtml` (ItemList on category pages) |
+
+The listing block takes `eager_load_images_count` (default 4). `listing-core.js` (`window.runAsRootTypesense.listing`) holds the logic (filters, URL state, facet counts, GA4 items) and is loaded once, deferred in the head, by `typesense.listing.core` on pages whose handle sets its `is_required` argument. Child components read the listing state from the `typesense-state` window event (`typesenseListingState()` mixin) and change it by dispatching `typesense-filter-change`, `typesense-sort-change`, `typesense-limit-change` and `typesense-page-change`.
+
+URL state uses `q`, `page`, `sort` (e.g. `price:asc`), `limit`, `price` (`min-max`) and one parameter per facet field with values joined by `|`. Unknown keys are dropped, invalid values fall back to the defaults and `page` is clamped to the available pages.
+
+#### JSON config
+
+Each listing renders its config as JSON in `<script type="application/json" data-typesense-listing-config>` (`ListingConfigViewModel::getJsonConfig()`). Plug the view model to change it.
+
+| Key | Content |
+|---|---|
+| `connection` | `host`, `port`, `protocol`, `apiKey` (search-only key) of the browser-side node |
+| `productCollection` | Store's product alias, e.g. `rar_product_de` |
+| `context`, `categoryId`, `listName` | `search` or `category`, the category id, the GA4 list name (category name or "Search Results") |
+| `baseFilter` | `filter_by` every search starts from (category ids or virtual rule, visibility) |
+| `facets` | `[{field, label, type, searchable, boolean, numeric, prefix?}]`; `type` is `dropdown`, `checkbox`, `slider` or `subcategory`, `numeric` is `int32`/`int64`/`float` or `false` |
+| `maxFacetValues` | `max_facet_values` sent to Typesense (50) |
+| `sortOptions`, `defaultSort` | `[{label, value}]` (`value` is a Typesense `sort_by`, `''` = relevance) and the category's default |
+| `limits`, `perPage` | Page sizes from the catalog grid settings and the default |
+| `inStockFirst` | Prepend `in_stock:desc` to every sort |
+| `requestParams`, `cacheParams`, `relevanceSortBy`, `directMatchesFirst` | Search parameters, cache options, boosting-rule sort and direct-match ranking (see Search Settings) |
+| `conversationalSearch` | `{enabled, modelId}` |
+| `currencyCode`, `locale`, `showPrices`, `showRatings` | Formatting; `showPrices` follows `ListingConfigViewModel::canShowPrices()` |
+| `addToCartUrl`, `wishlistEnabled`, `wishlistAddUrl`, `wishlistUrl` | Tile actions (POST with form key) |
+| `imageWidth`, `imageHeight`, `noResultsCategoryId`, `seoTextSelector` | See Instant Search Settings |
+
+The header search reads `<script type="application/json" data-typesense-autocomplete-config>` (`AutocompleteConfigViewModel`): collections, counts, `minQueryLength`, `searchUrl`, `groupBy`, highlight and price settings.
+
+#### Window events
+
+The listing and the header search dispatch these `CustomEvent`s on `window`. Listen to them for tracking instead of wrapping the Typesense client.
+
+| Event | When | `detail` |
+|---|---|---|
+| `typesense:results` | After every rendered result | `{context, listName, page, stateKey, items, documents}`; `items` are GA4 items (`item_id` = SKU, `item_name`, `price` when shown and > 0, `index`, `item_list_name`), `stateKey` the serialized URL state |
+| `typesense:select-item` | Shopper clicks a tile link | `{item, index, listName, document}` |
+| `typesense:suggestion-click` | Shopper clicks a header-search row | `{type, term, name, url, index, item?}`; `type` is `product`, `category`, `page`, `suggestion` or `see_all` (the "See all" link; `name` is the term), `item` only for products |
+| `typesense:sort-change` | Shopper changes the sort | `{context, listName, sort, previous}` |
+| `typesense:filter-change` | Shopper adds or removes filters | `{context, listName, added, removed}` with `{field, value}` entries (price as `min-max`) |
+
+#### GA4 dataLayer
+
+With "Push GA4 Events to the dataLayer" on, `tracking/ga4.phtml` maps the events to `window.dataLayer`, each push preceded by `{ecommerce: null}`:
+
+| Event | dataLayer push |
+|---|---|
+| `typesense:results` | `{event: 'view_item_list', ecommerce: {item_list_name, items}}`, once per listing state, never for empty results |
+| `typesense:select-item` | `{event: 'select_item', ecommerce: {item_list_name, items: [item]}}` |
+| `typesense:suggestion-click` | `{event: 'search_suggestion_click', search_term, suggestion_type, suggestion_name, suggestion_url (path only), index, ecommerce?: {item_list_name: 'search_suggestions', items}}` |
+| `typesense:sort-change` | `{event: 'sorting_interaction', sorting_option}` (`relevance` for the default) |
+| `typesense:filter-change` | `{event: 'filter_interaction', filter_type, filter_value}` per added filter, plus one with `filter_type: 'filter_deactivation'` when filters were removed |
+
+Projects with their own item shape leave the setting off and listen to the window events.
+
+#### Index requirements
+
+Grouped tiles read `children` (`object[]`), which needs a product collection created with `enable_nested_fields: true`. The flag can only be set when a collection is created, so after upgrading run a full product reindex (`bin/magento typesense:reindex --entity=product`) with Zero-Downtime Reindex on, or delete the product collections first without it. The same reindex adds the `price` facet (slider stats), sortable `in_stock`, `is_new`, the ancestor category paths in `categories.lvlN` and the anchor ancestors in `category_ids`.
+
+#### Hyvä Tailwind CSS
+
+The module's templates use Tailwind classes that are only in the CSS once the theme is rebuilt with them:
+
+1. The module registers itself for Hyvä's config (`hyva_config_generate_before`). Run `bin/magento hyva:config:generate` (`setup:upgrade` also does it) and check that `app/etc/hyva-themes.json` lists the module path (`vendor/run-as-root/magento2-typesense`, or the path-repository directory). Make sure the theme's `web/tailwind/hyva.config.json` does not exclude it.
+2. Rebuild the theme CSS in `<theme>/web/tailwind`: `npm run build` (Tailwind v4 themes regenerate `generated/hyva-source.css`, which then holds an `@source` for the module and imports its `view/frontend/tailwind/tailwind-source.css`; Tailwind v3 themes merge `view/frontend/tailwind/tailwind.config.js` through `@hyva-themes/hyva-modules`).
+3. Deploy static content (production) or flush caches. Repeat step 2 after every module upgrade that changes templates.
 
 ### Conversational Search (AI)
 

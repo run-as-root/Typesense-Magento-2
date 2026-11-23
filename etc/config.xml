@@ -53,12 +53,17 @@
                 <enabled>1</enabled>
                 <products_per_page>12</products_per_page>
                 <replace_category_page>0</replace_category_page>
-                <image_type>small_image</image_type>
+                <cacheable_search_page>1</cacheable_search_page>
+                <image_type>category_page_grid</image_type>
                 <image_width>300</image_width>
                 <image_height>300</image_height>
                 <tile_attributes/>
                 <sort_options>relevance,price_asc,price_desc,newest</sort_options>
                 <facet_filters/>
+                <facet_types/>
+                <in_stock_first>1</in_stock_first>
+                <no_results_category_id/>
+                <seo_text_selector>.page-bottom .category-description</seo_text_selector>
             </instant_search>
             <autocomplete>
                 <enabled>1</enabled>
@@ -66,6 +71,7 @@
                 <category_count>3</category_count>
                 <cms_page_count>2</cms_page_count>
                 <suggestion_count>4</suggestion_count>
+                <group_by/>
             </autocomplete>
             <merchandising>
                 <category_merchandiser_enabled>0</category_merchandiser_enabled>
@@ -156,6 +162,9 @@ GUIDELINES:
                 <enabled>0</enabled>
                 <limit>8</limit>
             </recommendations>
+            <tracking>
+                <ga4_datalayer>0</ga4_datalayer>
+            </tracking>
         </run_as_root_typesense>
     </default>
 </config>

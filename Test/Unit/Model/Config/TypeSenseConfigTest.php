@@ -398,4 +398,119 @@ final class TypeSenseConfigTest extends TestCase
 
         self::assertTrue($this->sut->isDirectMatchesFirstEnabled(3));
     }
+
+    public function test_cacheable_search_page_reads_instant_search_group_per_store(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/instant_search/cacheable_search_page', ScopeInterface::SCOPE_STORE, 2)
+            ->willReturn(true);
+
+        self::assertTrue($this->sut->isCacheableSearchPageEnabled(2));
+    }
+
+    public function test_get_listing_image_id_returns_configured_value(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->with('run_as_root_typesense/instant_search/image_type', ScopeInterface::SCOPE_STORE, null)
+            ->willReturn('category_page_list');
+
+        self::assertSame('category_page_list', $this->sut->getListingImageId());
+    }
+
+    public function test_get_listing_image_id_falls_back_to_category_page_grid(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertSame('category_page_grid', $this->sut->getListingImageId());
+    }
+
+    public function test_get_listing_image_id_falls_back_for_legacy_value(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn('small_image');
+
+        self::assertSame('category_page_grid', $this->sut->getListingImageId());
+    }
+
+    public function test_listing_settings_read_instant_search_group_per_store(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/instant_search/in_stock_first', ScopeInterface::SCOPE_STORE, 2)
+            ->willReturn(true);
+        $this->scopeConfig->method('getValue')->willReturnMap([
+            ['run_as_root_typesense/instant_search/no_results_category_id', ScopeInterface::SCOPE_STORE, 2, ' 17 '],
+            ['run_as_root_typesense/instant_search/seo_text_selector', ScopeInterface::SCOPE_STORE, 2, ' .page-bottom .seo '],
+            ['run_as_root_typesense/instant_search/image_width', ScopeInterface::SCOPE_STORE, 2, '240'],
+            ['run_as_root_typesense/instant_search/image_height', ScopeInterface::SCOPE_STORE, 2, '300'],
+        ]);
+
+        self::assertTrue($this->sut->isInStockFirst(2));
+        self::assertSame(17, $this->sut->getNoResultsCategoryId(2));
+        self::assertSame('.page-bottom .seo', $this->sut->getSeoTextSelector(2));
+        self::assertSame(240, $this->sut->getListingImageWidth(2));
+        self::assertSame(300, $this->sut->getListingImageHeight(2));
+    }
+
+    public function test_empty_listing_settings_disable_trending_products_and_seo_text_hiding(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertNull($this->sut->getNoResultsCategoryId());
+        self::assertSame('', $this->sut->getSeoTextSelector());
+        self::assertSame(0, $this->sut->getListingImageWidth());
+        self::assertSame([], $this->sut->getFacetTypes());
+    }
+
+    public function test_malformed_serialized_rows_are_treated_as_unset(): void
+    {
+        // A hand-edited or legacy (PHP-serialized) value must not fail every listing and search page.
+        $this->scopeConfig->method('getValue')->willReturn('a:1:{i:0;s:5:"color";}');
+
+        self::assertSame([], $this->sut->getFacetTypes());
+        self::assertSame([], $this->sut->getSearchableAttributes());
+    }
+
+    public function test_facet_types_are_keyed_by_attribute_and_skip_incomplete_rows(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->with('run_as_root_typesense/instant_search/facet_types', ScopeInterface::SCOPE_STORE, null)
+            ->willReturn(json_encode([
+                '_1' => ['attribute' => 'color', 'type' => 'dropdown', 'searchable' => '1'],
+                '_2' => ['attribute' => 'in_stock', 'type' => 'checkbox', 'searchable' => '0'],
+                '_3' => ['attribute' => '', 'type' => 'slider'],
+                '_4' => ['attribute' => 'size', 'type' => 'bogus'],
+            ]));
+
+        self::assertSame([
+            'color' => ['type' => 'dropdown', 'searchable' => true],
+            'in_stock' => ['type' => 'checkbox', 'searchable' => false],
+            'size' => ['type' => 'dropdown', 'searchable' => false],
+        ], $this->sut->getFacetTypes());
+    }
+
+    public function test_autocomplete_section_counts_and_group_by_field(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturnMap([
+            ['run_as_root_typesense/autocomplete/category_count', ScopeInterface::SCOPE_STORE, 2, '3'],
+            ['run_as_root_typesense/autocomplete/cms_page_count', ScopeInterface::SCOPE_STORE, 2, '2'],
+            ['run_as_root_typesense/autocomplete/suggestion_count', ScopeInterface::SCOPE_STORE, 2, '4'],
+            ['run_as_root_typesense/autocomplete/group_by', ScopeInterface::SCOPE_STORE, 2, ' variant_group '],
+        ]);
+
+        self::assertSame(3, $this->sut->getAutocompleteCategoryCount(2));
+        self::assertSame(2, $this->sut->getAutocompleteCmsPageCount(2));
+        self::assertSame(4, $this->sut->getAutocompleteSuggestionCount(2));
+        self::assertSame('variant_group', $this->sut->getAutocompleteGroupBy(2));
+    }
+
+    public function test_empty_or_negative_autocomplete_counts_are_zero(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturnMap([
+            ['run_as_root_typesense/autocomplete/category_count', ScopeInterface::SCOPE_STORE, null, null],
+            ['run_as_root_typesense/autocomplete/cms_page_count', ScopeInterface::SCOPE_STORE, null, '-1'],
+        ]);
+
+        self::assertSame(0, $this->sut->getAutocompleteCategoryCount());
+        self::assertSame(0, $this->sut->getAutocompleteCmsPageCount());
+        self::assertSame('', $this->sut->getAutocompleteGroupBy());
+    }
 }

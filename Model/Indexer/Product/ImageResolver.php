@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Indexer\Product;
 
+use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Model\Product;
-use Magento\Store\Model\StoreManagerInterface;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
 class ImageResolver implements ImageResolverInterface
 {
     public function __construct(
-        private readonly StoreManagerInterface $storeManager,
+        private readonly ImageHelper $imageHelper,
+        private readonly TypeSenseConfigInterface $config,
     ) {
     }
 
@@ -18,16 +20,15 @@ class ImageResolver implements ImageResolverInterface
     {
         $image = $product->getImage();
 
+        // The helper would return the placeholder image; the storefront decides how to show a missing image.
         if (!$image || $image === 'no_selection') {
             return '';
         }
 
         try {
-            $mediaUrl = $this->storeManager->getStore()->getBaseUrl(
-                \Magento\Framework\UrlInterface::URL_TYPE_MEDIA
-            );
-
-            return $mediaUrl . 'catalog/product' . $image;
+            return $this->imageHelper
+                ->init($product, $this->config->getListingImageId())
+                ->getUrl();
         } catch (\Exception) {
             return '';
         }

@@ -6,6 +6,7 @@ namespace RunAsRoot\TypeSense\Model\Config\Source;
 
 use Magento\Catalog\Model\ResourceModel\Product\Attribute\CollectionFactory;
 use Magento\Framework\Data\OptionSourceInterface;
+use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProvider;
 
 class ProductAttributeSource implements OptionSourceInterface
 {
@@ -71,7 +72,9 @@ class ProductAttributeSource implements OptionSourceInterface
         foreach ($collection as $attribute) {
             $code = $attribute->getAttributeCode();
 
-            if (in_array($code, self::EXCLUDED_ATTRIBUTES, true)) {
+            if (in_array($code, self::EXCLUDED_ATTRIBUTES, true)
+                || in_array($code, ProductSchemaProvider::RESERVED_FIELDS, true)
+            ) {
                 continue;
             }
 

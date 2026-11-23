@@ -1,0 +1,117 @@
+<?php
+/**
+ * Mixin of `typesenseTile`: add to cart (POST checkout/cart/add with form key) and add to wishlist.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<script>
+    function typesenseTileRequests() {
+        const strings = {
+            wishlistAdded: '<?= $escaper->escapeJs(__('%1 has been added to your Wish List.')) ?>',
+            wishlistError: '<?= $escaper->escapeJs(__('Could not add item to wishlist.')) ?>',
+            cartError: '<?= $escaper->escapeJs(__('There was a problem adding your item to the cart.')) ?>',
+            chooseQuantity: '<?= $escaper->escapeJs(__('Please specify the quantity of product(s).')) ?>',
+        };
+        const core = () => window.runAsRootTypesense.listing;
+        const message = (type, text) => {
+            if (typeof window.dispatchMessages !== 'undefined') {
+                window.dispatchMessages([{ type, text }], 5000);
+            }
+        };
+
+        return {
+            async addToCart() {
+                const params = core().buildCartParams(
+                    this.doc().id,
+                    hyva.getFormKey(),
+                    hyva.getUenc(),
+                    this.isGrouped() ? this.cartQuantities() : null,
+                    this.children().map(child => child.id),
+                );
+                if (params === null) {
+                    message('warning', strings.chooseQuantity);
+                    return;
+                }
+                this.isAddingToCart = true;
+                try {
+                    const response = await fetch(this.config.addToCartUrl, {
+                        method: 'POST',
+                        body: new URLSearchParams(params),
+                        credentials: 'include',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    });
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                        return;
+                    }
+                    if (!response.ok) {
+                        throw new Error('Add to cart failed with HTTP ' + response.status);
+                    }
+                    const data = await response.json().catch(() => ({}));
+                    // Products that need options, or "redirect to cart after adding", answer with a backUrl.
+                    if (data && data.backUrl) {
+                        window.location.href = data.backUrl;
+                        return;
+                    }
+                    this.childQuantities = {};
+                    this.typedQuantities = {};
+                    window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+                } catch (error) {
+                    console.error(error);
+                    message('error', strings.cartError);
+                } finally {
+                    this.isAddingToCart = false;
+                }
+            },
+
+            async addToWishlist() {
+                const productId = String(this.doc().id);
+                let isRedirecting = false;
+                this.isAddingToWishlist = true;
+                try {
+                    const response = await fetch(this.config.wishlistAddUrl, {
+                        method: 'POST',
+                        body: new URLSearchParams({ form_key: hyva.getFormKey(), product: productId, uenc: hyva.getUenc() }),
+                        credentials: 'include',
+                    });
+                    // Guests are redirected to the login page.
+                    if (response.redirected) {
+                        isRedirecting = true;
+                        window.location.href = response.url;
+                        return;
+                    }
+                    if (!response.ok) {
+                        message('warning', strings.wishlistError);
+                        return;
+                    }
+                    const data = await response.json();
+                    if (data.success) {
+                        this.wishlistIds = this.wishlistIds.concat(productId);
+                        message('success', hyva.str(strings.wishlistAdded, this.productName()));
+                    } else {
+                        message('error', data.error_message || strings.wishlistError);
+                    }
+                    window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+                } catch (error) {
+                    message('error', strings.wishlistError);
+                } finally {
+                    if (!isRedirecting) {
+                        this.isAddingToWishlist = false;
+                    }
+                }
+            },
+        };
+    }
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

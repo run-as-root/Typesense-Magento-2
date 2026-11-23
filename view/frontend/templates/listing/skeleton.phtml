@@ -1,0 +1,21 @@
+<?php
+/**
+ * Server-rendered placeholder tiles: visible from the first paint (no x-cloak), sized like real tiles.
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+
+$placeholderCount = (int) ($block->getData('placeholder_count') ?? 8);
+?>
+<?php for ($index = 0; $index < $placeholderCount; $index++): ?>
+    <div class="typesense-skeleton-tile flex flex-col gap-2 animate-pulse min-h-80 md:min-h-[26rem]" x-show="showSkeleton" aria-hidden="true">
+        <div class="aspect-square w-full rounded bg-gray-300"></div>
+        <div class="h-4 w-3/4 rounded bg-gray-300"></div>
+        <div class="h-4 w-1/2 rounded bg-gray-300"></div>
+        <div class="mt-auto h-5 w-1/3 rounded bg-gray-300"></div>
+    </div>
+<?php endfor; ?>

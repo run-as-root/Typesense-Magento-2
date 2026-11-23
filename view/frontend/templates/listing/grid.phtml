@@ -1,0 +1,15 @@
+<?php
+
+declare(strict_types=1);
+
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+?>
+<div class="typesense-grid grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-3 md:gap-6 xl:grid-cols-4 min-h-[28rem]"
+     x-show="showGrid" data-typesense-grid>
+    <?= $block->getChildHtml('skeleton') ?>
+    <template x-for="item in hits" :key="item._key">
+        <?= $block->getChildHtml('tile') ?>
+    </template>
+</div>

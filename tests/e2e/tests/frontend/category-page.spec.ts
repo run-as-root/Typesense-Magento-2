@@ -11,49 +11,25 @@ test.describe('Category Page', () => {
 
   test('loads with Typesense-powered listing', async () => {
     await expect(categoryPage.container).toBeVisible();
+    await expect(categoryPage.tiles.first()).toBeVisible();
   });
 
-  test('displays products for category', async () => {
-    const cards = await categoryPage.getProductCards();
-    await expect(cards.first()).toBeVisible();
-    expect(await cards.count()).toBeGreaterThan(0);
+  test('writes an ItemList JSON-LD from the visible products', async ({ page }) => {
+    // The server renders an empty ItemList; it is filled once the first results are rendered.
+    await expect(categoryPage.tiles.first()).toBeVisible();
+    const jsonLd = await page.locator('#typesense-item-list').textContent();
+    const itemList = JSON.parse(jsonLd ?? '{}');
+
+    expect(itemList['@type']).toBe('ItemList');
+    expect(itemList.itemListElement.length).toBeGreaterThan(0);
   });
 
-  test('facet filters appear and work', async ({ page }) => {
-    await expect(categoryPage.facets).toBeVisible();
-    const firstCheckbox = categoryPage.facets.locator('.ts-facet-checkbox').first();
-    if (await firstCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const statsBefore = await categoryPage.stats.textContent();
-      await firstCheckbox.click();
-      await page.waitForTimeout(1500);
-      const statsAfter = await categoryPage.stats.textContent();
-      expect(statsAfter).toContain('products');
-    }
-  });
+  test('add to cart posts with a form key and refreshes the cart', async ({ page }) => {
+    const button = categoryPage.tiles.locator('button:has-text("Add to Cart")').first();
+    test.skip(!(await button.isVisible()), 'no directly addable product in this category');
 
-  test('sort options work', async () => {
-    await expect(categoryPage.sortDropdown).toBeVisible();
-    const options = await categoryPage.sortDropdown.locator('option').count();
-    expect(options).toBeGreaterThan(1);
-    await categoryPage.selectSort('price:asc');
-    await expect((await categoryPage.getProductCards()).first()).toBeVisible();
-  });
-
-  test('pagination works when enough products', async ({ page }) => {
-    const nextBtn = categoryPage.nextButton;
-    if (await nextBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await nextBtn.click();
-      await page.waitForTimeout(1500);
-      await expect(categoryPage.pagination.locator('span')).toContainText('2 /');
-    }
-  });
-
-  test('price range slider works', async ({ page }) => {
-    if (await categoryPage.priceApplyButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await categoryPage.priceApplyButton.click();
-      await page.waitForTimeout(1500);
-      const stats = await categoryPage.stats.textContent();
-      expect(stats).toContain('products');
-    }
+    const request = page.waitForRequest(req => req.url().includes('checkout/cart/add') && req.method() === 'POST');
+    await button.click();
+    expect((await request).postData()).toContain('form_key=');
   });
 });

@@ -25,21 +25,28 @@ class CspDynamicCollector implements PolicyCollectorInterface
             return $defaultPolicies;
         }
 
-        $host = $this->config->getHost();
-        $port = $this->config->getPort();
-        $protocol = $this->config->getProtocol();
+        // The browser talks to the search node; the indexing node stays allowed for setups that use one host.
+        $sources = array_unique([
+            $this->toSource($this->config->getProtocol(), $this->config->getHost(), $this->config->getPort()),
+            $this->toSource(
+                $this->config->getSearchProtocol(),
+                $this->config->getSearchHost(),
+                $this->config->getSearchPort(),
+            ),
+        ]);
 
-        $hostValue = $protocol . '://' . $host;
-        if ($port !== 443 && $port !== 80) {
-            $hostValue .= ':' . $port;
-        }
-
-        $defaultPolicies[] = new FetchPolicy(
-            'connect-src',
-            false,
-            [$hostValue],
-        );
+        $defaultPolicies[] = new FetchPolicy('connect-src', false, array_values($sources));
 
         return $defaultPolicies;
+    }
+
+    private function toSource(string $protocol, string $host, int $port): string
+    {
+        $source = $protocol . '://' . $host;
+        if ($port !== 443 && $port !== 80) {
+            $source .= ':' . $port;
+        }
+
+        return $source;
     }
 }

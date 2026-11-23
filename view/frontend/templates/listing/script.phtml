@@ -1,0 +1,272 @@
+<?php
+/**
+ * Alpine component `typesenseListing`: state, requests and history of the listing. The child blocks add the
+ * event API, template getters and extras as mixins; slot templates reference them by name only (Alpine CSP).
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<?= $block->getChildHtml() ?>
+<script>
+    function initTypesenseListing() {
+        const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
+        // Kept out of the reactive data: they only decide which response may still render.
+        let sequencer = null;
+        // One per facet field, so a value search on one facet never drops another facet's response.
+        const facetSequencers = new Map();
+        const facetSequencer = (field) => {
+            if (!facetSequencers.has(field)) {
+                facetSequencers.set(field, core().createSequencer());
+            }
+
+            return facetSequencers.get(field);
+        };
+        // Inline display values of the SEO text elements hidden on pages after the first.
+        const hiddenSeoText = new Map();
+
+        return {
+            ...typesenseListingEvents(),
+            ...typesenseListingGetters(),
+            ...typesenseListingExtras(),
+            config: {},
+            state: { q: '', page: 1, sort: '', limit: 0, filters: {}, price: null, facetQueries: {} },
+            hits: [],
+            found: null,
+            facets: [],
+            priceStats: null,
+            currentLimit: 0,
+            isLoading: true,
+            hasLoaded: false,
+            error: null,
+            suggestedHits: [],
+            isLoadingSuggested: false,
+            wishlistIds: [],
+            aiAnswer: '',
+            conversationId: null,
+            eagerImageCount: 0,
+            isReady: false,
+
+            init() {
+                const configElement = this.$root.querySelector('[data-typesense-listing-config]');
+                this.config = JSON.parse(configElement ? configElement.textContent : '{}');
+                this.eagerImageCount = Number(this.$root.dataset.eagerImages) || 0;
+
+                if (core()) {
+                    this.start();
+                } else {
+                    window.addEventListener('load', () => this.start(), { once: true });
+                }
+            },
+
+            start() {
+                const listing = core();
+                if (this.isReady) {
+                    return;
+                }
+                if (!listing) {
+                    this.error = { kind: 'network', status: null, message: 'listing-core.js could not be loaded' };
+                    this.isLoading = false;
+                    this.hasLoaded = true;
+                    return;
+                }
+                sequencer = listing.createSequencer();
+                this.state = listing.parseUrlState(window.location.search, this.config);
+                this.isReady = true;
+                this.fetchResults('init');
+            },
+
+            async fetchResults(cause) {
+                const listing = core();
+                const id = sequencer.next();
+                // The full request carries every facet value search, so pending ones are outdated.
+                facetSequencers.forEach(facetSequence => facetSequence.next());
+                this.isLoading = true;
+                // Everything that can throw sits inside the try, so loading always ends in results or the error state.
+                try {
+                    this.cancelSuggested();
+                    this.writeHistory(cause);
+                    this.dispatchState();
+                    const searches = listing.buildSearches(this.state, this.config);
+                    const client = await window.runAsRootTypesense.getClient();
+                    const response = await client.multiSearch.perform({ searches }, this.config.cacheParams);
+                    if (!sequencer.isCurrent(id)) {
+                        return;
+                    }
+                    const results = response.results || [];
+                    const main = results[0];
+                    // multi_search reports a failed search as a result object instead of rejecting.
+                    if (!main || main.error || (main.code && !main.hits)) {
+                        throw main || new Error('Typesense returned no result');
+                    }
+
+                    const found = Number(main.found) || 0;
+                    const page = listing.clampPage(this.state.page, found, searches[0].per_page);
+                    if (page !== this.state.page) {
+                        this.state = Object.assign({}, this.state, { page });
+                        this.fetchResults('clamp');
+                        return;
+                    }
+
+                    const direct = searches[1] && searches[1].enable_synonyms === false ? results[1] : null;
+                    const ordered = direct ? listing.reorderByDirectMatches(main, direct, page) : main;
+                    this.currentLimit = searches[0].per_page;
+                    this.hits = listing.prepareHits(ordered.hits, this.eagerImageCount);
+                    this.found = found;
+                    this.facets = listing.mergeFacetCounts(results, this.state, searches);
+                    this.priceStats = listing.facetStats(results, 'price', searches);
+                    this.error = null;
+                    this.afterRender();
+                } catch (error) {
+                    if (!sequencer.isCurrent(id)) {
+                        return;
+                    }
+                    console.error('Typesense listing request failed', error);
+                    this.error = listing.normalizeError(error);
+                    this.hits = [];
+                    this.found = 0;
+                    this.facets = [];
+                    this.priceStats = null;
+                    this.updateSeoText();
+                } finally {
+                    if (sequencer.isCurrent(id)) {
+                        this.isLoading = false;
+                        this.hasLoaded = true;
+                        this.dispatchState();
+                    }
+                }
+            },
+
+            // A facet value search replaces only that facet's counts: no grid overlay, no history entry. While a
+            // full request runs, it is repeated instead, so the older full response cannot overwrite the values.
+            async fetchFacetValues(field) {
+                const listing = core();
+                if (this.isLoading) {
+                    this.fetchResults('facet-query');
+                    return;
+                }
+                const sequence = facetSequencer(field);
+                const id = sequence.next();
+                try {
+                    const search = listing.facetValueSearch(this.state, this.config, field);
+                    if (search === null) {
+                        return;
+                    }
+                    const client = await window.runAsRootTypesense.getClient();
+                    const response = await client.multiSearch.perform({ searches: [search] }, this.config.cacheParams);
+                    const result = (response.results || [])[0];
+                    if (!sequence.isCurrent(id) || !result || result.error) {
+                        return;
+                    }
+                    const entry = (result.facet_counts || []).find(facet => facet && facet.field_name === field)
+                        || { field_name: field, counts: [] };
+                    const known = this.facets.some(facet => facet.field_name === field);
+                    this.facets = known
+                        ? this.facets.map(facet => (facet.field_name === field ? entry : facet))
+                        : this.facets.concat(entry);
+                    this.dispatchState();
+                } catch (error) {
+                    console.warn('Typesense facet value search failed', error);
+                }
+            },
+
+            afterRender() {
+                const listing = core();
+                const offset = (this.state.page - 1) * this.currentLimit;
+                this.updateSeoText();
+                this.writeJsonLd();
+                // Tracking (tracking/ga4.phtml or a theme) de-duplicates view_item_list per stateKey.
+                window.dispatchEvent(new CustomEvent('typesense:results', {
+                    detail: {
+                        context: this.config.context,
+                        listName: this.config.listName,
+                        page: this.state.page,
+                        stateKey: listing.serializeUrlState(this.state, this.config),
+                        items: listing.toGa4Items(this.hits, offset, this.config.listName, this.config.showPrices !== false),
+                        documents: this.hits.map(hit => hit.document),
+                    },
+                }));
+                if (this.found === 0) {
+                    this.fetchSuggested();
+                } else {
+                    this.suggestedHits = [];
+                }
+                this.fetchAiAnswer();
+            },
+
+            writeHistory(cause) {
+                const listing = core();
+                const { pathname, search, hash } = window.location;
+                // Listing URLs are only built by serializeUrlState: '|' does not survive URLSearchParams.
+                const next = pathname + listing.serializeUrlState(this.state, this.config) + hash;
+                const action = cause === 'clamp' ? 'replace' : listing.historyAction(pathname + search + hash, next, cause);
+                if (action === 'push') {
+                    window.history.pushState({ typesense: true }, '', next);
+                } else if (action === 'replace') {
+                    window.history.replaceState(window.history.state, '', next);
+                }
+            },
+
+            updateState(patch, cause) {
+                this.state = Object.assign({}, this.state, patch);
+                this.fetchResults(cause);
+            },
+
+            updateSeoText() {
+                const selector = this.config.seoTextSelector;
+                if (!selector) {
+                    return;
+                }
+                // Inline style, not the hidden attribute: a display utility class on the element would override [hidden].
+                try {
+                    document.querySelectorAll(selector).forEach((element) => {
+                        if (this.state.page > 1 && !hiddenSeoText.has(element)) {
+                            hiddenSeoText.set(element, element.style.display);
+                            element.style.display = 'none';
+                        } else if (this.state.page <= 1 && hiddenSeoText.has(element)) {
+                            element.style.display = hiddenSeoText.get(element);
+                            hiddenSeoText.delete(element);
+                        }
+                    });
+                } catch (e) {
+                    console.warn('Typesense listing: invalid SEO text selector', selector);
+                }
+            },
+
+            writeJsonLd() {
+                const script = document.getElementById('typesense-item-list');
+                if (script) {
+                    // Written as text, never parsed as markup: product names are document data.
+                    script.textContent = JSON.stringify(core().buildItemListJsonLd(this.hits, this.config));
+                }
+            },
+
+            dispatchState() {
+                window.dispatchEvent(new CustomEvent('typesense-state', { detail: JSON.parse(JSON.stringify({
+                    context: this.config.context,
+                    isLoading: this.isLoading,
+                    hasLoaded: this.hasLoaded,
+                    found: this.found,
+                    page: this.state.page,
+                    totalPages: this.totalPages(),
+                    state: this.state,
+                    facets: this.facets,
+                    priceStats: this.priceStats,
+                    error: this.error,
+                })) }));
+            },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => Alpine.data('typesenseListing', initTypesenseListing), { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

@@ -1,0 +1,25 @@
+<?php
+/**
+ * Header search dropdown, suggestions section of `typesenseHeaderSearch`. Row texts are split into highlight segments
+ * (listing core `hitSegments`) rendered with x-text, so document data never becomes markup.
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+?>
+<div x-show="hasSuggestions" role="group" aria-labelledby="typesense-ac-suggestion-title" class="border-b border-gray-200 p-2">
+    <p id="typesense-ac-suggestion-title" class="mb-1 px-2 text-xs font-bold uppercase tracking-wide text-gray-500"><?= $escaper->escapeHtml(__('Suggestions')) ?></p>
+    <template x-for="row in sections.suggestions" :key="row.key">
+        <a :href="row.url"
+           :id="row.domId"
+           role="option"
+           :aria-selected="rowSelected"
+           :class="rowClasses"
+           @click="onRowClick"
+           @mouseenter="activateRow"
+           class="block truncate rounded px-2 py-1 text-sm text-gray-800 hover:bg-gray-100"><template x-for="segment in row.segments" :key="segment.key"><span><template x-if="segment.mark"><mark class="bg-transparent font-bold text-inherit" x-text="segment.text"></mark></template><template x-if="segment.plain"><span x-text="segment.text"></span></template></span></template></a>
+    </template>
+</div>

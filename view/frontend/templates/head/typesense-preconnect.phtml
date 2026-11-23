@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+use RunAsRoot\TypeSense\ViewModel\Frontend\ClientConfigViewModel;
+
+/** @var Escaper $escaper */
+/** @var Template $block */
+
+/** @var ClientConfigViewModel $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel->isEnabled()) {
+    return;
+}
+?>
+<link rel="preconnect" href="<?= $escaper->escapeUrl($viewModel->getNodeUrl()) ?>" crossorigin>

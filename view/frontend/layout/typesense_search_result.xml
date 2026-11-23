@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<!-- Added by Observer\LayoutLoadBefore on the search page only while the module and instant search are enabled. -->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      layout="1column"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <update handle="typesense_listing"/>
+    <head>
+        <title>Search Results</title>
+    </head>
+    <body>
+        <referenceBlock name="page.main.title">
+            <action method="setPageTitle">
+                <argument translate="true" name="title" xsi:type="string">Search Results</argument>
+            </action>
+        </referenceBlock>
+        <!-- Magento's own result list and layered navigation are replaced by the Typesense listing. -->
+        <referenceBlock name="search.result" remove="true"/>
+        <referenceBlock name="catalogsearch.leftnav" remove="true"/>
+        <referenceBlock name="search.search_terms_log" remove="true"/>
+
+        <referenceBlock name="typesense.listing">
+            <arguments>
+                <argument name="listing_context" xsi:type="string">search</argument>
+            </arguments>
+        </referenceBlock>
+        <referenceBlock name="typesense.listing.filters.skeleton">
+            <arguments>
+                <!-- Search pages have no subcategory filter, so one chip less than category pages. -->
+                <argument name="filter_chip_widths" xsi:type="array">
+                    <item name="first" xsi:type="string">w-32</item>
+                    <item name="second" xsi:type="string">w-28</item>
+                    <item name="third" xsi:type="string">w-20</item>
+                    <item name="fourth" xsi:type="string">w-24</item>
+                </argument>
+            </arguments>
+        </referenceBlock>
+        <!-- Search result pages are not indexed, so they carry no ItemList. -->
+        <referenceBlock name="typesense.listing.json-ld" remove="true"/>
+
+        <referenceContainer name="content">
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.search.title"
+                   template="RunAsRoot_TypeSense::search/title.phtml"
+                   after="typesense.listing">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\InstantSearchConfigViewModel</argument>
+                </arguments>
+            </block>
+        </referenceContainer>
+    </body>
+</page>

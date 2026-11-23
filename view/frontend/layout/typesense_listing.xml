@@ -1,0 +1,182 @@
+<?xml version="1.0"?>
+<!--
+Shared Typesense listing (search and category pages). Themes restyle it by overriding the slot templates or
+these blocks; `listing_context` is set by typesense_search_result.xml and typesense_category_search.xml.
+-->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="typesense.listing.core">
+            <arguments>
+                <argument name="is_required" xsi:type="boolean">true</argument>
+            </arguments>
+        </referenceBlock>
+        <referenceContainer name="content">
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.listing"
+                   template="RunAsRoot_TypeSense::listing/listing.phtml"
+                   before="-">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\ListingConfigViewModel</argument>
+                    <argument name="eager_load_images_count" xsi:type="number">4</argument>
+                </arguments>
+
+                <!-- Filter bar (chip row from md, drawer below) and toolbar (sorting, page size), one row above the grid. -->
+                <container name="typesense.listing.filters" as="filters" htmlTag="div" htmlClass="typesense-listing-filters">
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.filters.bar" as="bar"
+                           template="RunAsRoot_TypeSense::listing/filters/bar.phtml">
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.filters.skeleton" as="skeleton"
+                               template="RunAsRoot_TypeSense::listing/filters/skeleton.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.filters.drawer" as="drawer"
+                               template="RunAsRoot_TypeSense::listing/filters/mobile-drawer.phtml">
+                            <block class="Magento\Framework\View\Element\Template"
+                                   name="typesense.listing.filters.sorting-mobile" as="sorting-mobile"
+                                   template="RunAsRoot_TypeSense::listing/filters/sorting-mobile.phtml"/>
+                            <block class="Magento\Framework\View\Element\Template"
+                                   name="typesense.listing.filters.subcategory" as="subcategory"
+                                   template="RunAsRoot_TypeSense::listing/filters/subcategory.phtml"/>
+                            <block class="Magento\Framework\View\Element\Template"
+                                   name="typesense.listing.filters.dropdown" as="dropdown"
+                                   template="RunAsRoot_TypeSense::listing/filters/dropdown.phtml">
+                                <arguments>
+                                    <argument name="visible_values" xsi:type="number">5</argument>
+                                </arguments>
+                            </block>
+                            <block class="Magento\Framework\View\Element\Template"
+                                   name="typesense.listing.filters.slider" as="slider"
+                                   template="RunAsRoot_TypeSense::listing/filters/slider.phtml"/>
+                            <block class="Magento\Framework\View\Element\Template"
+                                   name="typesense.listing.filters.checkbox" as="checkbox"
+                                   template="RunAsRoot_TypeSense::listing/filters/checkbox.phtml">
+                                <arguments>
+                                    <argument name="group_label" xsi:type="string" translate="true">Properties</argument>
+                                </arguments>
+                            </block>
+                        </block>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.filters.active-filters" as="active-filters"
+                               template="RunAsRoot_TypeSense::listing/filters/active-filters.phtml"/>
+                    </block>
+                </container>
+                <container name="typesense.listing.toolbar" as="toolbar" htmlTag="div" htmlClass="typesense-listing-toolbar flex flex-wrap items-center justify-end gap-3">
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.toolbar.sorting" as="sorting"
+                           template="RunAsRoot_TypeSense::listing/filters/sorting.phtml"/>
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.toolbar.page-size" as="page-size"
+                           template="RunAsRoot_TypeSense::listing/filters/page-size.phtml"/>
+                </container>
+
+                <block class="Magento\Framework\View\Element\Template"
+                       name="typesense.listing.ai-answer" as="ai-answer"
+                       template="RunAsRoot_TypeSense::listing/ai-answer.phtml"/>
+                <block class="Magento\Framework\View\Element\Template"
+                       name="typesense.listing.products-count" as="products-count"
+                       template="RunAsRoot_TypeSense::listing/products-count.phtml"/>
+                <block class="Magento\Framework\View\Element\Template"
+                       name="typesense.listing.loading-overlay" as="loading-overlay"
+                       template="RunAsRoot_TypeSense::listing/loading-overlay.phtml"/>
+
+                <block class="Magento\Framework\View\Element\Template"
+                       name="typesense.listing.grid" as="grid"
+                       template="RunAsRoot_TypeSense::listing/grid.phtml">
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.skeleton" as="skeleton"
+                           template="RunAsRoot_TypeSense::listing/skeleton.phtml">
+                        <arguments>
+                            <argument name="placeholder_count" xsi:type="number">8</argument>
+                        </arguments>
+                    </block>
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.tile" as="tile"
+                           template="RunAsRoot_TypeSense::listing/tile/tile.phtml">
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.tile.image" as="image"
+                               template="RunAsRoot_TypeSense::listing/tile/image.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.tile.badges" as="badges"
+                               template="RunAsRoot_TypeSense::listing/tile/badges.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.tile.wishlist" as="wishlist"
+                               template="RunAsRoot_TypeSense::listing/tile/wishlist.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.tile.rating" as="rating"
+                               template="RunAsRoot_TypeSense::listing/tile/rating.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.tile.price" as="price"
+                               template="RunAsRoot_TypeSense::listing/tile/price.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.tile.variants" as="variants"
+                               template="RunAsRoot_TypeSense::listing/tile/variants.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.tile.actions" as="actions"
+                               template="RunAsRoot_TypeSense::listing/tile/actions.phtml"/>
+                    </block>
+                </block>
+
+                <block class="Magento\Framework\View\Element\Template"
+                       name="typesense.listing.no-results" as="no-results"
+                       template="RunAsRoot_TypeSense::listing/no-results.phtml">
+                    <!-- The suggested products use their own tile tree, so themes can style them apart. -->
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.no-results.tile" as="tile"
+                           template="RunAsRoot_TypeSense::listing/tile/tile.phtml">
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.no-results.tile.image" as="image"
+                               template="RunAsRoot_TypeSense::listing/tile/image.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.no-results.tile.badges" as="badges"
+                               template="RunAsRoot_TypeSense::listing/tile/badges.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.no-results.tile.wishlist" as="wishlist"
+                               template="RunAsRoot_TypeSense::listing/tile/wishlist.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.no-results.tile.rating" as="rating"
+                               template="RunAsRoot_TypeSense::listing/tile/rating.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.no-results.tile.price" as="price"
+                               template="RunAsRoot_TypeSense::listing/tile/price.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.no-results.tile.variants" as="variants"
+                               template="RunAsRoot_TypeSense::listing/tile/variants.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.no-results.tile.actions" as="actions"
+                               template="RunAsRoot_TypeSense::listing/tile/actions.phtml"/>
+                    </block>
+                </block>
+
+                <block class="Magento\Framework\View\Element\Template"
+                       name="typesense.listing.pagination" as="pagination"
+                       template="RunAsRoot_TypeSense::listing/pagination.phtml"/>
+
+                <block class="Magento\Framework\View\Element\Template"
+                       name="typesense.listing.script" as="script"
+                       template="RunAsRoot_TypeSense::listing/script.phtml">
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.script.events"
+                           template="RunAsRoot_TypeSense::listing/script/events.phtml"/>
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.script.getters"
+                           template="RunAsRoot_TypeSense::listing/script/getters.phtml"/>
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.script.extras"
+                           template="RunAsRoot_TypeSense::listing/script/extras.phtml"/>
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.script.tile"
+                           template="RunAsRoot_TypeSense::listing/tile/script.phtml">
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.script.tile.requests"
+                               template="RunAsRoot_TypeSense::listing/tile/script/requests.phtml"/>
+                    </block>
+                </block>
+
+                <block class="Magento\Framework\View\Element\Template"
+                       name="typesense.listing.json-ld" as="json-ld"
+                       template="RunAsRoot_TypeSense::listing/json-ld.phtml"/>
+            </block>
+        </referenceContainer>
+    </body>
+</page>

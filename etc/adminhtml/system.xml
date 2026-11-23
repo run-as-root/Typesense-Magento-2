@@ -320,15 +320,36 @@
                 </field>
                 <field id="facet_filters" translate="label comment" type="multiselect" sortOrder="27" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Facet Filters</label>
-                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\ProductAttributeSource</source_model>
-                    <comment>Product attributes to show as sidebar filters. "Category" is always included automatically. Only attributes marked as "Additional Attributes to Index" will work as facets.</comment>
+                    <source_model>RunAsRoot\TypeSense\Model\Config\Source\FacetAttributeSource</source_model>
+                    <comment>Product attributes to show as filters. "Category" is always included automatically. Only attributes marked as "Additional Attributes to Index" (and the core fields) will work as facets.</comment>
                     <can_be_empty>1</can_be_empty>
+                </field>
+                <field id="facet_types" translate="label comment" sortOrder="28" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Facet Types</label>
+                    <frontend_model>RunAsRoot\TypeSense\Block\Adminhtml\Form\Field\FacetTypes</frontend_model>
+                    <backend_model>Magento\Config\Model\Config\Backend\Serialized\ArraySerialized</backend_model>
+                    <comment>How each facet filter is shown. A facet without a row is a dropdown, except "Price", which is a range slider. Checkbox works only for Yes/No fields (e.g. Availability) and the slider only for numeric fields; other combinations fall back to a dropdown. "Value Search" adds a search box to a dropdown's values.</comment>
+                </field>
+                <field id="in_stock_first" translate="label comment" type="select"
+                       sortOrder="29" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Show Out-of-Stock Products Last</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Sorts in-stock products before out-of-stock ones under every sort option on search and category listings.</comment>
                 </field>
                 <field id="replace_category_page" translate="label comment" type="select"
                        sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Replace Category Pages</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Use TypeSense for category product listings.</comment>
+                </field>
+                <field id="cacheable_search_page" translate="label comment" type="select"
+                       sortOrder="35" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Cacheable Search Page</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Serve the search page as a full-page-cacheable shell (results load from TypeSense in the browser) when the URL holds only the query, listing state (page, sort, limit, price) and configured facet parameters. The browser still records each search term (Search Terms report and popularity), but Magento no longer stores the number of results for it. Search terms with a redirect URL still redirect; a redirect added later applies to an already cached query after the page cache is flushed.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
                 </field>
                 <field id="image_type" translate="label" type="select"
                        sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
@@ -344,6 +365,17 @@
                        sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Image Height</label>
                     <validate>validate-digits</validate>
+                </field>
+                <field id="no_results_category_id" translate="label comment" type="text"
+                       sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>No Results: Suggested Products Category ID</label>
+                    <validate>validate-digits</validate>
+                    <comment>When a search or category listing finds nothing, products of this category are shown below the message. Leave empty to show only the message.</comment>
+                </field>
+                <field id="seo_text_selector" translate="label comment" type="text"
+                       sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>SEO Text Selector</label>
+                    <comment>CSS selector of the category SEO text, which is hidden on listing pages after the first to avoid duplicate content. Leave empty to never hide it.</comment>
                 </field>
             </group>
 
@@ -375,6 +407,11 @@
                        sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Query Suggestions Count</label>
                     <validate>validate-digits</validate>
+                </field>
+                <field id="group_by" translate="label comment" type="text"
+                       sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Group Products By</label>
+                    <comment>Faceted product field (e.g. an Additional Attribute shared by the variants of one product); the header search then shows one product per value. Ignored when the field is not in the product schema or not faceted. Leave empty to disable.</comment>
                 </field>
             </group>
 
@@ -486,6 +523,18 @@
                         <field id="conversational_search/enabled">1</field>
                         <field id="enabled">1</field>
                     </depends>
+                </field>
+            </group>
+
+            <!-- Tracking -->
+            <group id="tracking" translate="label" type="text" sortOrder="100"
+                   showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Tracking</label>
+                <field id="ga4_datalayer" translate="label comment" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Push GA4 Events to the dataLayer</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>view_item_list, select_item, search_suggestion_click, sorting_interaction and filter_interaction from the listing and the header search. Leave off when a theme maps the typesense:* window events itself.</comment>
                 </field>
             </group>
         </section>

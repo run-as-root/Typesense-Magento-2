@@ -1,0 +1,214 @@
+<?php
+/**
+ * Mixin of `typesenseListing`: window event handlers and the state-changing API used by filters, toolbar and themes.
+ * Event details are structured objects, never '-'-joined strings. Control events use hyphens (`typesense-sort-change`);
+ * the colon-named `typesense:*` events are the tracking API (see tracking/ga4.phtml).
+ *
+ * `typesenseListingState()` is the consumer side for filters, toolbar and themes: it reads the listing config and keeps
+ * the last `typesense-state` detail in `listing`. Bind `@typesense-state.window="onListingState"` and call
+ * `initListingState()` from `init()`. Changes go back only as events, so the listing alone writes history.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<script>
+    function typesenseListingState() {
+        return {
+            listingConfig: {},
+            listing: {
+                context: '', isLoading: true, hasLoaded: false, found: null, page: 1, totalPages: 1, facets: [],
+                priceStats: null, error: null,
+                state: { q: '', page: 1, sort: '', limit: 0, filters: {}, price: null, facetQueries: {} },
+            },
+
+            initListingState() {
+                const root = this.$root.closest('.typesense-listing');
+                const element = (root || document).querySelector('[data-typesense-listing-config]');
+                try {
+                    this.listingConfig = JSON.parse(element ? element.textContent : '{}');
+                } catch (e) {
+                    this.listingConfig = {};
+                }
+            },
+            onListingState() {
+                const detail = this.$event && this.$event.detail;
+                if (detail && detail.state && detail.context === this.listingConfig.context) {
+                    this.listing = detail;
+                }
+            },
+            dispatchListingEvent(name, detail) {
+                window.dispatchEvent(new CustomEvent(name, { detail }));
+            },
+            hasActiveListingFilters() {
+                const state = this.listing.state;
+
+                return Object.keys(state.filters || {}).length > 0 || Boolean(state.price);
+            },
+            showControlsSkeleton() {
+                return !this.listing.hasLoaded;
+            },
+            // Hidden only once a finished request is known to be empty; filtered empty results keep their chips.
+            showControls() {
+                const listing = this.listing;
+                if (!listing.hasLoaded || listing.error !== null) {
+                    return false;
+                }
+
+                return listing.isLoading || Number(listing.found) > 0 || this.hasActiveListingFilters();
+            },
+        };
+    }
+
+    function typesenseListingEvents() {
+        const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
+
+        return {
+            onPopState() {
+                if (this.isReady) {
+                    this.state = core().parseUrlState(window.location.search, this.config);
+                    this.fetchResults('popstate');
+                }
+            },
+            onFilterChange() {
+                this.applyFilterChange(this.$event.detail);
+            },
+            onSortChange() {
+                this.setSort((this.$event.detail || {}).sort);
+            },
+            onLimitChange() {
+                this.setLimit((this.$event.detail || {}).limit);
+            },
+            onPageChange() {
+                this.setPage((this.$event.detail || {}).page);
+            },
+            onPrivateContentLoaded() {
+                const data = (this.$event.detail && this.$event.detail.data) || {};
+                if (core()) {
+                    this.wishlistIds = core().wishlistProductIds(data.wishlist);
+                }
+            },
+
+            /**
+             * detail: {clear: true} | {field, value, action: 'toggle'|'add'|'remove'} | {field, values: []}
+             * | {field, facetQuery} | {price: {min, max} | null}. Keys can be combined; clear applies first.
+             * Only configured facet fields are accepted; a facet value search alone keeps the page and only
+             * refetches that facet's values (fetchFacetValues).
+             */
+            applyFilterChange(detail) {
+                const change = detail || {};
+                if (!this.isReady) {
+                    return;
+                }
+                let filters = Object.assign({}, this.state.filters);
+                let facetQueries = Object.assign({}, this.state.facetQueries);
+                let price = this.state.price;
+                let filtersChanged = false;
+
+                if (change.clear) {
+                    filters = {};
+                    facetQueries = {};
+                    price = null;
+                    filtersChanged = true;
+                }
+                if (this.isFacetField(change.field)) {
+                    const field = change.field;
+                    if (Array.isArray(change.values)) {
+                        filters[field] = change.values.map(String);
+                        filtersChanged = true;
+                    } else if (change.value !== undefined && change.value !== null) {
+                        filters[field] = this.changeValues(filters[field] || [], String(change.value), change.action);
+                        filtersChanged = true;
+                    }
+                    if (!filters[field] || filters[field].length === 0) {
+                        delete filters[field];
+                    }
+                    if (change.facetQuery !== undefined) {
+                        facetQueries[field] = String(change.facetQuery || '');
+                    }
+                }
+                if (change.price !== undefined) {
+                    price = change.price ? { min: Number(change.price.min), max: Number(change.price.max) } : null;
+                    filtersChanged = true;
+                }
+
+                if (!filtersChanged && this.isFacetField(change.field) && change.facetQuery !== undefined) {
+                    this.state = Object.assign({}, this.state, { facetQueries });
+                    this.fetchFacetValues(change.field);
+                    return;
+                }
+                const patch = { filters, facetQueries, price };
+                const changes = filtersChanged ? core().filterChanges(this.state, patch) : null;
+                if (filtersChanged) {
+                    patch.page = 1;
+                }
+                this.updateState(patch, filtersChanged ? 'filter' : 'facet-query');
+                if (changes && (changes.added.length > 0 || changes.removed.length > 0)) {
+                    this.dispatchTracking('typesense:filter-change', changes);
+                }
+            },
+
+            changeValues(values, value, action) {
+                const has = values.includes(value);
+                if (action === 'remove' || (action !== 'add' && has)) {
+                    return values.filter(existing => existing !== value);
+                }
+
+                return has ? values : values.concat(value);
+            },
+
+            isFacetField(field) {
+                return typeof field === 'string'
+                    && (this.config.facets || []).some(facet => facet.field === field && field !== 'price');
+            },
+
+            setSort(sort) {
+                if (!this.isReady) {
+                    return;
+                }
+                const previous = this.state.sort;
+                const next = String(sort === undefined || sort === null ? '' : sort);
+                this.updateState({ sort: next, page: 1 }, 'sort');
+                if (next !== previous) {
+                    this.dispatchTracking('typesense:sort-change', { sort: next, previous });
+                }
+            },
+
+            setLimit(limit) {
+                if (this.isReady) {
+                    this.updateState({ limit: Number(limit), page: 1 }, 'limit');
+                }
+            },
+
+            setPage(page) {
+                const value = Number(page);
+                if (!this.isReady || !Number.isInteger(value) || value < 1 || value === this.state.page) {
+                    return;
+                }
+                this.updateState({ page: value }, 'page');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+
+            clearFilters() {
+                this.applyFilterChange({ clear: true });
+            },
+
+            // Tracking events (typesense:*) report shopper interactions only, never history navigation or clamping.
+            dispatchTracking(name, detail) {
+                window.dispatchEvent(new CustomEvent(name, {
+                    detail: Object.assign({ context: this.config.context, listName: this.config.listName }, detail),
+                }));
+            },
+        };
+    }
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

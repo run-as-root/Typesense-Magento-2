@@ -9,9 +9,12 @@ use Magento\Catalog\Model\Product\Attribute\Source\Status;
 use Magento\Catalog\Model\Product\Visibility;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
+use Magento\GroupedProduct\Model\Product\Type\Grouped;
 use Magento\Store\Model\StoreManagerInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\NameDecompounder;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\GroupedChildrenResolver;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\SalableResolverInterface;
 
 class ProductDataBuilder
 {
@@ -19,7 +22,7 @@ class ProductDataBuilder
         private readonly AttributeResolverInterface $attributeResolver,
         private readonly PriceCalculatorInterface $priceCalculator,
         private readonly ImageResolverInterface $imageResolver,
-        private readonly StockResolverInterface $stockResolver,
+        private readonly SalableResolverInterface $salableResolver,
         private readonly CategoryResolverInterface $categoryResolver,
         private readonly UrlResolverInterface $urlResolver,
         private readonly ProductCollectionFactory $collectionFactory,
@@ -28,19 +31,25 @@ class ProductDataBuilder
         private readonly StoreManagerInterface $storeManager,
         private readonly TypeSenseConfigInterface $config,
         private readonly NameDecompounder $nameDecompounder,
+        private readonly GroupedChildrenResolver $groupedChildrenResolver,
+        private readonly NewProductResolverInterface $newProductResolver,
     ) {
     }
 
     /**
-     * Build a Typesense document array from a product.
+     * Build a Typesense document array from a product, or null when the product must not be indexed.
      *
-     * @return array<string, mixed>
+     * @return array<string, mixed>|null
      */
-    public function build(Product $product, int $storeId): array
+    public function build(Product $product, int $storeId): ?array
     {
+        $listingData = $this->getListingData($product, $storeId);
+        if ($listingData === null) {
+            return null;
+        }
+
         $productId = (int) $product->getId();
         $categoryData = $this->categoryResolver->getCategoryData($product);
-        $specialPrice = $this->priceCalculator->getSpecialPrice($product);
 
         $document = [
             'id' => (string) $productId,
@@ -49,22 +58,25 @@ class ProductDataBuilder
             'sku' => (string) $product->getSku(),
             'url' => $this->urlResolver->getProductUrl($product),
             'image_url' => $this->imageResolver->getImageUrl($product),
-            'price' => $this->priceCalculator->getFinalPrice($product),
+            'price' => $listingData['final_price'],
+            'final_price' => $listingData['final_price'],
+            'regular_price' => $listingData['regular_price'],
             'categories' => $categoryData['categories'],
             'category_ids' => $categoryData['category_ids'],
             'categories.lvl0' => $categoryData['categories.lvl0'],
             'categories.lvl1' => $categoryData['categories.lvl1'],
             'categories.lvl2' => $categoryData['categories.lvl2'],
             'categories_text' => implode(', ', $categoryData['categories']),
-            'in_stock' => $this->stockResolver->isInStock($product),
+            'in_stock' => $listingData['in_stock'],
+            'is_new' => $this->newProductResolver->isNew($product, $storeId),
             'type_id' => (string) $product->getTypeId(),
             'visibility' => (int) $product->getVisibility(),
             'created_at' => $this->toTimestamp((string) $product->getCreatedAt()),
             'updated_at' => $this->toTimestamp((string) $product->getUpdatedAt()),
         ];
 
-        if ($specialPrice !== null) {
-            $document['special_price'] = $specialPrice;
+        if (isset($listingData['children'])) {
+            $document['children'] = $listingData['children'];
         }
 
         $description = $product->getData('description');
@@ -75,11 +87,6 @@ class ProductDataBuilder
         $shortDescription = $product->getData('short_description');
         if ($shortDescription !== null && $shortDescription !== '') {
             $document['short_description'] = strip_tags((string) $shortDescription);
-        }
-
-        $extra = $this->attributeResolver->getExtraAttributes($product);
-        if ($extra !== []) {
-            $document = array_merge($document, $extra);
         }
 
         if ($this->config->isGermanDecompoundingEnabled($storeId)) {
@@ -94,7 +101,7 @@ class ProductDataBuilder
         $document['rating_summary'] = $this->reviewResolver->getRatingSummary($productId, $storeId);
         $document['review_count'] = $this->reviewResolver->getReviewCount($productId, $storeId);
 
-        return $document;
+        return $document + $this->attributeResolver->getExtraAttributes($product);
     }
 
     /**
@@ -124,6 +131,53 @@ class ProductDataBuilder
         }
 
         return $collection;
+    }
+
+    /**
+     * @return array{final_price: float, regular_price: float, in_stock: bool, children?: list<array<string, mixed>>}|null
+     */
+    private function getListingData(Product $product, int $storeId): ?array
+    {
+        if ($product->getTypeId() !== Grouped::TYPE_CODE) {
+            return [
+                'final_price' => $this->priceCalculator->getFinalPrice($product),
+                'regular_price' => $this->priceCalculator->getRegularPrice($product),
+                'in_stock' => $this->salableResolver->isSalable($product, $storeId),
+            ];
+        }
+
+        $children = $this->groupedChildrenResolver->getChildren($product, $storeId);
+        if ($children === []) {
+            return null;
+        }
+
+        $salableChildren = array_filter($children, static fn (array $child): bool => $child['in_stock']);
+        // The "from" price is the cheapest buyable size; only when nothing is buyable does any size count,
+        // so an out-of-stock tile still shows a real price instead of 0.
+        $cheapest = $this->getCheapestChild($salableChildren !== [] ? $salableChildren : $children);
+
+        return [
+            'final_price' => $cheapest['final_price'],
+            'regular_price' => $cheapest['regular_price'],
+            'in_stock' => $salableChildren !== [],
+            'children' => $children,
+        ];
+    }
+
+    /**
+     * @param non-empty-array<array{final_price: float, regular_price: float}> $children
+     * @return array{final_price: float, regular_price: float}
+     */
+    private function getCheapestChild(array $children): array
+    {
+        $cheapest = reset($children);
+        foreach ($children as $child) {
+            if ($child['final_price'] < $cheapest['final_price']) {
+                $cheapest = $child;
+            }
+        }
+
+        return $cheapest;
     }
 
     private function getSkipWordsSource(Product $product, int $storeId): string

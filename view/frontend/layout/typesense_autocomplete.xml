@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!--
+Header search with Typesense autocomplete; LayoutLoadBefore adds this handle on every page while the module and
+autocomplete are enabled. Hyva_SmileElasticsuite's hyva_default.xml also sets the header-search template with a
+setTemplate action, and actions run in merge order: this handle is merged after hyva_default because module.xml
+sequences this module after Hyva_Theme, so our layout_load_before observer adds it after Hyvä added the hyva_* handles.
+-->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="typesense.listing.core">
+            <arguments>
+                <argument name="is_required" xsi:type="boolean">true</argument>
+            </arguments>
+        </referenceBlock>
+        <referenceBlock name="header-search">
+            <arguments>
+                <argument name="typesense_autocomplete" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\AutocompleteConfigViewModel</argument>
+            </arguments>
+            <action method="setTemplate">
+                <argument name="template" xsi:type="string">RunAsRoot_TypeSense::search/form-mini.phtml</argument>
+            </action>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.autocomplete.suggestion" as="typesense_suggestion"
+                   template="RunAsRoot_TypeSense::search/autocomplete/suggestion.phtml"/>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.autocomplete.product" as="typesense_product"
+                   template="RunAsRoot_TypeSense::search/autocomplete/product.phtml"/>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.autocomplete.category" as="typesense_category"
+                   template="RunAsRoot_TypeSense::search/autocomplete/category.phtml"/>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.autocomplete.page" as="typesense_page"
+                   template="RunAsRoot_TypeSense::search/autocomplete/page.phtml"/>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.autocomplete.see-all" as="typesense_see_all"
+                   template="RunAsRoot_TypeSense::search/autocomplete/see-all.phtml"/>
+        </referenceBlock>
+        <!-- Elasticsuite's autocomplete scripts have no form left to drive. -->
+        <referenceBlock name="autocomplete-result-js" remove="true"/>
+        <referenceBlock name="autocomplete-product-attribute-js" remove="true"/>
+    </body>
+</page>

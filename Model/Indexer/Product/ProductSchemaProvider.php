@@ -15,9 +15,25 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
     // category paths) must stay exact for facets, virtual categories and boosting rules.
     private const array UNSTEMMED_SEARCHABLE_FIELDS = ['sku'];
 
+    // Every field getFields() can declare, including the feature-dependent ones, so an additional
+    // attribute of the same name never duplicates or overwrites a core field.
+    public const array RESERVED_FIELDS = [
+        'id', 'product_id', 'name', 'sku', 'url', 'image_url', 'price', 'final_price', 'regular_price',
+        'description', 'short_description', 'categories', 'category_ids', 'categories.lvl0', 'categories.lvl1',
+        'categories.lvl2', 'in_stock', 'is_new', 'type_id', 'visibility', 'created_at', 'updated_at',
+        'sales_count', 'rating_summary', 'review_count', 'children', 'categories_text',
+        NameDecompounder::FIELD, 'embedding',
+    ];
+
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
+        private readonly AttributeResolverInterface $attributeResolver,
     ) {
+    }
+
+    public function getCollectionSettings(): array
+    {
+        return ['enable_nested_fields' => true];
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -35,8 +51,10 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'sku', 'type' => 'string'],
             ['name' => 'url', 'type' => 'string'],
             ['name' => 'image_url', 'type' => 'string'],
-            ['name' => 'price', 'type' => 'float'],
-            ['name' => 'special_price', 'type' => 'float', 'optional' => true],
+            // Faceted for the listing price slider's min/max stats.
+            ['name' => 'price', 'type' => 'float', 'facet' => true],
+            ['name' => 'final_price', 'type' => 'float'],
+            ['name' => 'regular_price', 'type' => 'float'],
             ['name' => 'description', 'type' => 'string', 'optional' => true],
             ['name' => 'short_description', 'type' => 'string', 'optional' => true],
             ['name' => 'categories', 'type' => 'string[]'],
@@ -44,7 +62,9 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
             ['name' => 'categories.lvl1', 'type' => 'string[]', 'facet' => true],
             ['name' => 'categories.lvl2', 'type' => 'string[]', 'facet' => true],
-            ['name' => 'in_stock', 'type' => 'bool', 'facet' => true],
+            // Typesense sorts bools by default; explicit because listings rely on in_stock:desc (out of stock last).
+            ['name' => 'in_stock', 'type' => 'bool', 'facet' => true, 'sort' => true],
+            ['name' => 'is_new', 'type' => 'bool', 'facet' => true, 'optional' => true],
             ['name' => 'type_id', 'type' => 'string', 'facet' => true],
             ['name' => 'visibility', 'type' => 'int32'],
             ['name' => 'created_at', 'type' => 'int64'],
@@ -52,10 +72,17 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'sales_count', 'type' => 'int32'],
             ['name' => 'rating_summary', 'type' => 'int32'],
             ['name' => 'review_count', 'type' => 'int32'],
+            // Display-only listing data for grouped products; filtering and sorting use the parent's fields.
+            ['name' => 'children', 'type' => 'object[]', 'optional' => true, 'index' => false],
         ];
 
-        foreach ($this->config->getAdditionalAttributes() as $attrCode) {
-            $fields[] = ['name' => $attrCode, 'type' => 'string', 'optional' => true, 'facet' => true];
+        $multiselectCodes = $this->attributeResolver->getMultiselectAttributeCodes();
+        // Config imported from files bypasses the admin source that hides core attributes, and Typesense
+        // rejects a schema with duplicate field names.
+        $additionalAttributes = array_diff($this->config->getAdditionalAttributes(), self::RESERVED_FIELDS);
+        foreach ($additionalAttributes as $attrCode) {
+            $type = in_array($attrCode, $multiselectCodes, true) ? 'string[]' : 'string';
+            $fields[] = ['name' => $attrCode, 'type' => $type, 'optional' => true, 'facet' => true];
         }
 
         // Text representation of categories for embedding
