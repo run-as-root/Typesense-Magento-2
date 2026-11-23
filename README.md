@@ -381,7 +381,7 @@ Limitations:
 
 ## Frontend
 
-All frontend components require the Hyva theme. They use Alpine.js for reactivity and make direct Typesense API calls using the public search-only API key. All components are written to be CSP-compatible — no inline `eval()` or dynamic script injection.
+All frontend components require the Hyva theme. They use Alpine.js for reactivity and make direct Typesense API calls using the public search-only API key. All components are written to be CSP-compatible: Alpine CSP components without `eval()`, inline scripts registered through Hyvä's `HyvaCsp`, and document data rendered only through `x-text` and attribute bindings. The one injected script is typesense-js itself: `js/client-loader.phtml` adds it from jsDelivr with a Subresource Integrity hash on the first `getClient()` call; `etc/csp_whitelist.xml` allows `cdn.jsdelivr.net`.
 
 ### Autocomplete
 
@@ -451,7 +451,7 @@ The listing and the header search dispatch these `CustomEvent`s on `window`. Lis
 |---|---|---|
 | `typesense:results` | After every rendered result | `{context, listName, page, stateKey, items, documents}`; `items` are GA4 items (`item_id` = SKU, `item_name`, `price` when shown and > 0, `index`, `item_list_name`), `stateKey` the serialized URL state |
 | `typesense:select-item` | Shopper clicks a tile link | `{item, index, listName, document}` |
-| `typesense:suggestion-click` | Shopper clicks a header-search row | `{type, term, name, url, index, item?}`; `type` is `product`, `category`, `page` or `suggestion`, `item` only for products |
+| `typesense:suggestion-click` | Shopper clicks a header-search row | `{type, term, name, url, index, item?}`; `type` is `product`, `category`, `page`, `suggestion` or `see_all` (the "See all" link; `name` is the term), `item` only for products |
 | `typesense:sort-change` | Shopper changes the sort | `{context, listName, sort, previous}` |
 | `typesense:filter-change` | Shopper adds or removes filters | `{context, listName, added, removed}` with `{field, value}` entries (price as `min-max`) |
 
