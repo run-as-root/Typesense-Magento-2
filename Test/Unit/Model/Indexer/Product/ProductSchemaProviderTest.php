@@ -286,6 +286,37 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertContains('color', $fieldNames);
     }
 
+    public function test_additional_attributes_named_like_late_core_fields_do_not_duplicate_them(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn(
+            ['categories_text', 'name_decompounded', 'embedding', 'is_new', 'category_ids', 'children', 'color'],
+        );
+        $config->method('isGermanDecompoundingEnabled')->willReturn(true);
+        $config->method('isConversationalSearchEnabled')->willReturn(true);
+        $config->method('getEmbeddingFields')->willReturn(['name']);
+
+        $fields = (new ProductSchemaProvider($config, $this->attributeResolver))->getFields();
+        $fieldNames = array_column($fields, 'name');
+
+        self::assertSame($fieldNames, array_values(array_unique($fieldNames)));
+        self::assertSame('bool', $this->findField($fields, 'is_new')['type']);
+        self::assertContains('color', $fieldNames);
+    }
+
+    public function test_reserved_fields_cover_every_core_field_with_all_features_enabled(): void
+    {
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn([]);
+        $config->method('isGermanDecompoundingEnabled')->willReturn(true);
+        $config->method('isConversationalSearchEnabled')->willReturn(true);
+        $config->method('getEmbeddingFields')->willReturn(['name']);
+
+        $fieldNames = array_column((new ProductSchemaProvider($config, $this->attributeResolver))->getFields(), 'name');
+
+        self::assertEqualsCanonicalizing($fieldNames, ProductSchemaProvider::RESERVED_FIELDS);
+    }
+
     public function test_get_fields_returns_no_additional_attribute_fields_when_none_configured(): void
     {
         $config = $this->createMock(TypeSenseConfigInterface::class);

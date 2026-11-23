@@ -15,6 +15,16 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
     // category paths) must stay exact for facets, virtual categories and boosting rules.
     private const array UNSTEMMED_SEARCHABLE_FIELDS = ['sku'];
 
+    // Every field getFields() can declare, including the feature-dependent ones, so an additional
+    // attribute of the same name never duplicates or overwrites a core field.
+    public const array RESERVED_FIELDS = [
+        'id', 'product_id', 'name', 'sku', 'url', 'image_url', 'price', 'final_price', 'regular_price',
+        'description', 'short_description', 'categories', 'category_ids', 'categories.lvl0', 'categories.lvl1',
+        'categories.lvl2', 'in_stock', 'is_new', 'type_id', 'visibility', 'created_at', 'updated_at',
+        'sales_count', 'rating_summary', 'review_count', 'children', 'categories_text',
+        NameDecompounder::FIELD, 'embedding',
+    ];
+
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
         private readonly AttributeResolverInterface $attributeResolver,
@@ -69,7 +79,7 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
         $multiselectCodes = $this->attributeResolver->getMultiselectAttributeCodes();
         // Config imported from files bypasses the admin source that hides core attributes, and Typesense
         // rejects a schema with duplicate field names.
-        $additionalAttributes = array_diff($this->config->getAdditionalAttributes(), array_column($fields, 'name'));
+        $additionalAttributes = array_diff($this->config->getAdditionalAttributes(), self::RESERVED_FIELDS);
         foreach ($additionalAttributes as $attrCode) {
             $type = in_array($attrCode, $multiselectCodes, true) ? 'string[]' : 'string';
             $fields[] = ['name' => $attrCode, 'type' => $type, 'optional' => true, 'facet' => true];

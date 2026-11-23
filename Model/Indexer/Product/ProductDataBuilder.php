@@ -89,11 +89,6 @@ class ProductDataBuilder
             $document['short_description'] = strip_tags((string) $shortDescription);
         }
 
-        $extra = $this->attributeResolver->getExtraAttributes($product);
-        if ($extra !== []) {
-            $document = array_merge($document, $extra);
-        }
-
         if ($this->config->isGermanDecompoundingEnabled($storeId)) {
             $document[NameDecompounder::FIELD] = $this->nameDecompounder->decompound(
                 $document['name'],
@@ -106,7 +101,7 @@ class ProductDataBuilder
         $document['rating_summary'] = $this->reviewResolver->getRatingSummary($productId, $storeId);
         $document['review_count'] = $this->reviewResolver->getReviewCount($productId, $storeId);
 
-        return $document;
+        return $document + $this->attributeResolver->getExtraAttributes($product);
     }
 
     /**

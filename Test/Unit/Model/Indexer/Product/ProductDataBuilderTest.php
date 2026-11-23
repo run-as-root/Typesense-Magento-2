@@ -260,6 +260,27 @@ final class ProductDataBuilderTest extends TestCase
         $this->sut->getProductCollection([], 3);
     }
 
+    public function test_extra_attributes_never_overwrite_core_fields(): void
+    {
+        $product = $this->createProductMock(id: 10);
+        $this->categoryResolver->method('getCategoryData')->willReturn([
+            'categories' => [], 'category_ids' => [3, 7],
+            'categories.lvl0' => [], 'categories.lvl1' => [], 'categories.lvl2' => [],
+        ]);
+        $this->newProductResolver->method('isNew')->willReturn(true);
+        $this->attributeResolver->method('getExtraAttributes')->willReturn([
+            'is_new' => 'Yes',
+            'category_ids' => '99',
+            'color' => 'Red',
+        ]);
+
+        $document = $this->sut->build($product, 1);
+
+        self::assertTrue($document['is_new']);
+        self::assertSame([3, 7], $document['category_ids']);
+        self::assertSame('Red', $document['color']);
+    }
+
     public function test_build_marks_product_new_from_news_date_resolver(): void
     {
         $product = $this->createProductMock(id: 10);

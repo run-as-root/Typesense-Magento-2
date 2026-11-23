@@ -36,7 +36,9 @@ class AttributeResolver implements AttributeResolverInterface
         $extra = [];
         foreach ($collection as $attribute) {
             $code = $attribute->getAttributeCode();
-            if (in_array($code, self::CORE_FIELDS, true)) {
+            if (in_array($code, self::CORE_FIELDS, true)
+                || in_array($code, ProductSchemaProvider::RESERVED_FIELDS, true)
+            ) {
                 continue;
             }
 

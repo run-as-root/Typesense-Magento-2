@@ -57,6 +57,32 @@ final class AttributeResolverTest extends TestCase
         self::assertSame(['material' => ['Wood']], $this->sut->getExtraAttributes($product));
     }
 
+    public function test_attributes_named_like_core_document_fields_are_not_extra(): void
+    {
+        $isNew = $this->createMock(Attribute::class);
+        $isNew->method('getAttributeCode')->willReturn('is_new');
+        $isNew->method('getFrontendInput')->willReturn('boolean');
+        $categoryIds = $this->createMock(Attribute::class);
+        $categoryIds->method('getAttributeCode')->willReturn('category_ids');
+        $categoryIds->method('getFrontendInput')->willReturn('text');
+        $color = $this->createMock(Attribute::class);
+        $color->method('getAttributeCode')->willReturn('color');
+        $color->method('getFrontendInput')->willReturn('select');
+        $collection = $this->createMock(Collection::class);
+        $collection->method('getIterator')->willReturn(new \ArrayIterator([$isNew, $categoryIds, $color]));
+        $factory = $this->createMock(CollectionFactory::class);
+        $factory->method('create')->willReturn($collection);
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn(['is_new', 'category_ids', 'color']);
+        $product = $this->createMock(Product::class);
+        $product->method('getAttributeText')->willReturnMap([['is_new', 'Yes'], ['color', 'Red']]);
+        $product->method('getData')->willReturn('5');
+
+        $extra = (new AttributeResolver($factory, $config))->getExtraAttributes($product);
+
+        self::assertSame(['color' => 'Red'], $extra);
+    }
+
     public function test_lists_multiselect_codes(): void
     {
         self::assertSame(['material'], $this->sut->getMultiselectAttributeCodes());
