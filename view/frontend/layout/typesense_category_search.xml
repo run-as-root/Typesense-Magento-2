@@ -10,6 +10,18 @@
                 <argument name="listing_context" xsi:type="string">category</argument>
             </arguments>
         </referenceBlock>
+        <referenceBlock name="typesense.listing.filters.skeleton">
+            <arguments>
+                <!-- One chip per usual facet plus the subcategory filter. -->
+                <argument name="filter_chip_widths" xsi:type="array">
+                    <item name="subcategory" xsi:type="string">w-28</item>
+                    <item name="first" xsi:type="string">w-32</item>
+                    <item name="second" xsi:type="string">w-28</item>
+                    <item name="third" xsi:type="string">w-20</item>
+                    <item name="fourth" xsi:type="string">w-24</item>
+                </argument>
+            </arguments>
+        </referenceBlock>
 
         <!-- Magento's product listing, toolbar and layered navigation are replaced by the Typesense listing. -->
         <referenceBlock name="category.products" remove="true"/>

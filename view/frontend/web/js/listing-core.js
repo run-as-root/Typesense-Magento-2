@@ -704,6 +704,87 @@
         return selected > 0 ? params : null;
     }
 
+    // Subcategory values are full category paths; only direct children of the prefix are offered, by name.
+    function optionLabel(facet, value, labels) {
+        if (facet.type === 'subcategory') {
+            const prefix = String(facet.prefix || '');
+            const name = value.startsWith(prefix) ? value.slice(prefix.length) : '';
+
+            return name === '' || name.includes(' > ') ? null : name;
+        }
+        if (facet.type === 'checkbox' || facet.boolean === true) {
+            return isBooleanValue(value) ? String((labels || {})[value] || value) : null;
+        }
+
+        return value;
+    }
+
+    // Selected values stay listed without a count, so they can still be unchecked when a value search
+    // or max_facet_values leaves them out of the counts.
+    function facetOptions(facet, entry, selected, labels) {
+        const chosen = valueList(selected);
+        const counts = entry && Array.isArray(entry.counts) ? entry.counts : [];
+        const options = [];
+        const seen = [];
+        const add = (value, count) => {
+            const label = value === '' || seen.includes(value) ? null : optionLabel(facet, value, labels);
+            if (label !== null) {
+                seen.push(value);
+                options.push({ value, label, count, selected: chosen.includes(value) });
+            }
+        };
+
+        for (const item of counts) {
+            add(String(item && item.value !== undefined && item.value !== null ? item.value : ''), Number(item && item.count) || 0);
+        }
+        for (const value of chosen) {
+            add(value, null);
+        }
+
+        return options;
+    }
+
+    function activeFilterChips(state, config, labels) {
+        const chips = [];
+        const filters = (state && state.filters) || {};
+        const facets = (config.facets || []).filter(facet => facet && typeof facet === 'object' && facet.field !== 'price');
+
+        for (const facet of facets) {
+            const values = valueList(filters[facet.field]);
+            for (const value of values) {
+                const label = optionLabel(facet, value, labels);
+                chips.push({
+                    key: JSON.stringify([facet.field, value]),
+                    field: facet.field,
+                    value,
+                    facetLabel: String(facet.label || facet.field),
+                    valueLabel: label === null ? value : label,
+                });
+            }
+        }
+
+        return chips;
+    }
+
+    // Returns null for the full range, so a slider moved back to both ends removes the price filter.
+    function clampPriceRange(min, max, bounds) {
+        if (!bounds) {
+            return null;
+        }
+        const clamp = (value, fallback) => {
+            const number = Number(value);
+
+            return Number.isFinite(number) && String(value).trim() !== ''
+                ? Math.min(Math.max(number, bounds.min), bounds.max)
+                : fallback;
+        };
+        const low = clamp(min, bounds.min);
+        const high = clamp(max, bounds.max);
+        const range = low <= high ? { min: low, max: high } : { min: high, max: low };
+
+        return range.min <= bounds.min && range.max >= bounds.max ? null : range;
+    }
+
     // typesense-js errors carry httpStatus; a failed search inside multi_search comes back as {code, error}.
     function normalizeError(err) {
         const fallback = 'Search request failed';
@@ -754,6 +835,9 @@
         prepareHits,
         wishlistProductIds,
         buildCartParams,
+        facetOptions,
+        activeFilterChips,
+        clampPriceRange,
     };
 
     if (typeof window !== 'undefined') {

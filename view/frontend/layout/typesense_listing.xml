@@ -16,9 +16,54 @@ these blocks; `listing_context` is set by typesense_search_result.xml and typese
                     <argument name="eager_load_images_count" xsi:type="number">4</argument>
                 </arguments>
 
-                <!-- Filled by the filter bar (sidebar/drawer) and the toolbar (sorting, page size). -->
-                <container name="typesense.listing.filters" as="filters" htmlTag="div" htmlClass="typesense-listing-filters"/>
-                <container name="typesense.listing.toolbar" as="toolbar" htmlTag="div" htmlClass="typesense-listing-toolbar"/>
+                <!-- Filter bar (chip row from md, drawer below) and toolbar (sorting, page size), one row above the grid. -->
+                <container name="typesense.listing.filters" as="filters" htmlTag="div" htmlClass="typesense-listing-filters">
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.filters.bar" as="bar"
+                           template="RunAsRoot_TypeSense::listing/filters/bar.phtml">
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.filters.skeleton" as="skeleton"
+                               template="RunAsRoot_TypeSense::listing/filters/skeleton.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.filters.drawer" as="drawer"
+                               template="RunAsRoot_TypeSense::listing/filters/mobile-drawer.phtml">
+                            <block class="Magento\Framework\View\Element\Template"
+                                   name="typesense.listing.filters.sorting-mobile" as="sorting-mobile"
+                                   template="RunAsRoot_TypeSense::listing/filters/sorting-mobile.phtml"/>
+                            <block class="Magento\Framework\View\Element\Template"
+                                   name="typesense.listing.filters.subcategory" as="subcategory"
+                                   template="RunAsRoot_TypeSense::listing/filters/subcategory.phtml"/>
+                            <block class="Magento\Framework\View\Element\Template"
+                                   name="typesense.listing.filters.dropdown" as="dropdown"
+                                   template="RunAsRoot_TypeSense::listing/filters/dropdown.phtml">
+                                <arguments>
+                                    <argument name="visible_values" xsi:type="number">5</argument>
+                                </arguments>
+                            </block>
+                            <block class="Magento\Framework\View\Element\Template"
+                                   name="typesense.listing.filters.slider" as="slider"
+                                   template="RunAsRoot_TypeSense::listing/filters/slider.phtml"/>
+                            <block class="Magento\Framework\View\Element\Template"
+                                   name="typesense.listing.filters.checkbox" as="checkbox"
+                                   template="RunAsRoot_TypeSense::listing/filters/checkbox.phtml">
+                                <arguments>
+                                    <argument name="group_label" xsi:type="string" translate="true">Properties</argument>
+                                </arguments>
+                            </block>
+                        </block>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.filters.active-filters" as="active-filters"
+                               template="RunAsRoot_TypeSense::listing/filters/active-filters.phtml"/>
+                    </block>
+                </container>
+                <container name="typesense.listing.toolbar" as="toolbar" htmlTag="div" htmlClass="typesense-listing-toolbar flex flex-wrap items-center justify-end gap-3">
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.toolbar.sorting" as="sorting"
+                           template="RunAsRoot_TypeSense::listing/filters/sorting.phtml"/>
+                    <block class="Magento\Framework\View\Element\Template"
+                           name="typesense.listing.toolbar.page-size" as="page-size"
+                           template="RunAsRoot_TypeSense::listing/filters/page-size.phtml"/>
+                </container>
 
                 <block class="Magento\Framework\View\Element\Template"
                        name="typesense.listing.ai-answer" as="ai-answer"

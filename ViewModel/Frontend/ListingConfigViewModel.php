@@ -18,6 +18,7 @@ use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
 use RunAsRoot\TypeSense\Model\Listing\FacetConfigBuilder;
+use RunAsRoot\TypeSense\Model\Listing\SubcategoryFacetResolver;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
@@ -55,6 +56,7 @@ class ListingConfigViewModel implements ArgumentInterface
         private readonly LocaleResolverInterface $localeResolver,
         private readonly ConversationModelManager $conversationModelManager,
         private readonly LoggerInterface $logger,
+        private readonly SubcategoryFacetResolver $subcategoryFacetResolver,
     ) {
     }
 
@@ -105,9 +107,9 @@ class ListingConfigViewModel implements ArgumentInterface
             'context' => $isCategory ? self::CONTEXT_CATEGORY : self::CONTEXT_SEARCH,
             'categoryId' => $category !== null ? (int) $category->getId() : null,
             'baseFilter' => $isCategory ? $this->getCategoryFilter($category, $storeId) : self::SEARCH_BASE_FILTER,
-            'facets' => $this->facetConfigBuilder->build($storeId),
+            'facets' => $this->getFacets($category, $storeId),
             'maxFacetValues' => self::MAX_FACET_VALUES,
-            'sortOptions' => $this->getSortOptions($storeId),
+            'sortOptions' => $this->getSortOptions($category, $storeId),
             'defaultSort' => $category !== null ? $this->mapMagentoSort((string) $category->getDefaultSortBy()) : '',
             'limits' => $limits,
             'perPage' => $this->getPerPage($isCategory, $limits, $storeId),
@@ -170,8 +172,27 @@ class ListingConfigViewModel implements ArgumentInterface
         }
     }
 
+    /** @return list<array<string, mixed>> */
+    private function getFacets(?Category $category, int $storeId): array
+    {
+        $facets = $this->facetConfigBuilder->build($storeId);
+        $subcategory = $category !== null ? $this->subcategoryFacetResolver->resolve($category, $storeId) : null;
+        if ($subcategory === null) {
+            return $facets;
+        }
+
+        // Inside a category only its next level is useful; the other category tree facets would repeat
+        // the "Category" filter with values from the whole tree.
+        $others = array_filter(
+            $facets,
+            static fn (array $facet): bool => !str_starts_with($facet['field'], 'categories.lvl'),
+        );
+
+        return [$subcategory, ...array_values($others)];
+    }
+
     /** @return list<array{label: string, value: string}> */
-    private function getSortOptions(int $storeId): array
+    private function getSortOptions(?Category $category, int $storeId): array
     {
         $options = [];
         $configured = $this->config->getEnabledSortOptions($storeId);
@@ -179,7 +200,27 @@ class ListingConfigViewModel implements ArgumentInterface
             $options[] = ['label' => (string) __($option['label']), 'value' => $option['value']];
         }
 
-        return $options;
+        $available = $category?->getAvailableSortBy();
+        if (!$available) {
+            return $options;
+        }
+
+        $allowed = array_values(array_filter(
+            $options,
+            fn (array $option): bool => in_array($this->toMagentoSortCode($option['value']), $available, true),
+        ));
+
+        // A category whose sort attributes match none of the options keeps them all rather than an empty menu.
+        return $allowed !== [] ? $allowed : $options;
+    }
+
+    private function toMagentoSortCode(string $sortValue): string
+    {
+        if ($sortValue === '') {
+            return 'position';
+        }
+
+        return explode(':', $sortValue, 2)[0];
     }
 
     private function mapMagentoSort(string $sortBy): ?string

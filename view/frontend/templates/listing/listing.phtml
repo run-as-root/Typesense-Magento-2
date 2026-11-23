@@ -29,13 +29,15 @@ if (!$viewModel->isEnabled($context)) {
      @private-content-loaded.window="onPrivateContentLoaded"
      data-eager-images="<?= (int) $block->getData('eager_load_images_count') ?>"
      data-listing-context="<?= $escaper->escapeHtmlAttr($context) ?>"
-     class="typesense-listing flex flex-col gap-6 lg:flex-row">
+     class="typesense-listing flex flex-col gap-4">
     <script type="application/json" data-typesense-listing-config><?= /* @noEscape */ $viewModel->getJsonConfig($context) ?></script>
 
-    <?= $block->getChildHtml('filters') ?>
+    <div class="typesense-listing-header flex items-start gap-3">
+        <div class="min-w-0 flex-1"><?= $block->getChildHtml('filters') ?></div>
+        <div class="flex shrink-0 items-center gap-3"><?= $block->getChildHtml('toolbar') ?></div>
+    </div>
 
-    <div class="typesense-listing-main flex-1 min-w-0">
-        <?= $block->getChildHtml('toolbar') ?>
+    <div class="typesense-listing-main min-w-0">
         <?= $block->getChildHtml('ai-answer') ?>
         <?= $block->getChildHtml('products-count') ?>
 

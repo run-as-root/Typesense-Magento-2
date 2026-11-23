@@ -12,8 +12,6 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface;
 
 class FacetConfigBuilder
 {
-    private const array NUMERIC_TYPES = ['int32', 'int64', 'float'];
-
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
         private readonly ProductSchemaProviderInterface $schemaProvider,
@@ -22,9 +20,9 @@ class FacetConfigBuilder
     }
 
     /**
-     * A facet without a configured type is a dropdown, except price, which is a slider. The listing
-     * core only accepts true/false on checkbox facets and a slider needs min/max stats, so a type the
-     * field cannot support falls back to a dropdown.
+     * A facet without a configured type is a dropdown. Price is always the slider and the only one, because
+     * the listing state holds a single range (`price`) and never filters price by exact values. The listing
+     * core only accepts true/false on checkbox facets, so a checkbox on a non-bool field becomes a dropdown.
      *
      * @return list<array{field: string, label: string, type: string, searchable: bool, boolean: bool}>
      */
@@ -36,12 +34,10 @@ class FacetConfigBuilder
 
         $facets = [];
         foreach ($fields as $field) {
-            $schemaType = $schemaTypes[$field] ?? 'string';
-            $isBoolean = $schemaType === 'bool';
-            $type = $types[$field]['type'] ?? ($field === 'price' ? 'slider' : 'dropdown');
+            $isBoolean = ($schemaTypes[$field] ?? 'string') === 'bool';
+            $type = $field === 'price' ? 'slider' : ($types[$field]['type'] ?? 'dropdown');
 
-            if (($type === 'checkbox' && !$isBoolean)
-                || ($type === 'slider' && !in_array($schemaType, self::NUMERIC_TYPES, true))) {
+            if (($type === 'checkbox' && !$isBoolean) || ($type === 'slider' && $field !== 'price')) {
                 $type = 'dropdown';
             }
 

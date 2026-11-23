@@ -22,6 +22,7 @@ use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface;
 use RunAsRoot\TypeSense\Model\Listing\FacetConfigBuilder;
+use RunAsRoot\TypeSense\Model\Listing\SubcategoryFacetResolver;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
@@ -38,6 +39,7 @@ final class ListingConfigViewModelTest extends TestCase
     private EavConfig&MockObject $eavConfig;
     private ScopeConfigInterface&MockObject $scopeConfig;
     private LoggerInterface&MockObject $logger;
+    private SubcategoryFacetResolver&MockObject $subcategoryFacetResolver;
     private ListingConfigViewModel $sut;
 
     protected function setUp(): void
@@ -89,6 +91,7 @@ final class ListingConfigViewModelTest extends TestCase
         $conversationModelManager = $this->createMock(ConversationModelManager::class);
         $conversationModelManager->method('getModelId')->willReturn('rar-product-assistant');
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->subcategoryFacetResolver = $this->createMock(SubcategoryFacetResolver::class);
 
         $this->sut = new ListingConfigViewModel(
             $this->config,
@@ -104,6 +107,7 @@ final class ListingConfigViewModelTest extends TestCase
             $localeResolver,
             $conversationModelManager,
             $this->logger,
+            $this->subcategoryFacetResolver,
         );
     }
 
@@ -231,13 +235,79 @@ final class ListingConfigViewModelTest extends TestCase
         self::assertFalse($this->sut->isEnabled(ListingConfigViewModel::CONTEXT_CATEGORY));
     }
 
-    private function givenCategory(int $id, string $name, string $defaultSortBy): void
+    public function test_category_sort_options_are_limited_to_the_category_available_sort_by(): void
+    {
+        $this->givenCategory(42, 'Gin', 'price', ['price', 'position']);
+        $this->givenCatalogLimits('12', '12');
+
+        $config = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY);
+
+        self::assertSame([
+            ['label' => 'Relevance', 'value' => ''],
+            ['label' => 'Price: Low to High', 'value' => 'price:asc'],
+        ], $config['sortOptions']);
+    }
+
+    public function test_category_sort_options_stay_complete_without_or_with_a_disjoint_available_sort_by(): void
+    {
+        $this->givenCategory(42, 'Gin', 'position', ['rating']);
+        $this->givenCatalogLimits('12', '12');
+
+        $config = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY);
+
+        // An empty sort menu would leave no way to sort at all, so the configured options stay.
+        self::assertCount(3, $config['sortOptions']);
+        self::assertCount(3, $this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH)['sortOptions']);
+    }
+
+    public function test_category_tree_facets_are_replaced_by_the_subcategory_facet_on_category_pages(): void
+    {
+        $category = $this->givenCategory(42, 'Gin', 'position');
+        $this->config->method('getFacetFilters')->willReturn(['categories.lvl0', 'color', 'categories.lvl1']);
+        $this->schemaProvider->method('getFields')->willReturn([]);
+        $this->eavConfig->method('getAttribute')->willReturn($this->createMock(Attribute::class));
+        $subcategory = [
+            'field' => 'categories.lvl1',
+            'label' => 'Category',
+            'type' => 'subcategory',
+            'searchable' => false,
+            'boolean' => false,
+            'prefix' => 'Gin > ',
+        ];
+        $this->subcategoryFacetResolver->method('resolve')->with($category, 1)->willReturn($subcategory);
+        $this->givenCatalogLimits('12', '12');
+
+        $facets = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY)['facets'];
+
+        self::assertSame([$subcategory, 'color'], [$facets[0], $facets[1]['field']]);
+        self::assertCount(2, $facets);
+    }
+
+    public function test_search_pages_get_no_subcategory_facet(): void
+    {
+        $this->subcategoryFacetResolver->expects(self::never())->method('resolve');
+        $this->config->method('getFacetFilters')->willReturn(['categories.lvl0']);
+        $this->schemaProvider->method('getFields')->willReturn([]);
+        $this->givenCatalogLimits('12', '12');
+
+        $facets = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH)['facets'];
+
+        self::assertSame(['categories.lvl0'], array_column($facets, 'field'));
+    }
+
+    /**
+     * @param list<string>|null $availableSortBy
+     */
+    private function givenCategory(int $id, string $name, string $defaultSortBy, ?array $availableSortBy = null): Category&MockObject
     {
         $category = $this->createMock(Category::class);
         $category->method('getId')->willReturn((string) $id);
         $category->method('getName')->willReturn($name);
         $category->method('getDefaultSortBy')->willReturn($defaultSortBy);
+        $category->method('getAvailableSortBy')->willReturn($availableSortBy);
         $this->registry->method('registry')->with('current_category')->willReturn($category);
+
+        return $category;
     }
 
     private function givenCatalogLimits(string $values, string $default): void

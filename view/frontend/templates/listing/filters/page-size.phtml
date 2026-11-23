@@ -1,0 +1,69 @@
+<?php
+/**
+ * Products per page (`typesensePageSize`) from Catalog > Storefront > "Products per Page on Grid Allowed Values".
+ * The listing leaves the default out of the URL.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<div x-data="typesensePageSize"
+     @typesense-state.window="onListingState"
+     class="typesense-page-size flex items-center">
+    <div x-show="showControlsSkeleton" class="h-10 w-32 animate-pulse rounded bg-gray-300" aria-hidden="true"></div>
+    <div x-cloak x-show="showPageSize" class="flex items-center gap-2 text-sm">
+        <span class="hidden lg:inline" aria-hidden="true"><?= $escaper->escapeHtml(__('Show')) ?></span>
+        <select id="typesense-page-size"
+                @change="selectLimit"
+                aria-label="<?= $escaper->escapeHtmlAttr(__('Products per page')) ?>"
+                class="form-select py-2 pl-3 pr-8 text-sm">
+            <template x-for="limitOption in limitOptions" :key="limitOption">
+                <option :value="limitOption" :selected="isLimitSelected" x-text="limitOption"></option>
+            </template>
+        </select>
+        <span class="hidden lg:inline" aria-hidden="true"><?= $escaper->escapeHtml(__('per page')) ?></span>
+    </div>
+</div>
+<script>
+    function initTypesensePageSize() {
+        return {
+            ...typesenseListingState(),
+
+            init() {
+                this.initListingState();
+            },
+            // Same rule as the listing core: the configured per-page value and the allowed values are accepted.
+            limitOptions() {
+                const values = [Number(this.listingConfig.perPage)].concat((this.listingConfig.limits || []).map(Number));
+
+                return values
+                    .filter((value, index) => Number.isInteger(value) && value > 0 && values.indexOf(value) === index)
+                    .sort((a, b) => a - b);
+            },
+            showPageSize() {
+                return this.showControls() && this.limitOptions().length > 1;
+            },
+            isLimitSelected() {
+                return this.limitOption === Number(this.listing.state.limit);
+            },
+            selectLimit() {
+                const limit = Number(this.$event.target.value);
+                if (limit !== Number(this.listing.state.limit)) {
+                    this.dispatchListingEvent('typesense-limit-change', { limit });
+                }
+            },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => Alpine.data('typesensePageSize', initTypesensePageSize), { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

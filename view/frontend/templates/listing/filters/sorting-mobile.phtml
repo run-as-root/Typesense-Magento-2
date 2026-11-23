@@ -1,0 +1,46 @@
+<?php
+/**
+ * Sorting inside the mobile filter drawer: an accordion with a radio list. Uses the `typesenseSorting` component
+ * of sorting.phtml; a choice applies at once, like the filters around it.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HeroiconsOutline $heroicons */
+$heroicons = $viewModels->require(HeroiconsOutline::class);
+?>
+<div x-data="typesenseSorting"
+     @typesense-state.window="onListingState"
+     x-show="hasSortOptions"
+     class="typesense-sorting-mobile border-b border-gray-200 md:hidden">
+    <button type="button"
+            @click="toggleSortMenu"
+            :aria-expanded="isOpen"
+            aria-controls="typesense-sort-mobile-options"
+            class="flex w-full items-center justify-between gap-2 py-4 text-sm font-semibold">
+        <span><?= $escaper->escapeHtml(__('Sort By')) ?></span>
+        <span :class="chevronClasses" class="transition-transform duration-200">
+            <?= $heroicons->chevronDownHtml('h-4 w-4', 16, 16, ['aria-hidden' => 'true']) ?>
+        </span>
+    </button>
+    <fieldset x-cloak x-show="isOpen" id="typesense-sort-mobile-options" class="pb-4">
+        <legend class="sr-only"><?= $escaper->escapeHtml(__('Sort By')) ?></legend>
+        <template x-for="sortOption in sortOptions" :key="sortOption.value">
+            <label class="flex cursor-pointer items-center gap-3 py-1.5 text-sm">
+                <input type="radio"
+                       name="typesense-sort-mobile"
+                       :checked="isSortOptionSelected"
+                       @change="selectSortOption"
+                       class="shrink-0">
+                <span x-text="sortOptionLabel"></span>
+            </label>
+        </template>
+    </fieldset>
+</div>

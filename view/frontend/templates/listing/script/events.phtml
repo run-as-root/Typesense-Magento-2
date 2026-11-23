@@ -2,6 +2,10 @@
 /**
  * Mixin of `typesenseListing`: window event handlers and the state-changing API used by filters, toolbar and themes.
  * Event details are structured objects, never '-'-joined strings.
+ *
+ * `typesenseListingState()` is the consumer side for filters, toolbar and themes: it reads the listing config and keeps
+ * the last `typesense-state` detail in `listing`. Bind `@typesense-state.window="onListingState"` and call
+ * `initListingState()` from `init()`. Changes go back only as events, so the listing alone writes history.
  */
 
 declare(strict_types=1);
@@ -17,6 +21,53 @@ use Magento\Framework\Escaper;
 $hyvaCsp = $viewModels->require(HyvaCsp::class);
 ?>
 <script>
+    function typesenseListingState() {
+        return {
+            listingConfig: {},
+            listing: {
+                context: '', isLoading: true, hasLoaded: false, found: null, page: 1, totalPages: 1, facets: [],
+                priceStats: null, error: null,
+                state: { q: '', page: 1, sort: '', limit: 0, filters: {}, price: null, facetQueries: {} },
+            },
+
+            initListingState() {
+                const root = this.$root.closest('.typesense-listing');
+                const element = (root || document).querySelector('[data-typesense-listing-config]');
+                try {
+                    this.listingConfig = JSON.parse(element ? element.textContent : '{}');
+                } catch (e) {
+                    this.listingConfig = {};
+                }
+            },
+            onListingState() {
+                const detail = this.$event && this.$event.detail;
+                if (detail && detail.state && detail.context === this.listingConfig.context) {
+                    this.listing = detail;
+                }
+            },
+            dispatchListingEvent(name, detail) {
+                window.dispatchEvent(new CustomEvent(name, { detail }));
+            },
+            hasActiveListingFilters() {
+                const state = this.listing.state;
+
+                return Object.keys(state.filters || {}).length > 0 || Boolean(state.price);
+            },
+            showControlsSkeleton() {
+                return !this.listing.hasLoaded;
+            },
+            // Hidden only once a finished request is known to be empty; filtered empty results keep their chips.
+            showControls() {
+                const listing = this.listing;
+                if (!listing.hasLoaded || listing.error !== null) {
+                    return false;
+                }
+
+                return listing.isLoading || Number(listing.found) > 0 || this.hasActiveListingFilters();
+            },
+        };
+    }
+
     function typesenseListingEvents() {
         const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
 

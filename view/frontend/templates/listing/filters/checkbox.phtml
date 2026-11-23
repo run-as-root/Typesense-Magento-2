@@ -1,0 +1,113 @@
+<?php
+/**
+ * Boolean facets of type checkbox (`typesenseFilterCheckbox`), grouped in one popover. Each row filters its field on
+ * `true` and shows that count. The group label is the layout argument `group_label`.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+/** @var HeroiconsOutline $heroicons */
+$heroicons = $viewModels->require(HeroiconsOutline::class);
+
+$groupLabel = (string) ($block->getData('group_label') ?: __('Properties'));
+?>
+<div x-data="typesenseFilterCheckbox"
+     x-show="hasCheckboxFacets"
+     @click.outside="closeOnOutside"
+     class="typesense-filter typesense-filter-checkbox relative border-b border-gray-200 md:border-0">
+    <button type="button"
+            @click="togglePanelOpen"
+            :aria-expanded="isOpen"
+            aria-controls="typesense-filter-checkboxes"
+            class="flex w-full items-center justify-between gap-2 py-4 text-sm font-semibold
+                   md:w-auto md:rounded md:border md:border-gray-300 md:bg-white md:px-3 md:py-2 md:font-normal">
+        <span class="flex items-center gap-1.5">
+            <span><?= $escaper->escapeHtml($groupLabel) ?></span>
+            <span x-show="hasActiveCount"
+                  x-text="activeCount"
+                  class="flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-900 px-1 text-xs text-white"></span>
+        </span>
+        <span :class="chevronClasses" class="transition-transform duration-200">
+            <?= $heroicons->chevronDownHtml('h-4 w-4', 16, 16, ['aria-hidden' => 'true']) ?>
+        </span>
+    </button>
+    <fieldset x-cloak
+              x-show="isOpen"
+              id="typesense-filter-checkboxes"
+              class="pb-4 md:absolute md:left-0 md:top-full md:z-30 md:mt-2 md:min-w-[17.5rem] md:rounded md:border
+                     md:border-gray-200 md:bg-white md:p-4 md:shadow-lg">
+        <legend class="sr-only"><?= $escaper->escapeHtml($groupLabel) ?></legend>
+        <template x-for="facet in checkboxFacets" :key="facet.field">
+            <label class="flex cursor-pointer items-start gap-3 py-1.5 text-sm">
+                <input type="checkbox"
+                       :checked="isFacetChecked"
+                       @change="toggleFacet"
+                       class="mt-0.5 shrink-0">
+                <span class="grow" x-text="facetLabel"></span>
+                <span x-text="trueCount" class="text-xs text-gray-500"></span>
+            </label>
+        </template>
+    </fieldset>
+</div>
+<script>
+    function initTypesenseFilterCheckbox() {
+        const panelKey = 'checkboxes';
+
+        return {
+            hasCheckboxFacets() {
+                return this.checkboxFacets().length > 0;
+            },
+            isOpen() {
+                return this.isPanelOpen(panelKey);
+            },
+            togglePanelOpen() {
+                this.togglePanel(panelKey);
+            },
+            closeOnOutside() {
+                this.closePanel(panelKey);
+            },
+            chevronClasses() {
+                return this.isOpen() ? 'rotate-180' : '';
+            },
+            activeCount() {
+                return this.checkboxFacets().filter(facet => this.selectedValues(facet.field).includes('true')).length;
+            },
+            hasActiveCount() {
+                return this.activeCount() > 0;
+            },
+            facetLabel() {
+                return this.facet.label;
+            },
+            trueOption() {
+                return this.facetOptionsFor(this.facet).find(option => option.value === 'true') || null;
+            },
+            trueCount() {
+                const option = this.trueOption();
+
+                return option && option.count !== null ? option.count : '';
+            },
+            isFacetChecked() {
+                return this.selectedValues(this.facet.field).includes('true');
+            },
+            // Boolean facets accept only true/false, so the checkbox sends `true`, never a label.
+            toggleFacet() {
+                this.dispatchFilterChange({ field: this.facet.field, value: 'true', action: 'toggle' });
+            },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => Alpine.data('typesenseFilterCheckbox', initTypesenseFilterCheckbox), { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

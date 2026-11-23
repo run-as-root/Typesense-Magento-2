@@ -514,3 +514,72 @@ test('buildCartParams posts qty 1 for a simple tile and super_group for grouped 
     ]);
     assert.equal(core.buildCartParams('42', 'fk', 'uenc', { 7: 0 }), null);
 });
+
+const yesNo = { true: 'Yes', false: 'No' };
+
+test('facetOptions lists counted values, keeps selected values without a count and labels booleans', () => {
+    const color = { field: 'color', type: 'dropdown', boolean: false };
+    const entry = { field_name: 'color', counts: [{ value: 'Black-White', count: 4 }, { value: '', count: 1 }, { value: 'Red', count: 2 }] };
+
+    assert.deepEqual(core.facetOptions(color, entry, ['Red', 'Blue (dark)'], yesNo), [
+        { value: 'Black-White', label: 'Black-White', count: 4, selected: false },
+        { value: 'Red', label: 'Red', count: 2, selected: true },
+        { value: 'Blue (dark)', label: 'Blue (dark)', count: null, selected: true },
+    ]);
+
+    const isNew = { field: 'is_new', type: 'checkbox', boolean: true };
+    const flags = { field_name: 'is_new', counts: [{ value: 'true', count: 3 }, { value: 'false', count: 9 }, { value: 'x', count: 1 }] };
+    assert.deepEqual(core.facetOptions(isNew, flags, ['true'], yesNo), [
+        { value: 'true', label: 'Yes', count: 3, selected: true },
+        { value: 'false', label: 'No', count: 9, selected: false },
+    ]);
+    assert.deepEqual(core.facetOptions(color, null, [], yesNo), []);
+});
+
+test('facetOptions shows only direct children below the subcategory prefix, labelled by name', () => {
+    const facet = { field: 'categories.lvl2', type: 'subcategory', prefix: 'Spirits > Gin > ' };
+    const entry = { field_name: 'categories.lvl2', counts: [
+        { value: 'Spirits > Gin > Dry Gin', count: 5 },
+        { value: 'Spirits > Gin > Dry Gin > London', count: 2 },
+        { value: 'Spirits > Rum > White', count: 7 },
+        { value: 'Spirits > Gin > Sloe', count: 1 },
+    ] };
+
+    assert.deepEqual(core.facetOptions(facet, entry, ['Spirits > Gin > Sloe'], yesNo), [
+        { value: 'Spirits > Gin > Dry Gin', label: 'Dry Gin', count: 5, selected: false },
+        { value: 'Spirits > Gin > Sloe', label: 'Sloe', count: 1, selected: true },
+    ]);
+});
+
+test('activeFilterChips are structured per value in facet order, never joined strings', () => {
+    const config = searchConfig({ facets: [
+        { field: 'categories.lvl1', label: 'Category', type: 'subcategory', prefix: 'Gin > ' },
+        { field: 'color', label: 'Color', type: 'dropdown' },
+        { field: 'in_stock', label: 'Availability', type: 'checkbox', boolean: true },
+        { field: 'price', label: 'Price', type: 'slider' },
+    ] });
+    const chips = core.activeFilterChips(state({
+        filters: { in_stock: ['true'], color: ['Black-White', 'Red'], 'categories.lvl1': ['Gin > Dry'], unknown: ['x'] },
+        price: { min: 10, max: 20 },
+    }), config, yesNo);
+
+    assert.deepEqual(chips.map(chip => [chip.field, chip.value, chip.facetLabel, chip.valueLabel]), [
+        ['categories.lvl1', 'Gin > Dry', 'Category', 'Dry'],
+        ['color', 'Black-White', 'Color', 'Black-White'],
+        ['color', 'Red', 'Color', 'Red'],
+        ['in_stock', 'true', 'Availability', 'Yes'],
+    ]);
+    assert.equal(new Set(chips.map(chip => chip.key)).size, chips.length);
+});
+
+test('clampPriceRange keeps values inside the stats bounds and clears a full range', () => {
+    const bounds = { min: 10, max: 200 };
+
+    assert.deepEqual(core.clampPriceRange(20, 80, bounds), { min: 20, max: 80 });
+    assert.deepEqual(core.clampPriceRange(-5, 80, bounds), { min: 10, max: 80 });
+    assert.deepEqual(core.clampPriceRange(90, 40, bounds), { min: 40, max: 90 });
+    assert.deepEqual(core.clampPriceRange('abc', 150, bounds), { min: 10, max: 150 });
+    assert.equal(core.clampPriceRange(10, 200, bounds), null);
+    assert.equal(core.clampPriceRange(0, 999, bounds), null);
+    assert.equal(core.clampPriceRange(20, 80, null), null);
+});

@@ -1,0 +1,118 @@
+<?php
+/**
+ * Active filter chips and Clear All (`typesenseActiveFilters`). Each chip removes exactly its `{field, value}`, so values
+ * containing `-`, `|` or commas are removed correctly. The price chip is left out when the listing hides prices.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+/** @var HeroiconsOutline $heroicons */
+$heroicons = $viewModels->require(HeroiconsOutline::class);
+
+$chipClasses = 'inline-flex shrink-0 items-center gap-2 rounded border border-gray-300 bg-gray-50 py-1 pl-2.5 pr-1 text-xs';
+?>
+<div x-data="typesenseActiveFilters"
+     @typesense-state.window="onListingState"
+     x-cloak
+     x-show="showActiveFilters"
+     class="typesense-active-filters mt-3 flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible">
+    <span class="hidden shrink-0 text-xs text-gray-600 md:inline"><?= $escaper->escapeHtml(__('Active Filters:')) ?></span>
+    <span x-show="showPriceChip" class="<?= $escaper->escapeHtmlAttr($chipClasses) ?>">
+        <span class="whitespace-nowrap" x-text="priceChipText"></span>
+        <button type="button"
+                @click="removePriceChip"
+                :aria-label="removePriceChipLabel"
+                class="rounded p-0.5 hover:bg-gray-200">
+            <?= $heroicons->xHtml('h-3.5 w-3.5', 14, 14, ['aria-hidden' => 'true']) ?>
+        </button>
+    </span>
+    <template x-for="chip in activeChips" :key="chip.key">
+        <span class="<?= $escaper->escapeHtmlAttr($chipClasses) ?>">
+            <span class="whitespace-nowrap" x-text="chipText"></span>
+            <button type="button"
+                    @click="removeChip"
+                    :aria-label="removeChipLabel"
+                    class="rounded p-0.5 hover:bg-gray-200">
+                <?= $heroicons->xHtml('h-3.5 w-3.5', 14, 14, ['aria-hidden' => 'true']) ?>
+            </button>
+        </span>
+    </template>
+    <button type="button" @click="clearAll" class="shrink-0 text-xs underline">
+        <?= $escaper->escapeHtml(__('Clear All')) ?>
+    </button>
+</div>
+<script>
+    function initTypesenseActiveFilters() {
+        const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
+        const strings = {
+            yes: '<?= $escaper->escapeJs(__('Yes')) ?>',
+            no: '<?= $escaper->escapeJs(__('No')) ?>',
+            price: '<?= $escaper->escapeJs(__('Price')) ?>',
+            chip: '<?= $escaper->escapeJs(__('%1: %2')) ?>',
+            remove: '<?= $escaper->escapeJs(__('Remove filter %1')) ?>',
+        };
+        const wholeAmounts = () => ({ minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+        return {
+            ...typesenseListingState(),
+
+            init() {
+                this.initListingState();
+            },
+            activeChips() {
+                const listing = core();
+
+                return listing
+                    ? listing.activeFilterChips(this.listing.state, this.listingConfig, { true: strings.yes, false: strings.no })
+                    : [];
+            },
+            showPriceChip() {
+                return this.listingConfig.showPrices !== false && Boolean(this.listing.state.price);
+            },
+            showActiveFilters() {
+                return this.showPriceChip() || this.activeChips().length > 0;
+            },
+            priceChipText() {
+                const price = this.listing.state.price || { min: 0, max: 0 };
+                const range = hyva.formatPrice(price.min, false, wholeAmounts()) + ' – '
+                    + hyva.formatPrice(price.max, false, wholeAmounts());
+
+                return hyva.str(strings.chip, strings.price, range);
+            },
+            removePriceChipLabel() {
+                return hyva.str(strings.remove, this.priceChipText());
+            },
+            removePriceChip() {
+                this.dispatchFilterChange({ price: null });
+            },
+            chipText() {
+                return hyva.str(strings.chip, this.chip.facetLabel, this.chip.valueLabel);
+            },
+            removeChipLabel() {
+                return hyva.str(strings.remove, this.chipText());
+            },
+            removeChip() {
+                this.dispatchFilterChange({ field: this.chip.field, value: this.chip.value, action: 'remove' });
+            },
+            clearAll() {
+                this.dispatchFilterChange({ clear: true });
+            },
+            dispatchFilterChange(detail) {
+                this.dispatchListingEvent('typesense-filter-change', detail);
+            },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => Alpine.data('typesenseActiveFilters', initTypesenseActiveFilters), { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

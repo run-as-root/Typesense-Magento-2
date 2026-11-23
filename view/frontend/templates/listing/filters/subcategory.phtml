@@ -1,0 +1,69 @@
+<?php
+/**
+ * Subcategories of the current category (category pages only). The facet is the category path field of the next
+ * level (`categories.lvlN`, see SubcategoryFacetResolver), so names and counts come from the listing's own Typesense
+ * result. Uses the `typesenseFilterDropdown` component of dropdown.phtml.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HeroiconsOutline $heroicons */
+$heroicons = $viewModels->require(HeroiconsOutline::class);
+
+$visibleValues = (int) ($block->getData('visible_values') ?? 5);
+?>
+<template x-for="facet in subcategoryFacets" :key="facet.field">
+    <div x-data="typesenseFilterDropdown"
+         @click.outside="closeOnOutside"
+         data-visible-values="<?= (int) $visibleValues ?>"
+         class="typesense-filter typesense-filter-subcategory relative border-b border-gray-200 md:border-0">
+        <button type="button"
+                @click="togglePanelOpen"
+                :aria-expanded="isOpen"
+                :aria-controls="panelId"
+                class="flex w-full items-center justify-between gap-2 py-4 text-sm font-semibold
+                       md:w-auto md:rounded md:border md:border-gray-300 md:bg-white md:px-3 md:py-2 md:font-normal">
+            <span class="flex items-center gap-1.5">
+                <span x-text="facetLabel"></span>
+                <span x-show="hasActiveCount"
+                      x-text="activeCount"
+                      class="flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-900 px-1 text-xs text-white"></span>
+            </span>
+            <span :class="chevronClasses" class="transition-transform duration-200">
+                <?= $heroicons->chevronDownHtml('h-4 w-4', 16, 16, ['aria-hidden' => 'true']) ?>
+            </span>
+        </button>
+        <div x-cloak
+             x-show="isOpen"
+             :id="panelId"
+             class="pb-4 md:absolute md:left-0 md:top-full md:z-30 md:mt-2 md:min-w-[17.5rem] md:rounded md:border
+                    md:border-gray-200 md:bg-white md:p-4 md:shadow-lg">
+            <fieldset>
+                <legend class="sr-only" x-text="facetLabel"></legend>
+                <template x-for="option in visibleOptions" :key="option.value">
+                    <label class="flex cursor-pointer items-start gap-3 py-1.5 text-sm">
+                        <input type="checkbox"
+                               :checked="isOptionSelected"
+                               @change="toggleOption"
+                               class="mt-0.5 shrink-0">
+                        <span class="grow" x-text="optionLabel"></span>
+                        <span x-show="hasOptionCount" x-text="optionCount" class="text-xs text-gray-500"></span>
+                    </label>
+                </template>
+            </fieldset>
+            <button type="button"
+                    x-show="showMoreToggle"
+                    @click="toggleExpanded"
+                    :aria-expanded="expanded"
+                    class="mt-2 text-sm underline"
+                    x-text="moreLessText"></button>
+        </div>
+    </div>
+</template>

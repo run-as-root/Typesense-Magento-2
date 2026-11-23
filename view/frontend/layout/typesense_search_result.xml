@@ -23,6 +23,17 @@
                 <argument name="listing_context" xsi:type="string">search</argument>
             </arguments>
         </referenceBlock>
+        <referenceBlock name="typesense.listing.filters.skeleton">
+            <arguments>
+                <!-- Search pages have no subcategory filter, so one chip less than category pages. -->
+                <argument name="filter_chip_widths" xsi:type="array">
+                    <item name="first" xsi:type="string">w-32</item>
+                    <item name="second" xsi:type="string">w-28</item>
+                    <item name="third" xsi:type="string">w-20</item>
+                    <item name="fourth" xsi:type="string">w-24</item>
+                </argument>
+            </arguments>
+        </referenceBlock>
         <!-- Search result pages are not indexed, so they carry no ItemList. -->
         <referenceBlock name="typesense.listing.json-ld" remove="true"/>
 
