@@ -23,6 +23,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- The CSP `connect-src` allowlist now includes the search node the browser actually connects to (`general/search_host`/`search_port`/`search_protocol`, falling back to the indexing node) besides the indexing node; with a separate public search host, storefront Typesense requests were blocked under a restrictive CSP.
 - Product recommendations ("You May Also Like") are a CSP-safe Alpine slider (`typesenseRecommendations` with one `typesenseRecommendation` per tile) rendered with `x-for`/`x-text`/attribute bindings instead of `innerHTML`, so document names and URLs can no longer inject markup or attributes; prices use `hyva.formatPrice` (no more hardcoded `$`) and follow the new `RecommendationsConfigViewModel::canShowPrices()` (plug it like the listing's). The view model's config no longer carries the Typesense host, port, protocol and key: requests use the shared `getClient()`. Strings are translated in `de_DE.csv`.
 - Grouped tiles add the chosen sizes to the cart again: `buildCartParams()` takes the tile's child ids as a fifth argument and sends every child in `super_group`, unselected ones as 0, as the product page does; Magento answered a partial `super_group` with "Please specify the quantity of product(s)".
 - An additional attribute named like a core product field (e.g. `short_description`, set through a config import that bypasses the admin list) no longer fails the product reindex with "duplicate field names in the schema"; the core field is kept.
