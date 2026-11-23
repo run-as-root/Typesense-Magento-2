@@ -414,4 +414,11 @@ final class TypeSenseConfigTest extends TestCase
 
         self::assertSame('category_page_grid', $this->sut->getListingImageId());
     }
+
+    public function test_get_listing_image_id_falls_back_for_legacy_value(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn('small_image');
+
+        self::assertSame('category_page_grid', $this->sut->getListingImageId());
+    }
 }

@@ -376,7 +376,6 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertTrue($field['infix']);
     }
 
-    /** @param array<int, array<string, mixed>> $fields */
     public function test_multiselect_schema_field_is_string_array(): void
     {
         $config = $this->createMock(TypeSenseConfigInterface::class);
@@ -391,6 +390,7 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertSame('string', $this->findField($fields, 'color')['type']);
     }
 
+    /** @param array<int, array<string, mixed>> $fields */
     private function findField(array $fields, string $name): array
     {
         foreach ($fields as $field) {

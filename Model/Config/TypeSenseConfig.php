@@ -8,6 +8,7 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Store\Model\ScopeInterface;
+use RunAsRoot\TypeSense\Model\Config\Source\ImageType;
 
 class TypeSenseConfig implements TypeSenseConfigInterface
 {
@@ -256,7 +257,8 @@ class TypeSenseConfig implements TypeSenseConfigInterface
     {
         $value = (string) $this->getValue('instant_search/image_type', $storeId);
 
-        return $value === '' ? self::DEFAULT_LISTING_IMAGE_ID : $value;
+        // Values saved before image ids were offered (image, small_image, thumbnail) would yield placeholders.
+        return isset(ImageType::LABELS[$value]) ? $value : self::DEFAULT_LISTING_IMAGE_ID;
     }
 
     // Autocomplete

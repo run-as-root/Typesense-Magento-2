@@ -67,8 +67,9 @@ class AttributeResolver implements AttributeResolverInterface
 
     public function getMultiselectAttributeCodes(): array
     {
+        $collection = $this->getAttributeCollection();
         $codes = [];
-        foreach ($this->getAttributeCollection() as $attribute) {
+        foreach ($collection as $attribute) {
             if ($attribute->getFrontendInput() === 'multiselect') {
                 $codes[] = $attribute->getAttributeCode();
             }
