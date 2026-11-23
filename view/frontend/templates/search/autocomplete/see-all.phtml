@@ -1,0 +1,13 @@
+<?php
+/**
+ * Header search dropdown footer: "See all (N)" link to the search page (URL built by the listing core's
+ * searchResultUrl, query encoded with encodeURIComponent) or the no-results line.
+ */
+
+declare(strict_types=1);
+
+?>
+<div class="p-3 text-center text-sm">
+    <a x-show="hasFound" :href="seeAllUrl" @click="onSeeAllClick" class="font-bold hover:underline" x-text="seeAllText"></a>
+    <p x-show="hasNoProducts" class="font-bold" x-text="noResultsText"></p>
+</div>

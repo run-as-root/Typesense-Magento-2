@@ -121,6 +121,15 @@ interface TypeSenseConfigInterface
 
     public function getAutocompleteProductCount(?int $storeId = null): int;
 
+    public function getAutocompleteCategoryCount(?int $storeId = null): int;
+
+    public function getAutocompleteCmsPageCount(?int $storeId = null): int;
+
+    public function getAutocompleteSuggestionCount(?int $storeId = null): int;
+
+    /** Product field the header search groups hits by (one hit per value); empty disables grouping. */
+    public function getAutocompleteGroupBy(?int $storeId = null): string;
+
     public function isCategoryMerchandiserEnabled(?int $storeId = null): bool;
 
     public function isQueryMerchandiserEnabled(?int $storeId = null): bool;

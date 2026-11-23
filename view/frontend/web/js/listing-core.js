@@ -746,7 +746,8 @@
         });
     }
 
-    // Images above the fold load eagerly for LCP; x-for needs one unique key per tile.
+    // Images above the fold load eagerly for LCP; x-for needs one unique key per tile; _position is the GA4 index
+    // on the page (the same order toGa4Items numbers the hits in).
     function prepareHits(hits, eagerCount) {
         const eager = Math.max(0, Number(eagerCount) || 0);
         const seen = [];
@@ -763,6 +764,7 @@
                 _key: key,
                 _loading: isEager ? 'eager' : 'lazy',
                 _priority: isEager ? 'high' : 'auto',
+                _position: prepared.length,
             }));
         }
 
@@ -912,6 +914,323 @@
         return { kind, status, message };
     }
 
+    // Snippets mark matches with <mark>; everything else is document text and must stay text (rendered via x-text).
+    function highlightSegments(snippet) {
+        const segments = [];
+        let marked = false;
+        for (const part of String(snippet === undefined || snippet === null ? '' : snippet).split(/(<\/?mark>)/i)) {
+            if (/^<mark>$/i.test(part)) {
+                marked = true;
+            } else if (/^<\/mark>$/i.test(part)) {
+                marked = false;
+            } else if (part !== '') {
+                segments.push({ key: segments.length, text: part, mark: marked, plain: !marked });
+            }
+        }
+
+        return segments;
+    }
+
+    function highlightSnippet(hit, field) {
+        const highlight = hit && hit.highlight && hit.highlight[field];
+        if (highlight && typeof highlight.snippet === 'string') {
+            return highlight.snippet;
+        }
+        const legacy = ((hit && hit.highlights) || []).find(entry => entry && entry.field === field);
+
+        return legacy && typeof legacy.snippet === 'string' ? legacy.snippet : null;
+    }
+
+    function hitSegments(hit, field, fallback, enabled) {
+        const snippet = enabled ? highlightSnippet(hit, field) : null;
+        if (snippet) {
+            return highlightSegments(snippet);
+        }
+        const text = fallback === undefined || fallback === null ? '' : String(fallback);
+
+        return text === '' ? [] : [{ key: 0, text, mark: false, plain: true }];
+    }
+
+    function searchResultUrl(searchUrl, q) {
+        const base = String(searchUrl || '');
+
+        return base + (base.includes('?') ? '&' : '?') + 'q=' + encodeURIComponent(String(q));
+    }
+
+    function cmsPageUrl(baseUrl, urlKey) {
+        const base = String(baseUrl || '').replace(/\/?$/, '/');
+
+        return base + String(urlKey || '').split('/').map(encodeURIComponent).join('/');
+    }
+
+    // With group_by, `found` counts groups; the header shows products, so it uses found_docs.
+    function flattenGroupedResult(result) {
+        if (!result || !Array.isArray(result.grouped_hits)) {
+            return result;
+        }
+        const hits = [];
+        for (const group of result.grouped_hits) {
+            hits.push(...((group && group.hits) || []));
+        }
+
+        return Object.assign({}, result, {
+            hits,
+            found: result.found_docs !== undefined ? result.found_docs : result.found,
+        });
+    }
+
+    const AUTOCOMPLETE_LIST_NAME = 'search_suggestions';
+    // Magento's 404 CMS page is indexed like any other page but is no search result.
+    const HIDDEN_PAGE_KEYS = ['no-route'];
+
+    function buildAutocompleteSearches(q, config) {
+        const query = String(q || '').trim();
+        const searches = [];
+        const sources = { products: 0, direct: null, suggestions: null, categories: null, pages: null };
+        const add = search => searches.push(search) - 1;
+
+        const product = Object.assign({}, config.requestParams, {
+            collection: config.productCollection,
+            q: query,
+            filter_by: 'visibility:[3,4]',
+            per_page: Number(config.productCount) || 6,
+        });
+        if (config.relevanceSortBy) {
+            product.sort_by = config.relevanceSortBy;
+        }
+        if (config.groupBy) {
+            product.group_by = config.groupBy;
+            product.group_limit = 1;
+        }
+        add(product);
+        if (config.directMatchesFirst) {
+            sources.direct = add(Object.assign({}, product, { enable_synonyms: false }));
+        }
+        if (config.suggestionCollection) {
+            sources.suggestions = add({ collection: config.suggestionCollection, q: query, query_by: 'query', per_page: Number(config.suggestionCount) });
+        }
+        if (config.categoryCollection) {
+            sources.categories = add({
+                collection: config.categoryCollection, q: query, query_by: 'name',
+                filter_by: 'is_active:=true && level:>1', per_page: Number(config.categoryCount),
+            });
+        }
+        if (config.pageCollection) {
+            sources.pages = add({
+                collection: config.pageCollection, q: query, query_by: 'title',
+                filter_by: 'is_active:=true', per_page: Number(config.pageCount),
+            });
+        }
+
+        return { searches, sources };
+    }
+
+    function sectionHits(results, index) {
+        const result = index === null ? null : results[index];
+
+        return result && !result.error && Array.isArray(result.hits) ? result.hits : [];
+    }
+
+    function autocompleteRow(type, hit, index, fields) {
+        return Object.assign({
+            key: type + '-' + String(hitDocument(hit).id),
+            type,
+            index,
+            position: 0,
+            domId: '',
+            imageUrl: '',
+            hasImage: false,
+            price: null,
+            hasPrice: false,
+            item: null,
+        }, fields);
+    }
+
+    /**
+     * Rows of the header dropdown in display order (suggestions, products, categories, pages); `position` is the
+     * keyboard index across all sections. Throws the failed product result, so the caller hides the dropdown;
+     * a failed side section (e.g. a collection not indexed yet) is only left out.
+     */
+    function autocompleteResults(results, sources, q, config) {
+        const main = results[sources.products];
+        if (!main || main.error || (main.code && !main.hits && !main.grouped_hits)) {
+            throw main || new Error('Typesense returned no result');
+        }
+        let products = flattenGroupedResult(main);
+        if (sources.direct !== null) {
+            products = reorderByDirectMatches(products, flattenGroupedResult(results[sources.direct]), 1);
+        }
+        const showPrices = config.showPrices !== false;
+        const highlight = Boolean(config.highlight);
+
+        const sections = {
+            suggestions: sectionHits(results, sources.suggestions).map((hit, i) => {
+                const doc = hitDocument(hit);
+                return autocompleteRow('suggestion', hit, i, {
+                    name: String(doc.query || ''),
+                    url: searchResultUrl(config.searchUrl, doc.query || ''),
+                    segments: hitSegments(hit, 'query', doc.query, highlight),
+                });
+            }).filter(row => row.name !== ''),
+            products: ((products && products.hits) || []).map((hit, i) => {
+                const doc = hitDocument(hit);
+                const price = hitPrice(doc);
+                const shownPrice = showPrices && price !== null && price > 0 ? price : null;
+                return autocompleteRow('product', hit, i, {
+                    name: String(doc.name || ''),
+                    url: String(doc.url || ''),
+                    segments: hitSegments(hit, 'name', doc.name, highlight),
+                    imageUrl: String(doc.image_url || ''),
+                    hasImage: Boolean(doc.image_url),
+                    price: shownPrice,
+                    hasPrice: shownPrice !== null,
+                    item: toGa4Items([hit], i, AUTOCOMPLETE_LIST_NAME, showPrices)[0],
+                });
+            }).filter(row => row.url !== ''),
+            categories: sectionHits(results, sources.categories).map((hit, i) => {
+                const doc = hitDocument(hit);
+                return autocompleteRow('category', hit, i, {
+                    name: String(doc.name || ''),
+                    url: String(doc.url || ''),
+                    segments: hitSegments(hit, 'name', doc.name, highlight),
+                });
+            }).filter(row => row.url !== ''),
+            pages: sectionHits(results, sources.pages)
+                .filter(hit => !HIDDEN_PAGE_KEYS.includes(hitDocument(hit).url_key))
+                .map((hit, i) => {
+                    const doc = hitDocument(hit);
+                    return autocompleteRow('page', hit, i, {
+                        name: String(doc.title || ''),
+                        url: doc.url_key ? cmsPageUrl(config.baseUrl, doc.url_key) : '',
+                        segments: hitSegments(hit, 'title', doc.title, highlight),
+                    });
+                }).filter(row => row.url !== ''),
+        };
+
+        const rows = [...sections.suggestions, ...sections.products, ...sections.categories, ...sections.pages];
+        rows.forEach((row, position) => {
+            row.position = position;
+            row.domId = 'typesense-ac-option-' + position;
+        });
+
+        return { sections, rows, found: Number(products && products.found) || 0 };
+    }
+
+    function suggestionClickDetail(row, term) {
+        const detail = { type: row.type, term: String(term), name: row.name, url: row.url, index: row.index };
+        if (row.item) {
+            detail.item = row.item;
+        }
+
+        return detail;
+    }
+
+    function priceValue(price) {
+        return price ? price.min + '-' + price.max : '';
+    }
+
+    function filterChanges(prev, next) {
+        const before = (prev && prev.filters) || {};
+        const after = (next && next.filters) || {};
+        const added = [];
+        const removed = [];
+
+        for (const field of Object.keys(after)) {
+            for (const value of after[field]) {
+                if (!(before[field] || []).includes(value)) {
+                    added.push({ field, value });
+                }
+            }
+        }
+        for (const field of Object.keys(before)) {
+            for (const value of before[field]) {
+                if (!(after[field] || []).includes(value)) {
+                    removed.push({ field, value });
+                }
+            }
+        }
+        const prevPrice = priceValue(prev && prev.price);
+        const nextPrice = priceValue(next && next.price);
+        if (nextPrice !== '' && nextPrice !== prevPrice) {
+            added.push({ field: 'price', value: nextPrice });
+        } else if (nextPrice === '' && prevPrice !== '') {
+            removed.push({ field: 'price', value: prevPrice });
+        }
+
+        return { added, removed };
+    }
+
+    function urlPath(url) {
+        try {
+            return new URL(String(url), 'https://localhost').pathname;
+        } catch (e) {
+            return String(url);
+        }
+    }
+
+    /**
+     * Maps the module's `typesense:*` window events to GA4 dataLayer pushes. Every push is preceded by
+     * {ecommerce: null} so GTM does not merge the previous ecommerce object into it.
+     */
+    function createGa4Tracker() {
+        let lastListKey = null;
+        const withReset = events => events.flatMap(event => [{ ecommerce: null }, event]);
+
+        const mappers = {
+            'typesense:results'(detail) {
+                const items = detail.items || [];
+                const key = String(detail.context) + '\n' + String(detail.stateKey !== undefined ? detail.stateKey : detail.page);
+                if (items.length === 0 || key === lastListKey) {
+                    return [];
+                }
+                lastListKey = key;
+
+                return [{ event: 'view_item_list', ecommerce: { item_list_name: detail.listName, items } }];
+            },
+            'typesense:select-item'(detail) {
+                return detail.item
+                    ? [{ event: 'select_item', ecommerce: { item_list_name: detail.listName, items: [detail.item] } }]
+                    : [];
+            },
+            'typesense:suggestion-click'(detail) {
+                const event = {
+                    event: 'search_suggestion_click',
+                    search_term: detail.term,
+                    suggestion_type: detail.type,
+                    suggestion_name: detail.name,
+                    suggestion_url: urlPath(detail.url),
+                    index: detail.index,
+                };
+                if (detail.item) {
+                    event.ecommerce = { item_list_name: detail.item.item_list_name, items: [detail.item] };
+                }
+
+                return [event];
+            },
+            'typesense:sort-change'(detail) {
+                return [{ event: 'sorting_interaction', sorting_option: detail.sort || 'relevance' }];
+            },
+            'typesense:filter-change'(detail) {
+                const events = (detail.added || []).map(change => ({
+                    event: 'filter_interaction', filter_type: change.field, filter_value: change.value,
+                }));
+                if ((detail.removed || []).length > 0) {
+                    events.push({ event: 'filter_interaction', filter_type: 'filter_deactivation', filter_value: '' });
+                }
+
+                return events;
+            },
+        };
+
+        return {
+            events(name, detail) {
+                const mapper = Object.prototype.hasOwnProperty.call(mappers, name) ? mappers[name] : null;
+
+                return mapper ? withReset(mapper(detail || {})) : [];
+            },
+        };
+    }
+
     const listing = {
         quoteValue,
         buildFilterBy,
@@ -937,13 +1256,21 @@
         facetOptions,
         activeFilterChips,
         clampPriceRange,
+        highlightSegments,
+        hitSegments,
+        searchResultUrl,
+        cmsPageUrl,
+        flattenGroupedResult,
+        buildAutocompleteSearches,
+        autocompleteResults,
+        suggestionClickDetail,
+        filterChanges,
+        createGa4Tracker,
     };
 
     if (typeof window !== 'undefined') {
         window.runAsRootTypesense = window.runAsRootTypesense || {};
         window.runAsRootTypesense.listing = listing;
-        // Legacy alias for the header autocomplete until it moves to the listing core.
-        window.runAsRootTypesense.reorderByDirectMatches = reorderByDirectMatches;
     }
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = listing;

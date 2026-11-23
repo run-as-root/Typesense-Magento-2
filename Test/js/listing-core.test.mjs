@@ -449,7 +449,7 @@ test('normalizeError turns typesense 4xx and network errors into a message', () 
     assert.ok(unknown.message.length > 0);
 });
 
-test('reorderByDirectMatches keeps its behaviour and the legacy window alias', () => {
+test('reorderByDirectMatches keeps its behaviour and only the listing namespace exposes it', () => {
     const doc = id => ({ document: { id } });
     const main = { found: 4, hits: [doc('a'), doc('b'), doc('c'), doc('d')] };
     const direct = { hits: [doc('c'), doc('x')] };
@@ -463,10 +463,8 @@ test('reorderByDirectMatches keeps its behaviour and the legacy window alias', (
     vm.runInNewContext(readFileSync(corePath, 'utf8'), sandbox);
     assert.equal(typeof sandbox.window.runAsRootTypesense.getClient, 'function');
     assert.equal(typeof sandbox.window.runAsRootTypesense.listing.buildSearches, 'function');
-    assert.equal(
-        sandbox.window.runAsRootTypesense.reorderByDirectMatches,
-        sandbox.window.runAsRootTypesense.listing.reorderByDirectMatches,
-    );
+    assert.equal(typeof sandbox.window.runAsRootTypesense.listing.reorderByDirectMatches, 'function');
+    assert.equal(sandbox.window.runAsRootTypesense.reorderByDirectMatches, undefined);
 });
 
 test('buildFilterBy keeps a lone OR base filter byte-identical so merchandising overrides still match', () => {
@@ -488,13 +486,13 @@ test('buildItemListJsonLd and toGa4Items leave prices out when prices are hidden
     ]);
 });
 
-test('prepareHits marks the first images eager and keys every hit once', () => {
+test('prepareHits marks the first images eager, keys every hit once and numbers the kept hits', () => {
     const prepared = core.prepareHits([
         { document: { id: '1' } }, { document: { id: '2' } }, { document: { id: '1' } }, { document: { id: '3' } },
     ], 2);
 
-    assert.deepEqual(prepared.map(hit => [hit._key, hit._loading, hit._priority]), [
-        ['1', 'eager', 'high'], ['2', 'eager', 'high'], ['3', 'lazy', 'auto'],
+    assert.deepEqual(prepared.map(hit => [hit._key, hit._loading, hit._priority, hit._position]), [
+        ['1', 'eager', 'high', 0], ['2', 'eager', 'high', 1], ['3', 'lazy', 'auto', 2],
     ]);
     assert.deepEqual(core.prepareHits(undefined, 4), []);
 });

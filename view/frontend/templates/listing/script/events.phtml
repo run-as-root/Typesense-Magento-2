@@ -1,7 +1,8 @@
 <?php
 /**
  * Mixin of `typesenseListing`: window event handlers and the state-changing API used by filters, toolbar and themes.
- * Event details are structured objects, never '-'-joined strings.
+ * Event details are structured objects, never '-'-joined strings. Control events use hyphens (`typesense-sort-change`);
+ * the colon-named `typesense:*` events are the tracking API (see tracking/ga4.phtml).
  *
  * `typesenseListingState()` is the consumer side for filters, toolbar and themes: it reads the listing config and keeps
  * the last `typesense-state` detail in `listing`. Bind `@typesense-state.window="onListingState"` and call
@@ -146,10 +147,14 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     return;
                 }
                 const patch = { filters, facetQueries, price };
+                const changes = filtersChanged ? core().filterChanges(this.state, patch) : null;
                 if (filtersChanged) {
                     patch.page = 1;
                 }
                 this.updateState(patch, filtersChanged ? 'filter' : 'facet-query');
+                if (changes && (changes.added.length > 0 || changes.removed.length > 0)) {
+                    this.dispatchTracking('typesense:filter-change', changes);
+                }
             },
 
             changeValues(values, value, action) {
@@ -167,8 +172,14 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             },
 
             setSort(sort) {
-                if (this.isReady) {
-                    this.updateState({ sort: String(sort === undefined || sort === null ? '' : sort), page: 1 }, 'sort');
+                if (!this.isReady) {
+                    return;
+                }
+                const previous = this.state.sort;
+                const next = String(sort === undefined || sort === null ? '' : sort);
+                this.updateState({ sort: next, page: 1 }, 'sort');
+                if (next !== previous) {
+                    this.dispatchTracking('typesense:sort-change', { sort: next, previous });
                 }
             },
 
@@ -189,6 +200,13 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
 
             clearFilters() {
                 this.applyFilterChange({ clear: true });
+            },
+
+            // Tracking events (typesense:*) report shopper interactions only, never history navigation or clamping.
+            dispatchTracking(name, detail) {
+                window.dispatchEvent(new CustomEvent(name, {
+                    detail: Object.assign({ context: this.config.context, listName: this.config.listName }, detail),
+                }));
             },
         };
     }

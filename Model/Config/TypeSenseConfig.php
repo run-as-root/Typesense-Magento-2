@@ -333,6 +333,26 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return (int) $this->getValue('autocomplete/product_count', $storeId);
     }
 
+    public function getAutocompleteCategoryCount(?int $storeId = null): int
+    {
+        return max(0, (int) $this->getValue('autocomplete/category_count', $storeId));
+    }
+
+    public function getAutocompleteCmsPageCount(?int $storeId = null): int
+    {
+        return max(0, (int) $this->getValue('autocomplete/cms_page_count', $storeId));
+    }
+
+    public function getAutocompleteSuggestionCount(?int $storeId = null): int
+    {
+        return max(0, (int) $this->getValue('autocomplete/suggestion_count', $storeId));
+    }
+
+    public function getAutocompleteGroupBy(?int $storeId = null): string
+    {
+        return trim((string) $this->getValue('autocomplete/group_by', $storeId));
+    }
+
     // Merchandising
     public function isCategoryMerchandiserEnabled(?int $storeId = null): bool
     {

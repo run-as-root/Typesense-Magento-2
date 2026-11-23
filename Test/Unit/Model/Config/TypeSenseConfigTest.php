@@ -477,4 +477,31 @@ final class TypeSenseConfigTest extends TestCase
             'size' => ['type' => 'dropdown', 'searchable' => false],
         ], $this->sut->getFacetTypes());
     }
+
+    public function test_autocomplete_section_counts_and_group_by_field(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturnMap([
+            ['run_as_root_typesense/autocomplete/category_count', ScopeInterface::SCOPE_STORE, 2, '3'],
+            ['run_as_root_typesense/autocomplete/cms_page_count', ScopeInterface::SCOPE_STORE, 2, '2'],
+            ['run_as_root_typesense/autocomplete/suggestion_count', ScopeInterface::SCOPE_STORE, 2, '4'],
+            ['run_as_root_typesense/autocomplete/group_by', ScopeInterface::SCOPE_STORE, 2, ' variant_group '],
+        ]);
+
+        self::assertSame(3, $this->sut->getAutocompleteCategoryCount(2));
+        self::assertSame(2, $this->sut->getAutocompleteCmsPageCount(2));
+        self::assertSame(4, $this->sut->getAutocompleteSuggestionCount(2));
+        self::assertSame('variant_group', $this->sut->getAutocompleteGroupBy(2));
+    }
+
+    public function test_empty_or_negative_autocomplete_counts_are_zero(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturnMap([
+            ['run_as_root_typesense/autocomplete/category_count', ScopeInterface::SCOPE_STORE, null, null],
+            ['run_as_root_typesense/autocomplete/cms_page_count', ScopeInterface::SCOPE_STORE, null, '-1'],
+        ]);
+
+        self::assertSame(0, $this->sut->getAutocompleteCategoryCount());
+        self::assertSame(0, $this->sut->getAutocompleteCmsPageCount());
+        self::assertSame('', $this->sut->getAutocompleteGroupBy());
+    }
 }

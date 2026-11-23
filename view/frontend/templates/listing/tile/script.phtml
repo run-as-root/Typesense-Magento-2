@@ -1,8 +1,8 @@
 <?php
 /**
  * Alpine component `typesenseTile`, one per product tile. It reads `item` (a prepared hit) from the x-for scope and
- * the listing's `config` and `wishlistIds` from the parent `typesenseListing`; cart and wishlist requests come from
- * the `typesenseTileRequests` mixin (child block).
+ * the listing's `config`, `state`, `currentLimit`, `hits` and `wishlistIds` from the parent `typesenseListing`; cart
+ * and wishlist requests come from the `typesenseTileRequests` mixin (child block).
  */
 
 declare(strict_types=1);
@@ -48,6 +48,22 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
 
             productUrl() {
                 return this.doc().url || '#';
+            },
+            // Bound to the image and name links. Tiles of the no-results suggestions are not the tracked list.
+            trackSelect() {
+                const listing = window.runAsRootTypesense && window.runAsRootTypesense.listing;
+                if (!listing || !this.isListingTile()) {
+                    return;
+                }
+                const offset = (Math.max(1, Number(this.state.page) || 1) - 1) * (Number(this.currentLimit) || 0);
+                const index = offset + (Number(this.item._position) || 0);
+                const item = listing.toGa4Items([this.item], index, this.config.listName, this.config.showPrices !== false)[0];
+                window.dispatchEvent(new CustomEvent('typesense:select-item', {
+                    detail: { item, index, listName: this.config.listName, document: this.doc() },
+                }));
+            },
+            isListingTile() {
+                return (this.hits || []).some(hit => hit._key === this.item._key);
             },
             productName() {
                 return this.doc().name || '';

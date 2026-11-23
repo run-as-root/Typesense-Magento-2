@@ -18,7 +18,7 @@ use Magento\Framework\View\Element\Template;
     </div>
     <div class="flex flex-col grow gap-2 pt-3">
         <?= $block->getChildHtml('rating') ?>
-        <a :href="productUrl" class="typesense-tile-name line-clamp-2 min-h-10 text-sm font-medium text-gray-900 hover:underline" x-text="productName"></a>
+        <a :href="productUrl" @click="trackSelect" class="typesense-tile-name line-clamp-2 min-h-10 text-sm font-medium text-gray-900 hover:underline" x-text="productName"></a>
         <?= $block->getChildHtml('price') ?>
         <?= $block->getChildHtml('variants') ?>
         <?= $block->getChildHtml('actions') ?>

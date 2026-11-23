@@ -283,3 +283,72 @@ test('a value search on one facet does not drop the pending value search of anot
 
     assert.deepEqual(listing.facets.map(f => [f.field_name, f.counts[0].value]), [['color', 'color-hit'], ['size', 'size-hit']]);
 });
+
+// JSON round trip: details are created in the vm context, whose prototypes differ from this realm's.
+const tracked = (env, type) => env.events.filter(e => e.type === type).map(e => JSON.parse(JSON.stringify(e.detail)));
+
+test('results carry the listing state key and sort and filter changes dispatch tracking events', async () => {
+    const env = createEnvironment('?color=Red');
+    env.responder = results(30, [hit(1), hit(2)]);
+    const listing = env.listing();
+    listing.init();
+    await settle();
+
+    const [first] = tracked(env, 'typesense:results');
+    assert.equal(first.stateKey, '?color=Red');
+    assert.equal(first.items.length, 2);
+
+    listing.setSort('price:asc');
+    listing.setSort('price:asc');
+    await settle();
+    assert.deepEqual(tracked(env, 'typesense:sort-change'), [
+        { context: 'category', listName: 'Gin', sort: 'price:asc', previous: '' },
+    ]);
+
+    listing.applyFilterChange({ field: 'color', value: 'Blue, dark', action: 'add' });
+    listing.applyFilterChange({ field: 'color', facetQuery: 'b' });
+    listing.applyFilterChange({ price: { min: 10, max: 20 } });
+    listing.applyFilterChange({ clear: true });
+    await settle();
+    assert.deepEqual(tracked(env, 'typesense:filter-change'), [
+        { context: 'category', listName: 'Gin', added: [{ field: 'color', value: 'Blue, dark' }], removed: [] },
+        { context: 'category', listName: 'Gin', added: [{ field: 'price', value: '10-20' }], removed: [] },
+        {
+            context: 'category', listName: 'Gin', added: [],
+            removed: [{ field: 'color', value: 'Red' }, { field: 'color', value: 'Blue, dark' }, { field: 'price', value: '10-20' }],
+        },
+    ]);
+    assert.equal(tracked(env, 'typesense:results').pop().stateKey, '?sort=price%3Aasc');
+
+    listing.onPopState();
+    await settle();
+    assert.equal(tracked(env, 'typesense:sort-change').length, 1, 'history navigation is no interaction');
+});
+
+test('a tile click dispatches select-item with the GA4 item at its listing position', async () => {
+    const env = createEnvironment('?page=2');
+    env.responder = results(30, [hit(1), hit(2)]);
+    const listing = env.listing();
+    listing.init();
+    await settle();
+
+    const tile = Object.assign(env.context.initTypesenseTile(), {
+        config: listing.config, state: listing.state, currentLimit: listing.currentLimit, hits: listing.hits, item: listing.hits[1],
+    });
+    tile.trackSelect();
+
+    assert.deepEqual(tracked(env, 'typesense:select-item'), [{
+        item: { item_id: 'S2', item_name: 'P2', price: 10, index: 13, item_list_name: 'Gin' },
+        index: 13,
+        listName: 'Gin',
+        document: JSON.parse(JSON.stringify(listing.hits[1].document)),
+    }]);
+
+    const hidden = Object.assign({}, tile, { config: Object.assign({}, listing.config, { showPrices: false }) });
+    hidden.trackSelect();
+    assert.equal('price' in tracked(env, 'typesense:select-item').pop().item, false);
+
+    const suggested = Object.assign({}, tile, { hits: [], item: Object.assign({}, hit(7), { _key: '7', _position: 0 }) });
+    suggested.trackSelect();
+    assert.equal(tracked(env, 'typesense:select-item').length, 2, 'no-results suggestions are not the tracked list');
+});

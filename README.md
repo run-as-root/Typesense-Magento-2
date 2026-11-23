@@ -178,6 +178,13 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | Category Count | 3 | Max category results |
 | CMS Page Count | 2 | Max CMS page results |
 | Suggestion Count | 4 | Max query suggestion results |
+| Group Products By | — | Faceted product field sent as `group_by` (one product per value); ignored when not a faceted schema field |
+
+### Tracking Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| Push GA4 Events to the dataLayer | No | Maps the `typesense:*` window events to `view_item_list`, `select_item`, `search_suggestion_click`, `sorting_interaction` and `filter_interaction` |
 
 ### Conversational Search (AI) Settings
 
@@ -372,7 +379,7 @@ All frontend components require the Hyva theme. They use Alpine.js for reactivit
 
 ### Autocomplete
 
-Injected into the Hyva search form. Opens a dropdown with results from all configured entity collections. Configured via the autocomplete settings in admin.
+Replaces the template of Hyvä's `header-search` block (handle `typesense_autocomplete`, also over Hyva_SmileElasticsuite's) with `search/form-mini.phtml`: a GET form to the search page plus a dropdown with query suggestions, products, categories and CMS pages from one multi search, highlighted matches, "See all (N)" and keyboard navigation. Typesense errors hide the dropdown; Enter still submits the form. Configured via the autocomplete settings in admin.
 
 ### Instant Search Page
 

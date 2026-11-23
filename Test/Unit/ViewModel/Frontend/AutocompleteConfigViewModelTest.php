@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Test\Unit\ViewModel\Frontend;
 
-use Magento\Store\Api\Data\StoreInterface;
+use Magento\Search\Helper\Data as SearchHelper;
+use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 use RunAsRoot\TypeSense\ViewModel\Frontend\AutocompleteConfigViewModel;
@@ -19,9 +21,11 @@ final class AutocompleteConfigViewModelTest extends TestCase
     private TypeSenseConfigInterface&MockObject $config;
     private StoreManagerInterface&MockObject $storeManager;
     private CollectionNameResolverInterface&MockObject $collectionNameResolver;
-    private StoreInterface&MockObject $store;
+    private Store&MockObject $store;
     private SearchRequestParamsBuilder&MockObject $requestParamsBuilder;
     private SearchParametersProvider&MockObject $searchParametersProvider;
+    private SearchHelper&MockObject $searchHelper;
+    private ProductSchemaProviderInterface&MockObject $schemaProvider;
     private AutocompleteConfigViewModel $sut;
 
     protected function setUp(): void
@@ -30,13 +34,16 @@ final class AutocompleteConfigViewModelTest extends TestCase
         $this->storeManager          = $this->createMock(StoreManagerInterface::class);
         $this->collectionNameResolver = $this->createMock(CollectionNameResolverInterface::class);
 
-        $this->store = $this->createMock(StoreInterface::class);
+        $this->store = $this->createMock(Store::class);
         $this->store->method('getCode')->willReturn('default');
         $this->store->method('getId')->willReturn(1);
+        $this->store->method('getBaseUrl')->willReturn('https://shop.test/de/');
         $this->storeManager->method('getStore')->willReturn($this->store);
 
         $this->requestParamsBuilder = $this->createMock(SearchRequestParamsBuilder::class);
         $this->searchParametersProvider = $this->createMock(SearchParametersProvider::class);
+        $this->searchHelper = $this->createMock(SearchHelper::class);
+        $this->schemaProvider = $this->createMock(ProductSchemaProviderInterface::class);
 
         $this->sut = new AutocompleteConfigViewModel(
             $this->config,
@@ -44,6 +51,8 @@ final class AutocompleteConfigViewModelTest extends TestCase
             $this->collectionNameResolver,
             $this->requestParamsBuilder,
             $this->searchParametersProvider,
+            $this->searchHelper,
+            $this->schemaProvider,
         );
     }
 
@@ -71,49 +80,120 @@ final class AutocompleteConfigViewModelTest extends TestCase
         self::assertFalse($this->sut->isEnabled());
     }
 
-    public function test_get_config_returns_array_with_expected_keys(): void
+    public function test_autocomplete_config_has_min_query_length_collections_and_no_admin_key(): void
     {
-        $this->config->method('getSearchHost')->willReturn('search.example.com');
-        $this->config->method('getSearchPort')->willReturn(8108);
-        $this->config->method('getSearchProtocol')->willReturn('https');
-        $this->config->method('getSearchOnlyApiKey')->willReturn('xyz-search-key');
+        $this->config->method('getApiKey')->willReturn('admin-secret-key');
+        $this->config->method('getSearchOnlyApiKey')->willReturn('search-only-key');
         $this->config->method('getAutocompleteProductCount')->willReturn(6);
-
+        $this->config->method('getAutocompleteCategoryCount')->willReturn(3);
+        $this->config->method('getAutocompleteCmsPageCount')->willReturn(2);
+        $this->config->method('getAutocompleteSuggestionCount')->willReturn(4);
+        $this->config->method('isCategoryIndexingEnabled')->willReturn(true);
+        $this->config->method('isCmsPageIndexingEnabled')->willReturn(true);
+        $this->config->method('isSuggestionIndexingEnabled')->willReturn(true);
+        $this->searchHelper->method('getMinQueryLength')->willReturn('3');
+        $this->searchHelper->method('getResultUrl')->willReturn('https://shop.test/de/catalogsearch/result/');
         $this->collectionNameResolver
             ->method('resolve')
             ->willReturnMap([
                 ['product', 'default', 1, 'prefix_product_default'],
                 ['category', 'default', 1, 'prefix_category_default'],
+                ['cms_page', 'default', 1, 'prefix_cms_page_default'],
                 ['suggestion', 'default', 1, 'prefix_suggestion_default'],
             ]);
 
         $result = $this->sut->getConfig();
 
-        self::assertArrayHasKey('typesenseHost', $result);
-        self::assertArrayHasKey('typesensePort', $result);
-        self::assertArrayHasKey('typesenseProtocol', $result);
-        self::assertArrayHasKey('typesenseSearchOnlyApiKey', $result);
-        self::assertArrayHasKey('productCollection', $result);
-        self::assertArrayHasKey('categoryCollection', $result);
-        self::assertArrayHasKey('suggestionCollection', $result);
-        self::assertArrayHasKey('productCount', $result);
-
-        self::assertSame('search.example.com', $result['typesenseHost']);
-        self::assertSame(8108, $result['typesensePort']);
-        self::assertSame('https', $result['typesenseProtocol']);
-        self::assertSame('xyz-search-key', $result['typesenseSearchOnlyApiKey']);
+        self::assertSame(3, $result['minQueryLength']);
         self::assertSame('prefix_product_default', $result['productCollection']);
         self::assertSame('prefix_category_default', $result['categoryCollection']);
+        self::assertSame('prefix_cms_page_default', $result['pageCollection']);
         self::assertSame('prefix_suggestion_default', $result['suggestionCollection']);
         self::assertSame(6, $result['productCount']);
+        self::assertSame(3, $result['categoryCount']);
+        self::assertSame(2, $result['pageCount']);
+        self::assertSame(4, $result['suggestionCount']);
+        self::assertSame('https://shop.test/de/catalogsearch/result/', $result['searchUrl']);
+        self::assertSame('https://shop.test/de/', $result['baseUrl']);
+
+        // The shared client (js/client-loader.phtml) holds the search-only key; this config needs none.
+        $json = $this->sut->getJsonConfig();
+        self::assertStringNotContainsString('admin-secret-key', $json);
+        self::assertStringNotContainsString('search-only-key', $json);
+        self::assertStringNotContainsStringIgnoringCase('apikey', $json);
+    }
+
+    public function test_sections_without_an_index_or_a_count_have_no_collection(): void
+    {
+        $this->config->method('getAutocompleteCategoryCount')->willReturn(0);
+        $this->config->method('getAutocompleteCmsPageCount')->willReturn(2);
+        $this->config->method('getAutocompleteSuggestionCount')->willReturn(4);
+        $this->config->method('isCategoryIndexingEnabled')->willReturn(true);
+        $this->config->method('isCmsPageIndexingEnabled')->willReturn(false);
+        $this->config->method('isSuggestionIndexingEnabled')->willReturn(true);
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+
+        $result = $this->sut->getConfig();
+
+        self::assertNull($result['categoryCollection']);
+        self::assertNull($result['pageCollection']);
+        self::assertSame('collection', $result['suggestionCollection']);
+    }
+
+    public function test_group_by_is_used_only_for_a_faceted_schema_field(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $this->schemaProvider->method('getFields')->willReturn([
+            ['name' => 'variant_group', 'type' => 'string', 'facet' => true],
+            ['name' => 'name', 'type' => 'string'],
+        ]);
+        $groupBy = 'variant_group';
+        $this->config->method('getAutocompleteGroupBy')->willReturnCallback(
+            static function () use (&$groupBy): string {
+                return $groupBy;
+            },
+        );
+
+        self::assertSame('variant_group', $this->sut->getConfig()['groupBy']);
+
+        $groupBy = 'name';
+        self::assertNull($this->sut->getConfig()['groupBy']);
+
+        $groupBy = 'missing_field';
+        self::assertNull($this->sut->getConfig()['groupBy']);
+
+        $groupBy = '';
+        self::assertNull($this->sut->getConfig()['groupBy']);
+    }
+
+    public function test_config_carries_highlighting_and_price_visibility(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $this->config->method('isHighlightEnabled')->with(1)->willReturn(true);
+
+        $result = $this->sut->getConfig();
+
+        self::assertTrue($result['highlight']);
+        self::assertTrue($result['showPrices']);
+    }
+
+    public function test_search_form_values_come_from_magento_search_settings(): void
+    {
+        $this->searchHelper->method('getMinQueryLength')->willReturn('2');
+        $this->searchHelper->method('getMaxQueryLength')->willReturn('128');
+        $this->searchHelper->method('getResultUrl')->willReturn('https://shop.test/catalogsearch/result/');
+        $this->searchHelper->method('getQueryParamName')->willReturn('q');
+        $this->searchHelper->method('getEscapedQueryText')->willReturn('&lt;b&gt;');
+
+        self::assertSame(2, $this->sut->getMinQueryLength());
+        self::assertSame(128, $this->sut->getMaxQueryLength());
+        self::assertSame('https://shop.test/catalogsearch/result/', $this->sut->getResultUrl());
+        self::assertSame('q', $this->sut->getQueryParamName());
+        self::assertSame('&lt;b&gt;', $this->sut->getEscapedQueryText());
     }
 
     public function test_get_json_config_returns_valid_json_string(): void
     {
-        $this->config->method('getSearchHost')->willReturn('localhost');
-        $this->config->method('getSearchPort')->willReturn(8108);
-        $this->config->method('getSearchProtocol')->willReturn('http');
-        $this->config->method('getSearchOnlyApiKey')->willReturn('key');
         $this->config->method('getAutocompleteProductCount')->willReturn(4);
 
         $this->collectionNameResolver->method('resolve')->willReturn('collection_name');
@@ -123,7 +203,7 @@ final class AutocompleteConfigViewModelTest extends TestCase
         self::assertIsString($json);
         $decoded = json_decode($json, true);
         self::assertIsArray($decoded);
-        self::assertArrayHasKey('typesenseHost', $decoded);
+        self::assertSame(4, $decoded['productCount']);
     }
 
     public function test_config_contains_request_and_cache_params(): void

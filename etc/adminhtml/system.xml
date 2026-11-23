@@ -408,6 +408,11 @@
                     <label>Query Suggestions Count</label>
                     <validate>validate-digits</validate>
                 </field>
+                <field id="group_by" translate="label comment" type="text"
+                       sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Group Products By</label>
+                    <comment>Faceted product field (e.g. an Additional Attribute shared by the variants of one product); the header search then shows one product per value. Ignored when the field is not in the product schema or not faceted. Leave empty to disable.</comment>
+                </field>
             </group>
 
             <!-- Merchandising -->
@@ -518,6 +523,18 @@
                         <field id="conversational_search/enabled">1</field>
                         <field id="enabled">1</field>
                     </depends>
+                </field>
+            </group>
+
+            <!-- Tracking -->
+            <group id="tracking" translate="label" type="text" sortOrder="100"
+                   showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Tracking</label>
+                <field id="ga4_datalayer" translate="label comment" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Push GA4 Events to the dataLayer</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>view_item_list, select_item, search_suggestion_click, sorting_interaction and filter_interaction from the listing and the header search. Leave off when a theme maps the typesense:* window events itself.</comment>
                 </field>
             </group>
         </section>

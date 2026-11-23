@@ -187,12 +187,15 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                 const offset = (this.state.page - 1) * this.currentLimit;
                 this.updateSeoText();
                 this.writeJsonLd();
+                // Tracking (tracking/ga4.phtml or a theme) de-duplicates view_item_list per stateKey.
                 window.dispatchEvent(new CustomEvent('typesense:results', {
                     detail: {
                         context: this.config.context,
                         listName: this.config.listName,
                         page: this.state.page,
+                        stateKey: listing.serializeUrlState(this.state, this.config),
                         items: listing.toGa4Items(this.hits, offset, this.config.listName, this.config.showPrices !== false),
+                        documents: this.hits.map(hit => hit.document),
                     },
                 }));
                 if (this.found === 0) {

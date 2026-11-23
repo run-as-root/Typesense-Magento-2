@@ -11,13 +11,14 @@ use Magento\Framework\Registry;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
 /**
- * Typesense listing layouts live in their own handles so that a disabled module or setting leaves
- * Magento's own search and category pages untouched.
+ * Typesense listing layouts and the header search live in their own handles so that a disabled module or setting
+ * leaves Magento's own search, category pages and header search untouched.
  */
 class LayoutLoadBefore implements ObserverInterface
 {
     public const string CATEGORY_HANDLE = 'typesense_category_search';
     public const string SEARCH_HANDLE = 'typesense_search_result';
+    public const string AUTOCOMPLETE_HANDLE = 'typesense_autocomplete';
 
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
@@ -37,8 +38,12 @@ class LayoutLoadBefore implements ObserverInterface
             default => null,
         };
 
-        if ($handle !== null) {
-            $observer->getData('layout')->getUpdate()->addHandle($handle);
+        $handles = array_filter([
+            $handle,
+            $this->config->isAutocompleteEnabled() ? self::AUTOCOMPLETE_HANDLE : null,
+        ]);
+        foreach ($handles as $layoutHandle) {
+            $observer->getData('layout')->getUpdate()->addHandle($layoutHandle);
         }
     }
 

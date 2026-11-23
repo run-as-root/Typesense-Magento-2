@@ -71,6 +71,7 @@
                 <category_count>3</category_count>
                 <cms_page_count>2</cms_page_count>
                 <suggestion_count>4</suggestion_count>
+                <group_by/>
             </autocomplete>
             <merchandising>
                 <category_merchandiser_enabled>0</category_merchandiser_enabled>
@@ -161,6 +162,9 @@ GUIDELINES:
                 <enabled>0</enabled>
                 <limit>8</limit>
             </recommendations>
+            <tracking>
+                <ga4_datalayer>0</ga4_datalayer>
+            </tracking>
         </run_as_root_typesense>
     </default>
 </config>

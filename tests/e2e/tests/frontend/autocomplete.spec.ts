@@ -13,7 +13,7 @@ test.describe('Autocomplete', () => {
     await expect(autocomplete.searchInput).toBeVisible();
   });
 
-  test('typing 2+ chars opens dropdown', async () => {
+  test('typing the minimum query length opens dropdown', async () => {
     await autocomplete.search('bag');
     await expect(autocomplete.dropdown).toBeVisible();
   });
@@ -23,7 +23,7 @@ test.describe('Autocomplete', () => {
     await expect(autocomplete.productResults.first()).toBeVisible();
     const firstProduct = autocomplete.productResults.first();
     await expect(firstProduct.locator('img')).toBeVisible();
-    await expect(firstProduct.locator('p.text-sm.font-medium')).not.toBeEmpty();
+    await expect(firstProduct.locator('span.font-medium')).not.toBeEmpty();
   });
 
   test('shows category suggestions', async () => {

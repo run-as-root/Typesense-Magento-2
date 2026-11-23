@@ -7,6 +7,7 @@ namespace RunAsRoot\TypeSense\Test\Unit\Observer;
 use Magento\Catalog\Model\Category;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Registry;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
@@ -88,6 +89,37 @@ final class LayoutLoadBeforeTest extends TestCase
         $this->config->method('isReplaceCategoryPage')->willReturn(true);
 
         $this->sut->execute($this->createObserver('catalogsearch_result_index', []));
+    }
+
+    /** @return array<string, array{bool, bool, string, string[]}> */
+    public static function autocompleteProvider(): array
+    {
+        return [
+            'enabled, any page' => [true, true, 'cms_index_index', ['typesense_autocomplete']],
+            'enabled, with listing handle' => [
+                true,
+                true,
+                'catalogsearch_result_index',
+                ['typesense_search_result', 'typesense_autocomplete'],
+            ],
+            'autocomplete disabled' => [true, false, 'cms_index_index', []],
+            'module disabled' => [false, true, 'cms_index_index', []],
+        ];
+    }
+
+    /** @param string[] $expectedHandles */
+    #[DataProvider('autocompleteProvider')]
+    public function test_autocomplete_handle_added_only_when_enabled(
+        bool $moduleEnabled,
+        bool $autocompleteEnabled,
+        string $fullActionName,
+        array $expectedHandles,
+    ): void {
+        $this->config->method('isEnabled')->willReturn($moduleEnabled);
+        $this->config->method('isAutocompleteEnabled')->willReturn($autocompleteEnabled);
+        $this->config->method('isInstantSearchEnabled')->willReturn(true);
+
+        $this->sut->execute($this->createObserver($fullActionName, $expectedHandles));
     }
 
     /** @param string[] $expectedHandles */
