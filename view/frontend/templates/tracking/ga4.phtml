@@ -12,12 +12,10 @@ declare(strict_types=1);
 
 use Hyva\Theme\Model\ViewModelRegistry;
 use Hyva\Theme\ViewModel\HyvaCsp;
-use Magento\Framework\Escaper;
 use Magento\Framework\View\Element\Template;
 use RunAsRoot\TypeSense\ViewModel\Frontend\ClientConfigViewModel;
 
 /** @var Template $block */
-/** @var Escaper $escaper */
 /** @var ViewModelRegistry $viewModels */
 
 /** @var ClientConfigViewModel $viewModel */
@@ -29,14 +27,13 @@ if (!$viewModel->isEnabled()) {
 /** @var HyvaCsp $hyvaCsp */
 $hyvaCsp = $viewModels->require(HyvaCsp::class);
 ?>
-<script src="<?= $escaper->escapeUrl($block->getViewFileUrl('RunAsRoot_TypeSense::js/listing-core.js')) ?>" defer></script>
 <script>
     (() => {
         const EVENTS = ['typesense:results', 'typesense:select-item', 'typesense:suggestion-click',
             'typesense:sort-change', 'typesense:filter-change'];
         let tracker = null;
 
-        // Every event source builds its detail with the listing core, so the core is loaded once events arrive.
+        // The event sources (listing, header search) require js/listing-core.phtml, so the core exists once they fire.
         const push = (event) => {
             const listing = window.runAsRootTypesense && window.runAsRootTypesense.listing;
             if (!listing) {

@@ -26,7 +26,6 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
 /** @var LucideIcons $lucideIcons */
 $lucideIcons = $viewModels->require(LucideIcons::class);
 ?>
-<script src="<?= $escaper->escapeUrl($block->getViewFileUrl('RunAsRoot_TypeSense::js/listing-core.js')) ?>" defer></script>
 <script>
     function initTypesenseHeaderSearch() {
         const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;

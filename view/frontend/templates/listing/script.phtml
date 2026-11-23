@@ -8,18 +8,15 @@ declare(strict_types=1);
 
 use Hyva\Theme\Model\ViewModelRegistry;
 use Hyva\Theme\ViewModel\HyvaCsp;
-use Magento\Framework\Escaper;
 use Magento\Framework\View\Element\Template;
 
 /** @var Template $block */
-/** @var Escaper $escaper */
 /** @var ViewModelRegistry $viewModels */
 
 /** @var HyvaCsp $hyvaCsp */
 $hyvaCsp = $viewModels->require(HyvaCsp::class);
 ?>
 <?= $block->getChildHtml() ?>
-<script src="<?= $escaper->escapeUrl($block->getViewFileUrl('RunAsRoot_TypeSense::js/listing-core.js')) ?>" defer></script>
 <script>
     function initTypesenseListing() {
         const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;

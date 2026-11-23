@@ -92,6 +92,7 @@ test('buildAutocompleteSearches sends one multi search with only the configured 
 
     assert.deepEqual(plan.searches[0], {
         query_by: 'name,sku', infix: 'off', collection: 'p', q: 'gin', filter_by: 'visibility:[3,4]', per_page: 4,
+        include_fields: 'id,name,sku,url,image_url,final_price,price,variant_group',
         sort_by: '_text_match:desc', group_by: 'variant_group', group_limit: 1,
     });
     assert.equal(plan.searches[1].enable_synonyms, false);
@@ -102,6 +103,7 @@ test('buildAutocompleteSearches sends one multi search with only the configured 
     assert.deepEqual(plan.searches[4], { collection: 'cms', q: 'gin', query_by: 'title', filter_by: 'is_active:=true', per_page: 2 });
 
     const minimal = core.buildAutocompleteSearches('gin', acConfig({ categoryCollection: null, pageCollection: null, suggestionCollection: null }));
+    assert.equal(minimal.searches[0].include_fields, 'id,name,sku,url,image_url,final_price,price');
     assert.equal(minimal.searches.length, 1);
     assert.equal(minimal.searches[0].group_by, undefined);
     assert.deepEqual(minimal.sources, { products: 0, direct: null, suggestions: null, categories: null, pages: null });
@@ -132,6 +134,7 @@ test('autocompleteResults builds ordered rows with highlights, URLs, prices and 
     const [direct, first] = result.sections.products;
     assert.equal(direct.price, null, 'a price of 0 is never shown');
     assert.equal(direct.hasPrice, false);
+    assert.equal('price' in direct.item, false, 'nor sent to GA4');
     assert.equal(first.price, 20);
     assert.equal(first.hasImage, true);
     assert.equal(first.domId, 'typesense-ac-option-2');
@@ -254,4 +257,18 @@ test('view_item_list is pushed once per listing state and never for empty result
     assert.equal(tracker.events('typesense:results', detail('?color=Red&page=2')).length, 2);
     assert.equal(tracker.events('typesense:results', detail('?color=Red')).length, 2, 'back to an earlier state counts again');
     assert.deepEqual(tracker.events('typesense:results', detail('?q=none', [])), []);
+});
+
+test('autocomplete product searches return only the fields the rows and GA4 items read', () => {
+    const plan = core.buildAutocompleteSearches('gin', acConfig({ directMatchesFirst: true }));
+    const fields = plan.searches[0].include_fields.split(',');
+    const config = acConfig({ categoryCollection: null, pageCollection: null, suggestionCollection: null });
+    const full = { id: '1', name: 'Gin', sku: ['S1'], url: '/gin.html', image_url: '/gin.jpg', final_price: 20, price: 20, description: 'long', children: [{ id: 2 }] };
+    const trimmed = Object.fromEntries(Object.entries(full).filter(([key]) => fields.includes(key)));
+    const rowsOf = doc => core.autocompleteResults([{ found: 1, hits: [{ document: doc }] }], { products: 0, direct: null, suggestions: null, categories: null, pages: null }, 'gin', config).rows;
+
+    assert.deepEqual(rowsOf(trimmed), rowsOf(full));
+    assert.equal(fields.includes('children'), false);
+    assert.equal(fields.includes('description'), false);
+    assert.equal(plan.searches[1].include_fields, plan.searches[0].include_fields);
 });

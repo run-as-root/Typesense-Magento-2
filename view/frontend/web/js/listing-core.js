@@ -736,7 +736,8 @@
             const doc = hitDocument(hit);
             const item = { item_id: String(firstValue(doc.sku) || ''), item_name: String(doc.name || '') };
             const price = hitPrice(doc);
-            if (showPrices && price !== null) {
+            // 0 means no salable price (e.g. a grouped product without buyable children), not a free product.
+            if (showPrices && price !== null && price > 0) {
                 item.price = price;
             }
             item.index = start + i;
@@ -980,6 +981,8 @@
     }
 
     const AUTOCOMPLETE_LIST_NAME = 'search_suggestions';
+    // Everything a product row and its GA4 item read; keystrokes must not fetch children[] or descriptions.
+    const AUTOCOMPLETE_PRODUCT_FIELDS = ['id', 'name', 'sku', 'url', 'image_url', 'final_price', 'price'];
     // Magento's 404 CMS page is indexed like any other page but is no search result.
     const HIDDEN_PAGE_KEYS = ['no-route'];
 
@@ -994,6 +997,7 @@
             q: query,
             filter_by: 'visibility:[3,4]',
             per_page: Number(config.productCount) || 6,
+            include_fields: AUTOCOMPLETE_PRODUCT_FIELDS.concat(config.groupBy ? [config.groupBy] : []).join(','),
         });
         if (config.relevanceSortBy) {
             product.sort_by = config.relevanceSortBy;

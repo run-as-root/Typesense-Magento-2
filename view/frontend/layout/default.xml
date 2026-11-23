@@ -18,6 +18,11 @@
                     <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\ClientConfigViewModel</argument>
                 </arguments>
             </block>
+            <!-- listing-core.js, loaded once; handles that use it set is_required. -->
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.listing.core"
+                   template="RunAsRoot_TypeSense::js/listing-core.phtml"
+                   after="typesense.client.loader"/>
         </referenceContainer>
 
         <referenceContainer name="before.body.end">

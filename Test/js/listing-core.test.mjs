@@ -474,6 +474,17 @@ test('buildFilterBy keeps a lone OR base filter byte-identical so merchandising 
     assert.equal(core.buildFilterBy(base, { color: ['Red'] }, null), '(' + base + ') && color:=[`Red`]');
 });
 
+test('toGa4Items sends a price only when it is above 0', () => {
+    const items = core.toGa4Items([
+        { document: { sku: 'A', name: 'A', final_price: 0 } },
+        { document: { sku: 'B', name: 'B' } },
+        { document: { sku: 'C', name: 'C', final_price: 12.5 } },
+    ], 0, 'Gin');
+
+    assert.deepEqual(items.map(item => item.price), [undefined, undefined, 12.5]);
+    assert.equal('price' in items[0], false);
+});
+
 test('buildItemListJsonLd and toGa4Items leave prices out when prices are hidden', () => {
     const jsonLd = core.buildItemListJsonLd(hits, searchConfig({ showPrices: false }));
 
