@@ -15,6 +15,8 @@ test.describe('Category Page', () => {
   });
 
   test('writes an ItemList JSON-LD from the visible products', async ({ page }) => {
+    // The server renders an empty ItemList; it is filled once the first results are rendered.
+    await expect(categoryPage.tiles.first()).toBeVisible();
     const jsonLd = await page.locator('#typesense-item-list').textContent();
     const itemList = JSON.parse(jsonLd ?? '{}');
 

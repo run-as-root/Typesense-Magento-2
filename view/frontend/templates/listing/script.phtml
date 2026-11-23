@@ -25,6 +25,8 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
         const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
         // Kept out of the reactive data: it only decides which response may still render.
         let sequencer = null;
+        // Inline display values of the SEO text elements hidden on pages after the first.
+        const hiddenSeoText = new Map();
 
         return {
             ...typesenseListingEvents(),
@@ -80,13 +82,13 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             async fetchResults(cause) {
                 const listing = core();
                 const id = sequencer.next();
-                this.cancelSuggested();
                 this.isLoading = true;
-                this.writeHistory(cause);
-                this.dispatchState();
-
-                const searches = listing.buildSearches(this.state, this.config);
+                // Everything that can throw sits inside the try, so loading always ends in results or the error state.
                 try {
+                    this.cancelSuggested();
+                    this.writeHistory(cause);
+                    this.dispatchState();
+                    const searches = listing.buildSearches(this.state, this.config);
                     const client = await window.runAsRootTypesense.getClient();
                     const response = await client.multiSearch.perform({ searches }, this.config.cacheParams);
                     if (!sequencer.isCurrent(id)) {
@@ -180,9 +182,16 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                 if (!selector) {
                     return;
                 }
+                // Inline style, not the hidden attribute: a display utility class on the element would override [hidden].
                 try {
                     document.querySelectorAll(selector).forEach((element) => {
-                        element.hidden = this.state.page > 1;
+                        if (this.state.page > 1 && !hiddenSeoText.has(element)) {
+                            hiddenSeoText.set(element, element.style.display);
+                            element.style.display = 'none';
+                        } else if (this.state.page <= 1 && hiddenSeoText.has(element)) {
+                            element.style.display = hiddenSeoText.get(element);
+                            hiddenSeoText.delete(element);
+                        }
                     });
                 } catch (e) {
                     console.warn('Typesense listing: invalid SEO text selector', selector);

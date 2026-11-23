@@ -25,8 +25,6 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
         const strings = {
             rating: '<?= $escaper->escapeJs(__('Rating: %1 out of 5')) ?>',
             quantityFor: '<?= $escaper->escapeJs(__('Quantity for %1')) ?>',
-            addToWishlist: '<?= $escaper->escapeJs(__('Add to Wish List')) ?>',
-            inWishlist: '<?= $escaper->escapeJs(__('In your Wish List')) ?>',
         };
         // Types whose tile can add one unit directly; others need the product page to choose options.
         const DIRECT_ADD_TYPES = ['simple', 'virtual', 'downloadable'];
@@ -197,8 +195,18 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             isNotWished() {
                 return !this.isWished();
             },
-            wishlistLabel() {
-                return this.isWished() ? strings.inWishlist : strings.addToWishlist;
+            wishlistUrl() {
+                return this.config.wishlistUrl;
+            },
+            isNotAddingToWishlist() {
+                return !this.isAddingToWishlist;
+            },
+            // Visible busy state next to aria-busy; themes can restyle the is-busy class.
+            wishlistButtonClasses() {
+                return this.isAddingToWishlist ? 'is-busy cursor-wait opacity-60' : '';
+            },
+            cartButtonClasses() {
+                return this.isAddingToCart ? 'is-busy cursor-wait opacity-60' : '';
             },
         };
     }

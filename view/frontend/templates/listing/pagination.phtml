@@ -1,7 +1,7 @@
 <?php
 /**
  * Numbered page window with previous/next. Links carry real URLs (built by serializeUrlState) for crawlers and
- * new tabs; a plain click is handled in place.
+ * new tabs; only a plain left click is handled in place.
  */
 
 declare(strict_types=1);
@@ -15,7 +15,8 @@ use Magento\Framework\Escaper;
         <ol class="flex items-center gap-1">
             <li>
                 <a :href="prevPageHref"
-                   @click.prevent="goToPrevPage"
+                   @click="goToPrevPage"
+                   :tabindex="prevPageTabindex"
                    :aria-disabled="isFirstPage"
                    :class="prevPageClasses"
                    class="flex h-10 w-10 items-center justify-center rounded border border-gray-300 hover:bg-gray-100">
@@ -26,7 +27,7 @@ use Magento\Framework\Escaper;
             <template x-for="pageNumber in pages" :key="pageNumber">
                 <li>
                     <a :href="pageHref"
-                       @click.prevent="goToPage"
+                       @click="goToPage"
                        :aria-current="currentPageMarker"
                        :aria-label="pageLabel"
                        :class="pageClasses"
@@ -36,7 +37,8 @@ use Magento\Framework\Escaper;
             </template>
             <li>
                 <a :href="nextPageHref"
-                   @click.prevent="goToNextPage"
+                   @click="goToNextPage"
+                   :tabindex="nextPageTabindex"
                    :aria-disabled="isLastPage"
                    :class="nextPageClasses"
                    class="flex h-10 w-10 items-center justify-center rounded border border-gray-300 hover:bg-gray-100">

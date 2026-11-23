@@ -131,14 +131,33 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
 
                 return window.location.pathname + (core() ? core().serializeUrlState(state, this.config) : '');
             },
+            prevPageTabindex() {
+                return this.isFirstPage() ? '-1' : false;
+            },
+            nextPageTabindex() {
+                return this.isLastPage() ? '-1' : false;
+            },
             goToPage() {
-                this.setPage(this.pageNumber);
+                this.navigateToPage(this.pageNumber, false);
             },
             goToPrevPage() {
-                this.setPage(this.state.page - 1);
+                this.navigateToPage(this.state.page - 1, this.isFirstPage());
             },
             goToNextPage() {
-                this.setPage(this.state.page + 1);
+                this.navigateToPage(this.state.page + 1, this.isLastPage());
+            },
+            // Modified clicks (new tab/window) keep the browser default; a disabled link does nothing.
+            navigateToPage(page, isDisabled) {
+                const event = this.$event;
+                if (!isDisabled && event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0)) {
+                    return;
+                }
+                if (event) {
+                    event.preventDefault();
+                }
+                if (!isDisabled) {
+                    this.setPage(page);
+                }
             },
         };
     }

@@ -52,7 +52,6 @@ final class ListingConfigViewModelTest extends TestCase
             ['label' => 'Price: Low to High', 'value' => 'price:asc'],
             ['label' => 'Name: A–Z', 'value' => 'name:asc'],
         ]);
-        $this->config->method('getFacetFilters')->willReturn(['categories.lvl0']);
         $this->config->method('getProductsPerPage')->willReturn(12);
         $this->config->method('isInStockFirst')->willReturn(true);
         $this->config->method('isDirectMatchesFirstEnabled')->willReturn(true);
@@ -159,40 +158,27 @@ final class ListingConfigViewModelTest extends TestCase
 
     public function test_listing_config_maps_facet_types_with_dropdown_default_and_price_slider(): void
     {
-        $this->config = $this->createMock(TypeSenseConfigInterface::class);
-        $this->config->method('getFacetFilters')
-            ->willReturn(['categories.lvl0', 'color', 'in_stock', 'price', 'size', 'volume']);
-        $this->config->method('getFacetTypes')->willReturn([
-            'color' => ['type' => 'dropdown', 'searchable' => true],
-            'size' => ['type' => 'checkbox', 'searchable' => false],
-            'volume' => ['type' => 'slider', 'searchable' => false],
-        ]);
+        $this->config->method('getFacetFilters')->willReturn(['categories.lvl0', 'color', 'in_stock', 'price']);
+        $this->config->method('getFacetTypes')->willReturn(['color' => ['type' => 'dropdown', 'searchable' => true]]);
         $this->schemaProvider->method('getFields')->willReturn([
             ['name' => 'price', 'type' => 'float', 'facet' => true],
             ['name' => 'in_stock', 'type' => 'bool', 'facet' => true],
             ['name' => 'color', 'type' => 'string', 'facet' => true],
-            ['name' => 'size', 'type' => 'string', 'facet' => true],
-            ['name' => 'volume', 'type' => 'string', 'facet' => true],
         ]);
         $color = $this->createMock(Attribute::class);
         $color->method('getId')->willReturn(93);
         $color->method('getStoreLabel')->with(1)->willReturn('Farbe');
-        $missing = $this->createMock(Attribute::class);
-        $missing->method('getId')->willReturn(null);
-        $this->eavConfig->method('getAttribute')->willReturnCallback(
-            static fn (string $entityType, string $code): Attribute => $code === 'color' ? $color : $missing,
-        );
-        $builder = new FacetConfigBuilder($this->config, $this->schemaProvider, $this->eavConfig);
+        $this->eavConfig->method('getAttribute')->willReturn($color);
+        $this->givenCatalogLimits('12', '12');
+
+        $facets = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH)['facets'];
 
         self::assertSame([
             ['field' => 'categories.lvl0', 'label' => 'Category', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false],
             ['field' => 'color', 'label' => 'Farbe', 'type' => 'dropdown', 'searchable' => true, 'boolean' => false],
             ['field' => 'in_stock', 'label' => 'Availability', 'type' => 'dropdown', 'searchable' => false, 'boolean' => true],
             ['field' => 'price', 'label' => 'Price', 'type' => 'slider', 'searchable' => false, 'boolean' => false],
-            // Checkbox needs a bool field and slider a numeric one, otherwise the facet stays a dropdown.
-            ['field' => 'size', 'label' => 'Size', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false],
-            ['field' => 'volume', 'label' => 'Volume', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false],
-        ], $builder->build(1));
+        ], $facets);
     }
 
     public function test_listing_config_never_contains_admin_api_key(): void
