@@ -1,0 +1,96 @@
+<?php
+/**
+ * Alpine component `typesenseFilterSlider` of listing/filters/slider.phtml.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<script>
+    function initTypesenseFilterSlider() {
+        const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
+        const panelKey = 'price';
+        const wholeAmounts = () => ({ minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+        return {
+            minValue: 0,
+            maxValue: 0,
+
+            bounds() {
+                return this.listing.priceStats || { min: 0, max: 0 };
+            },
+            rangeMin() {
+                return this.bounds().min;
+            },
+            rangeMax() {
+                return this.bounds().max;
+            },
+            // The active price filter, else the full range; re-run whenever the listing state or stats change.
+            syncRange() {
+                const bounds = this.bounds();
+                const price = this.listing.state.price;
+                this.minValue = price ? Math.max(bounds.min, Math.min(Number(price.min), bounds.max)) : bounds.min;
+                this.maxValue = price ? Math.min(bounds.max, Math.max(Number(price.max), bounds.min)) : bounds.max;
+            },
+            isOpen() {
+                return this.isPanelOpen(panelKey);
+            },
+            togglePanelOpen() {
+                this.togglePanel(panelKey);
+            },
+            closeOnOutside() {
+                this.closePanel(panelKey);
+            },
+            chevronClasses() {
+                return this.isOpen() ? 'rotate-180' : '';
+            },
+            facetLabel() {
+                return this.facet.label;
+            },
+            minValueText() {
+                return hyva.formatPrice(this.minValue, false, wholeAmounts());
+            },
+            maxValueText() {
+                return hyva.formatPrice(this.maxValue, false, wholeAmounts());
+            },
+            // The thumbs may meet but not cross; the input is reset when the value is held at the other thumb.
+            onMinRangeInput() {
+                const target = this.$event.target;
+                this.minValue = Math.min(Number(target.value), this.maxValue);
+                target.value = this.minValue;
+            },
+            onMaxRangeInput() {
+                const target = this.$event.target;
+                this.maxValue = Math.max(Number(target.value), this.minValue);
+                target.value = this.maxValue;
+            },
+            onMinNumberChange() {
+                this.minValue = Number(this.$event.target.value);
+                this.applyRange();
+            },
+            onMaxNumberChange() {
+                this.maxValue = Number(this.$event.target.value);
+                this.applyRange();
+            },
+            applyRange() {
+                const range = core() ? core().clampPriceRange(this.minValue, this.maxValue, this.listing.priceStats) : null;
+                const current = this.listing.state.price || null;
+                if (JSON.stringify(range) === JSON.stringify(current)) {
+                    this.syncRange();
+                    return;
+                }
+                this.dispatchFilterChange({ price: range });
+            },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => Alpine.data('typesenseFilterSlider', initTypesenseFilterSlider), { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

@@ -6,15 +6,9 @@
 
 declare(strict_types=1);
 
-use Hyva\Theme\Model\ViewModelRegistry;
-use Hyva\Theme\ViewModel\HyvaCsp;
 use Magento\Framework\Escaper;
 
 /** @var Escaper $escaper */
-/** @var ViewModelRegistry $viewModels */
-
-/** @var HyvaCsp $hyvaCsp */
-$hyvaCsp = $viewModels->require(HyvaCsp::class);
 ?>
 <div x-data="typesensePageSize"
      @typesense-state.window="onListingState"
@@ -33,37 +27,3 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
         <span class="hidden lg:inline" aria-hidden="true"><?= $escaper->escapeHtml(__('per page')) ?></span>
     </div>
 </div>
-<script>
-    function initTypesensePageSize() {
-        return {
-            ...typesenseListingState(),
-
-            init() {
-                this.initListingState();
-            },
-            // Same rule as the listing core: the configured per-page value and the allowed values are accepted.
-            limitOptions() {
-                const values = [Number(this.listingConfig.perPage)].concat((this.listingConfig.limits || []).map(Number));
-
-                return values
-                    .filter((value, index) => Number.isInteger(value) && value > 0 && values.indexOf(value) === index)
-                    .sort((a, b) => a - b);
-            },
-            showPageSize() {
-                return this.showControls() && this.limitOptions().length > 1;
-            },
-            isLimitSelected() {
-                return this.limitOption === Number(this.listing.state.limit);
-            },
-            selectLimit() {
-                const limit = Number(this.$event.target.value);
-                if (limit !== Number(this.listing.state.limit)) {
-                    this.dispatchListingEvent('typesense-limit-change', { limit });
-                }
-            },
-        };
-    }
-
-    window.addEventListener('alpine:init', () => Alpine.data('typesensePageSize', initTypesensePageSize), { once: true });
-</script>
-<?php $hyvaCsp->registerInlineScript() ?>

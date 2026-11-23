@@ -1,4 +1,4 @@
-// Runs the inline Alpine scripts of the filter bar and toolbar templates against stubs (no browser, no Alpine).
+// Runs the Alpine scripts of the filter bar and toolbar components against stubs (no browser, no Alpine).
 // Alpine merges the scopes of nested components and x-for variables; the tests merge them with Object.assign.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,9 +8,9 @@ import vm from 'node:vm';
 
 const moduleRoot = fileURLToPath(new URL('../../', import.meta.url));
 const templates = moduleRoot + 'view/frontend/templates/listing/';
-const scriptFiles = ['script/events.phtml', 'filters/mobile-drawer.phtml', 'filters/bar.phtml', 'filters/dropdown.phtml',
-    'filters/checkbox.phtml', 'filters/slider.phtml', 'filters/active-filters.phtml', 'filters/sorting.phtml',
-    'filters/page-size.phtml'];
+const scriptFiles = ['script/events.phtml', 'script/filters/mobile-drawer.phtml', 'script/filters/bar.phtml',
+    'script/filters/dropdown.phtml', 'script/filters/checkbox.phtml', 'script/filters/slider.phtml',
+    'script/filters/active-filters.phtml', 'script/filters/sorting.phtml', 'script/filters/page-size.phtml'];
 
 function inlineScripts(file) {
     const source = readFileSync(templates + file, 'utf8');

@@ -1,0 +1,75 @@
+<?php
+/**
+ * Mixin of `typesenseFilterBar`: drawer state of listing/filters/mobile-drawer.phtml.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<script>
+    function typesenseFilterDrawer() {
+        const strings = {
+            showItem: '<?= $escaper->escapeJs(__('Show %1 item')) ?>',
+            showItems: '<?= $escaper->escapeJs(__('Show %1 items')) ?>',
+        };
+
+        return {
+            drawerOpen: false,
+
+            openDrawer() {
+                this.drawerOpen = true;
+                document.body.classList.add('overflow-hidden');
+                this.$nextTick(() => hyva.trapFocus(this.$refs.drawer));
+            },
+            closeDrawer() {
+                if (!this.drawerOpen) {
+                    return;
+                }
+                this.resetDrawer();
+                this.$nextTick(() => this.$refs.drawerToggle && this.$refs.drawerToggle.focus());
+            },
+            // Leaving the mobile layout with the drawer open must not keep the page scroll-locked.
+            resetDrawer() {
+                this.drawerOpen = false;
+                document.body.classList.remove('overflow-hidden');
+                hyva.releaseFocus(this.$refs.drawer);
+            },
+            resetFilters() {
+                this.dispatchFilterChange({ clear: true });
+            },
+            // No translate on desktop: a transform would make the row a stacking context below the product grid,
+            // hiding the facet popovers behind the tiles.
+            drawerClasses() {
+                if (this.isDesktop) {
+                    return '';
+                }
+
+                return this.drawerOpen ? 'translate-x-0' : '-translate-x-full';
+            },
+            drawerInert() {
+                return !this.isDesktop && !this.drawerOpen;
+            },
+            drawerRole() {
+                return this.isDesktop ? false : 'dialog';
+            },
+            drawerModal() {
+                return this.isDesktop ? false : 'true';
+            },
+            showItemsText() {
+                const found = Number(this.listing.found) || 0;
+
+                return hyva.str(found === 1 ? strings.showItem : strings.showItems, found);
+            },
+        };
+    }
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

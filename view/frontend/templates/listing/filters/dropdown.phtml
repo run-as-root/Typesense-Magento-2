@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 use Hyva\Theme\Model\ViewModelRegistry;
 use Hyva\Theme\ViewModel\HeroiconsOutline;
-use Hyva\Theme\ViewModel\HyvaCsp;
 use Magento\Framework\Escaper;
 use Magento\Framework\View\Element\Template;
 
@@ -17,8 +16,6 @@ use Magento\Framework\View\Element\Template;
 /** @var Escaper $escaper */
 /** @var ViewModelRegistry $viewModels */
 
-/** @var HyvaCsp $hyvaCsp */
-$hyvaCsp = $viewModels->require(HyvaCsp::class);
 /** @var HeroiconsOutline $heroicons */
 $heroicons = $viewModels->require(HeroiconsOutline::class);
 
@@ -84,105 +81,3 @@ $visibleValues = (int) ($block->getData('visible_values') ?? 5);
         </div>
     </div>
 </template>
-<script>
-    function initTypesenseFilterDropdown() {
-        const strings = {
-            more: '<?= $escaper->escapeJs(__('More')) ?>',
-            less: '<?= $escaper->escapeJs(__('Less')) ?>',
-            search: '<?= $escaper->escapeJs(__('Search %1')) ?>',
-        };
-
-        return {
-            expanded: false,
-            visibleValues: 5,
-
-            init() {
-                this.visibleValues = Number(this.$root.dataset.visibleValues) || 5;
-            },
-            panelKey() {
-                return 'facet:' + this.facet.field;
-            },
-            panelId() {
-                return 'typesense-filter-' + this.facet.field.replace(/[^A-Za-z0-9_-]/g, '-');
-            },
-            isOpen() {
-                return this.isPanelOpen(this.panelKey());
-            },
-            togglePanelOpen() {
-                this.togglePanel(this.panelKey());
-            },
-            closeOnOutside() {
-                this.closePanel(this.panelKey());
-            },
-            chevronClasses() {
-                return this.isOpen() ? 'rotate-180' : '';
-            },
-            facetLabel() {
-                return this.facet.label;
-            },
-            activeCount() {
-                return this.selectedValues(this.facet.field).length;
-            },
-            hasActiveCount() {
-                return this.activeCount() > 0;
-            },
-            options() {
-                return this.facetOptionsFor(this.facet);
-            },
-            visibleOptions() {
-                const options = this.options();
-
-                return this.expanded ? options : options.slice(0, this.visibleValues);
-            },
-            showMoreToggle() {
-                return this.options().length > this.visibleValues;
-            },
-            moreLessText() {
-                return this.expanded ? strings.less : strings.more;
-            },
-            toggleExpanded() {
-                this.expanded = !this.expanded;
-            },
-            showNoValues() {
-                return this.options().length === 0;
-            },
-
-            isSearchable() {
-                return this.facet.searchable === true;
-            },
-            searchPlaceholder() {
-                return hyva.str(strings.search, this.facet.label);
-            },
-            onValueSearch() {
-                this.dispatchFilterChange({ field: this.facet.field, facetQuery: this.$event.target.value.trim() });
-            },
-            // Follows Clear All and back/forward, but never rewrites the field while the shopper types in it.
-            syncValueSearch() {
-                const input = this.$refs.valueSearch;
-                const value = this.facetValueSearch(this.facet.field);
-                if (input && input !== document.activeElement && input.value.trim() !== value) {
-                    input.value = value;
-                }
-            },
-
-            isOptionSelected() {
-                return this.option.selected;
-            },
-            optionLabel() {
-                return this.option.label;
-            },
-            optionCount() {
-                return this.option.count;
-            },
-            hasOptionCount() {
-                return this.option.count !== null;
-            },
-            toggleOption() {
-                this.dispatchFilterChange({ field: this.facet.field, value: this.option.value, action: 'toggle' });
-            },
-        };
-    }
-
-    window.addEventListener('alpine:init', () => Alpine.data('typesenseFilterDropdown', initTypesenseFilterDropdown), { once: true });
-</script>
-<?php $hyvaCsp->registerInlineScript() ?>

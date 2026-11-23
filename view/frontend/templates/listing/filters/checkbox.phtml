@@ -8,7 +8,6 @@ declare(strict_types=1);
 
 use Hyva\Theme\Model\ViewModelRegistry;
 use Hyva\Theme\ViewModel\HeroiconsOutline;
-use Hyva\Theme\ViewModel\HyvaCsp;
 use Magento\Framework\Escaper;
 use Magento\Framework\View\Element\Template;
 
@@ -16,8 +15,6 @@ use Magento\Framework\View\Element\Template;
 /** @var Escaper $escaper */
 /** @var ViewModelRegistry $viewModels */
 
-/** @var HyvaCsp $hyvaCsp */
-$hyvaCsp = $viewModels->require(HyvaCsp::class);
 /** @var HeroiconsOutline $heroicons */
 $heroicons = $viewModels->require(HeroiconsOutline::class);
 
@@ -61,53 +58,3 @@ $groupLabel = (string) ($block->getData('group_label') ?: __('Properties'));
         </template>
     </fieldset>
 </div>
-<script>
-    function initTypesenseFilterCheckbox() {
-        const panelKey = 'checkboxes';
-
-        return {
-            hasCheckboxFacets() {
-                return this.checkboxFacets().length > 0;
-            },
-            isOpen() {
-                return this.isPanelOpen(panelKey);
-            },
-            togglePanelOpen() {
-                this.togglePanel(panelKey);
-            },
-            closeOnOutside() {
-                this.closePanel(panelKey);
-            },
-            chevronClasses() {
-                return this.isOpen() ? 'rotate-180' : '';
-            },
-            activeCount() {
-                return this.checkboxFacets().filter(facet => this.selectedValues(facet.field).includes('true')).length;
-            },
-            hasActiveCount() {
-                return this.activeCount() > 0;
-            },
-            facetLabel() {
-                return this.facet.label;
-            },
-            trueOption() {
-                return this.facetOptionsFor(this.facet).find(option => option.value === 'true') || null;
-            },
-            trueCount() {
-                const option = this.trueOption();
-
-                return option && option.count !== null ? option.count : '';
-            },
-            isFacetChecked() {
-                return this.selectedValues(this.facet.field).includes('true');
-            },
-            // Boolean facets accept only true/false, so the checkbox sends `true`, never a label.
-            toggleFacet() {
-                this.dispatchFilterChange({ field: this.facet.field, value: 'true', action: 'toggle' });
-            },
-        };
-    }
-
-    window.addEventListener('alpine:init', () => Alpine.data('typesenseFilterCheckbox', initTypesenseFilterCheckbox), { once: true });
-</script>
-<?php $hyvaCsp->registerInlineScript() ?>

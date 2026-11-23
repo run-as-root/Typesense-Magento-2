@@ -1,0 +1,84 @@
+<?php
+/**
+ * Alpine component `typesenseActiveFilters` of listing/filters/active-filters.phtml.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<script>
+    function initTypesenseActiveFilters() {
+        const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
+        const strings = {
+            yes: '<?= $escaper->escapeJs(__('Yes')) ?>',
+            no: '<?= $escaper->escapeJs(__('No')) ?>',
+            price: '<?= $escaper->escapeJs(__('Price')) ?>',
+            chip: '<?= $escaper->escapeJs(__('%1: %2')) ?>',
+            remove: '<?= $escaper->escapeJs(__('Remove filter %1')) ?>',
+        };
+        const wholeAmounts = () => ({ minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+        return {
+            ...typesenseListingState(),
+
+            init() {
+                this.initListingState();
+            },
+            activeChips() {
+                const listing = core();
+
+                return listing
+                    ? listing.activeFilterChips(this.listing.state, this.listingConfig, { true: strings.yes, false: strings.no })
+                    : [];
+            },
+            showPriceChip() {
+                return this.listingConfig.showPrices !== false && Boolean(this.listing.state.price);
+            },
+            showActiveFilters() {
+                return this.showPriceChip() || this.activeChips().length > 0;
+            },
+            priceRangeText() {
+                const price = this.listing.state.price || { min: 0, max: 0 };
+
+                return hyva.formatPrice(price.min, false, wholeAmounts()) + ' – '
+                    + hyva.formatPrice(price.max, false, wholeAmounts());
+            },
+            priceChipText() {
+                return hyva.str(strings.chip, strings.price, this.priceRangeText());
+            },
+            removePriceChipLabel() {
+                return hyva.str(strings.remove, this.priceChipText());
+            },
+            removePriceChip() {
+                this.dispatchFilterChange({ price: null });
+            },
+            chipText() {
+                return hyva.str(strings.chip, this.chip.facetLabel, this.chip.valueLabel);
+            },
+            removeChipLabel() {
+                return hyva.str(strings.remove, this.chipText());
+            },
+            removeChip() {
+                this.dispatchFilterChange({ field: this.chip.field, value: this.chip.value, action: 'remove' });
+            },
+            clearAll() {
+                this.dispatchFilterChange({ clear: true });
+            },
+            dispatchFilterChange(detail) {
+                this.dispatchListingEvent('typesense-filter-change', detail);
+            },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => Alpine.data('typesenseActiveFilters', initTypesenseActiveFilters), { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

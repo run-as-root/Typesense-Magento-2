@@ -434,8 +434,10 @@ The search and category listings share the `typesense_listing` handle: one Alpin
 | tile slots | `typesense.listing.tile.{image,badges,wishlist,rating,price,variants,actions}` | `listing/tile/*.phtml` |
 | `no-results` | `typesense.listing.no-results` with its own `tile` tree (`typesense.listing.no-results.tile.*`) | `listing/no-results.phtml` |
 | `pagination` | `typesense.listing.pagination` | `listing/pagination.phtml` |
-| `script` | `typesense.listing.script` (+ `.events`, `.getters`, `.extras`, `.tile`, `.tile.requests`) | `listing/script.phtml`, `listing/script/*.phtml`, `listing/tile/script*.phtml` |
+| `script` | `typesense.listing.script` (+ `.events`, `.getters`, `.extras`, `.filters.*`, `.tile`, `.tile.requests`) | `listing/script.phtml`, `listing/script/*.phtml`, `listing/script/filters/*.phtml`, `listing/tile/script*.phtml` |
 | `json-ld` | `typesense.listing.json-ld` | `listing/json-ld.phtml` (ItemList on category pages) |
+
+The Alpine components of the filters and toolbar slots (`typesenseFilterBar` with its `typesenseFilterDrawer` mixin, `typesenseFilterDropdown`, `typesenseFilterSlider`, `typesenseFilterCheckbox`, `typesenseActiveFilters`, `typesenseSorting`, `typesensePageSize`) live in `listing/script/filters/*.phtml`, rendered by `typesense.listing.script.filters.{bar,drawer,dropdown,slider,checkbox,active-filters,sorting,page-size}` under `typesense.listing.script`. The slot templates under `listing/filters/` are markup-only: a theme can override them with its own markup, or move or remove their blocks, without copying any JavaScript.
 
 The listing block takes `eager_load_images_count` (default 4). `listing-core.js` (`window.runAsRootTypesense.listing`) holds the logic (filters, URL state, facet counts, GA4 items) and is loaded once, deferred in the head, by `typesense.listing.core` on pages whose handle sets its `is_required` argument. Child components read the listing state from the `typesense-state` window event (`typesenseListingState()` mixin) and change it by dispatching `typesense-filter-change`, `typesense-sort-change`, `typesense-limit-change` and `typesense-page-change`.
 
