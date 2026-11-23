@@ -460,6 +460,15 @@ final class TypeSenseConfigTest extends TestCase
         self::assertSame([], $this->sut->getFacetTypes());
     }
 
+    public function test_malformed_serialized_rows_are_treated_as_unset(): void
+    {
+        // A hand-edited or legacy (PHP-serialized) value must not fail every listing and search page.
+        $this->scopeConfig->method('getValue')->willReturn('a:1:{i:0;s:5:"color";}');
+
+        self::assertSame([], $this->sut->getFacetTypes());
+        self::assertSame([], $this->sut->getSearchableAttributes());
+    }
+
     public function test_facet_types_are_keyed_by_attribute_and_skip_incomplete_rows(): void
     {
         $this->scopeConfig->method('getValue')

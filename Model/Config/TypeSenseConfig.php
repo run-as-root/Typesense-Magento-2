@@ -296,8 +296,7 @@ class TypeSenseConfig implements TypeSenseConfigInterface
 
     public function getFacetTypes(?int $storeId = null): array
     {
-        $value = (string) $this->getValue('instant_search/facet_types', $storeId);
-        $rows = $value === '' ? null : $this->serializer->unserialize($value);
+        $rows = $this->getSerializedRows('instant_search/facet_types', $storeId);
 
         if (!is_array($rows)) {
             return [];
@@ -377,8 +376,7 @@ class TypeSenseConfig implements TypeSenseConfigInterface
 
     public function getSearchableAttributes(?int $storeId = null): array
     {
-        $value = (string) $this->getValue('search/searchable_attributes', $storeId);
-        $rows = $value === '' ? null : $this->serializer->unserialize($value);
+        $rows = $this->getSerializedRows('search/searchable_attributes', $storeId);
 
         if (!is_array($rows)) {
             return [];
@@ -554,5 +552,20 @@ class TypeSenseConfig implements TypeSenseConfigInterface
             ScopeInterface::SCOPE_STORE,
             $storeId,
         );
+    }
+
+    // A malformed value (hand-edited, or PHP-serialized from an old install) must not fail every storefront page.
+    private function getSerializedRows(string $path, ?int $storeId): mixed
+    {
+        $value = (string) $this->getValue($path, $storeId);
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return $this->serializer->unserialize($value);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
     }
 }
