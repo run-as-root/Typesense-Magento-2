@@ -85,3 +85,6 @@
 "Tracking","Tracking"
 "Push GA4 Events to the dataLayer","GA4-Events an den dataLayer senden"
 "view_item_list, select_item, search_suggestion_click, sorting_interaction and filter_interaction from the listing and the header search. Leave off when a theme maps the typesense:* window events itself.","view_item_list, select_item, search_suggestion_click, sorting_interaction und filter_interaction aus der Produktliste und der Header-Suche. Ausgeschaltet lassen, wenn ein Theme die typesense:*-Window-Events selbst auswertet."
+"You May Also Like","Das könnte Ihnen auch gefallen"
+"Loading recommendations...","Empfehlungen werden geladen …"
+"No image","Kein Bild"

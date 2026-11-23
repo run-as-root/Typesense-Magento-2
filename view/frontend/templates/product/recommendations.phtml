@@ -1,9 +1,8 @@
 <?php
 /**
- * Typesense Product Recommendations — Hyva CSP-compatible
- *
- * Vector similarity search for "similar products" on PDP.
- * Uses JS DOM rendering for CSP compliance.
+ * "You may also like" slider on the product page: a vector similarity search on the product embeddings.
+ * Alpine CSP components `typesenseRecommendations` and `typesenseRecommendation` (one per tile, reading `item` from
+ * the x-for scope and `config` from the parent).
  */
 
 declare(strict_types=1);
@@ -31,141 +30,142 @@ if (!$product) {
 
 /** @var HyvaCsp $hyvaCsp */
 $hyvaCsp = $viewModels->require(HyvaCsp::class);
-
-$config = $viewModel->getJsonConfig($product);
 ?>
-
 <script>
     function initTypesenseRecommendations() {
-        const config = <?= /* @noEscape */ $config ?>;
+        const SCROLL_STEP = 280;
 
         return {
+            config: {},
             recommendations: [],
             loading: true,
-            error: false,
 
-            init() {
-                this.fetchRecommendations();
-            },
-
-            async fetchRecommendations() {
+            async init() {
+                const configElement = this.$root.querySelector('[data-typesense-recommendations-config]');
+                this.config = JSON.parse(configElement.textContent);
                 try {
                     const client = await window.runAsRootTypesense.getClient();
-                    const result = await client.collections(config.productCollection).documents().search({
+                    const result = await client.collections(this.config.productCollection).documents().search({
                         q: '*',
-                        vector_query: 'embedding:([], id:' + config.productId + ')',
-                        filter_by: 'id:!=' + config.productId + ' && in_stock:true',
-                        per_page: config.limit,
+                        vector_query: 'embedding:([], id:' + this.config.productId + ')',
+                        filter_by: 'id:!=' + this.config.productId + ' && in_stock:true',
+                        per_page: this.config.limit,
                         exclude_fields: 'embedding',
                     });
-
-                    this.recommendations = (result.hits || []).map(h => h.document);
+                    this.recommendations = (result.hits || []).map(hit => hit.document);
                 } catch (e) {
                     console.warn('Typesense recommendations failed:', e);
-                    this.error = true;
                 }
-
                 this.loading = false;
-                this.$nextTick(() => this.renderProducts());
             },
 
-            esc(str) {
-                const div = document.createElement('div');
-                div.textContent = String(str || '');
-                return div.innerHTML;
+            visible() {
+                return this.loading || this.recommendations.length > 0;
             },
-
             slideLeft() {
-                const container = this.$el.querySelector('[data-rec-slider]');
-                if (container) container.scrollBy({ left: -280, behavior: 'smooth' });
+                this.$refs.slider.scrollBy({ left: -SCROLL_STEP, behavior: 'smooth' });
             },
-
             slideRight() {
-                const container = this.$el.querySelector('[data-rec-slider]');
-                if (container) container.scrollBy({ left: 280, behavior: 'smooth' });
+                this.$refs.slider.scrollBy({ left: SCROLL_STEP, behavior: 'smooth' });
             },
+        };
+    }
 
-            renderProducts() {
-                const container = this.$el.querySelector('[data-rec-slider]');
-                const wrapper = this.$el.querySelector('[data-rec-wrapper]');
-                if (!container || !wrapper) return;
-
-                if (this.recommendations.length === 0) {
-                    wrapper.style.display = 'none';
-                    return;
-                }
-
-                let html = '';
-                for (const doc of this.recommendations) {
-                    const price = doc.final_price ? '$' + Number(doc.final_price).toFixed(2) : '';
-                    const regularPrice = doc.regular_price ? '$' + Number(doc.regular_price).toFixed(2) : '';
-                    const hasDiscount = price && doc.regular_price > doc.final_price;
-
-                    const imgHtml = doc.image_url
-                        ? '<img src="' + this.esc(doc.image_url) + '" alt="' + this.esc(doc.name) + '" class="w-full h-full object-contain" loading="lazy"/>'
-                        : '<div class="w-full h-full bg-gray-100 flex items-center justify-center"><span class="text-gray-300 text-xs">No image</span></div>';
-
-                    let priceHtml = '';
-                    if (hasDiscount) {
-                        priceHtml = '<span class="text-sm font-bold text-red-600">' + this.esc(price) + '</span>'
-                            + ' <span class="text-xs text-gray-400 line-through">' + this.esc(regularPrice) + '</span>';
-                    } else {
-                        priceHtml = '<span class="text-sm font-bold text-gray-800">' + this.esc(price) + '</span>';
-                    }
-
-                    html += '<div class="flex-shrink-0 w-56 snap-start">'
-                        + '<a href="' + this.esc(doc.url) + '" class="block border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow h-full flex flex-col">'
-                        + '<div class="aspect-square mb-3 overflow-hidden rounded">' + imgHtml + '</div>'
-                        + '<h3 class="text-sm font-medium text-gray-800 mb-1 line-clamp-2">' + this.esc(doc.name) + '</h3>'
-                        + '<div class="mt-auto pt-2">' + priceHtml + '</div>'
-                        + '</a></div>';
-                }
-
-                container.innerHTML = html;
-
-                // Bind arrow buttons
-                const leftBtn = this.$el.querySelector('[data-rec-left]');
-                const rightBtn = this.$el.querySelector('[data-rec-right]');
-                if (leftBtn) leftBtn.addEventListener('click', () => this.slideLeft());
-                if (rightBtn) rightBtn.addEventListener('click', () => this.slideRight());
+    function initTypesenseRecommendation() {
+        return {
+            doc() {
+                return this.item || {};
+            },
+            url() {
+                return this.doc().url || '#';
+            },
+            name() {
+                return this.doc().name || '';
+            },
+            hasImage() {
+                return Boolean(this.doc().image_url);
+            },
+            hasNoImage() {
+                return !this.hasImage();
+            },
+            imageUrl() {
+                return this.doc().image_url || null;
+            },
+            // A price of 0 means no salable price: never show it.
+            showPrice() {
+                return this.config.showPrices !== false && Number(this.doc().final_price) > 0;
+            },
+            finalPriceText() {
+                return hyva.formatPrice(Number(this.doc().final_price) || 0);
+            },
+            showRegularPrice() {
+                return this.showPrice() && Number(this.doc().regular_price) > Number(this.doc().final_price);
+            },
+            regularPriceText() {
+                return hyva.formatPrice(Number(this.doc().regular_price) || 0);
+            },
+            finalPriceClass() {
+                return this.showRegularPrice() ? 'text-red-600' : 'text-gray-800';
             },
         };
     }
 
     window.addEventListener('alpine:init', () => {
         Alpine.data('initTypesenseRecommendations', initTypesenseRecommendations);
+        Alpine.data('initTypesenseRecommendation', initTypesenseRecommendation);
     }, { once: true });
 </script>
 <?php $hyvaCsp->registerInlineScript() ?>
 
-<div x-data="initTypesenseRecommendations" class="mt-12 mb-8" data-rec-wrapper>
+<div x-data="initTypesenseRecommendations" x-show="visible" class="mt-12 mb-8">
+    <script type="application/json" data-typesense-recommendations-config><?= /* @noEscape */ $viewModel->getJsonConfig($product) ?></script>
     <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-semibold text-gray-800">
             <?= $escaper->escapeHtml(__('You May Also Like')) ?>
         </h2>
         <div class="flex gap-2">
-            <button data-rec-left
+            <button type="button" @click="slideLeft"
                     class="p-2 rounded-full border border-gray-300 hover:bg-gray-100 transition-colors cursor-pointer"
                     aria-label="<?= $escaper->escapeHtmlAttr(__('Previous')) ?>">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                 </svg>
             </button>
-            <button data-rec-right
+            <button type="button" @click="slideRight"
                     class="p-2 rounded-full border border-gray-300 hover:bg-gray-100 transition-colors cursor-pointer"
                     aria-label="<?= $escaper->escapeHtmlAttr(__('Next')) ?>">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                 </svg>
             </button>
         </div>
     </div>
 
-    <div data-rec-slider
+    <div x-ref="slider"
          class="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4"
          style="-webkit-overflow-scrolling: touch; scrollbar-width: thin;">
-        <div class="text-center py-8 w-full">
+        <div x-show="loading" class="text-center py-8 w-full">
             <p class="text-gray-400 text-sm"><?= $escaper->escapeHtml(__('Loading recommendations...')) ?></p>
         </div>
+        <template x-for="item in recommendations" :key="item.id">
+            <div x-data="initTypesenseRecommendation" class="flex-shrink-0 w-56 snap-start">
+                <a :href="url"
+                   class="block border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow h-full flex flex-col">
+                    <div class="aspect-square mb-3 overflow-hidden rounded">
+                        <img x-show="hasImage" :src="imageUrl" :alt="name"
+                             class="w-full h-full object-contain" loading="lazy"/>
+                        <div x-show="hasNoImage" class="w-full h-full bg-gray-100 flex items-center justify-center">
+                            <span class="text-gray-300 text-xs"><?= $escaper->escapeHtml(__('No image')) ?></span>
+                        </div>
+                    </div>
+                    <h3 class="text-sm font-medium text-gray-800 mb-1 line-clamp-2" x-text="name"></h3>
+                    <div x-show="showPrice" class="mt-auto pt-2">
+                        <span class="text-sm font-bold" :class="finalPriceClass" x-text="finalPriceText"></span>
+                        <span x-show="showRegularPrice" class="text-xs text-gray-400 line-through"
+                              x-text="regularPriceText"></span>
+                    </div>
+                </a>
+            </div>
+        </template>
     </div>
 </div>

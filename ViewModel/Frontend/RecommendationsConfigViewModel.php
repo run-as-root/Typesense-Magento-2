@@ -10,6 +10,10 @@ use Magento\Store\Model\StoreManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 
+/**
+ * Configuration of `product/recommendations.phtml`. It holds no connection data: requests go through the shared
+ * client of `js/client-loader.phtml`.
+ */
 class RecommendationsConfigViewModel implements ArgumentInterface
 {
     public function __construct(
@@ -25,7 +29,16 @@ class RecommendationsConfigViewModel implements ArgumentInterface
     }
 
     /**
-     * @return array<string, mixed>
+     * Shops that hide prices (e.g. for guests) change this with an after plugin, as on
+     * ListingConfigViewModel::canShowPrices().
+     */
+    public function canShowPrices(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array{productCollection: string, productId: string, limit: int, showPrices: bool}
      */
     public function getConfig(ProductInterface $product): array
     {
@@ -34,18 +47,18 @@ class RecommendationsConfigViewModel implements ArgumentInterface
         $storeId = (int) $store->getId();
 
         return [
-            'typesenseHost'             => $this->config->getSearchHost(),
-            'typesensePort'             => $this->config->getSearchPort(),
-            'typesenseProtocol'         => $this->config->getSearchProtocol(),
-            'typesenseSearchOnlyApiKey' => $this->config->getSearchOnlyApiKey(),
-            'productCollection'         => $this->collectionNameResolver->resolve('product', $storeCode, $storeId),
-            'productId'                 => (string) $product->getId(),
-            'limit'                     => $this->config->getRecommendationsLimit(),
+            'productCollection' => $this->collectionNameResolver->resolve('product', $storeCode, $storeId),
+            'productId'         => (string) $product->getId(),
+            'limit'             => $this->config->getRecommendationsLimit(),
+            'showPrices'        => $this->canShowPrices(),
         ];
     }
 
     public function getJsonConfig(ProductInterface $product): string
     {
-        return (string) json_encode($this->getConfig($product));
+        return (string) json_encode(
+            $this->getConfig($product),
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
+        );
     }
 }
