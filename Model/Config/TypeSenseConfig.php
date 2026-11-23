@@ -12,6 +12,7 @@ use Magento\Store\Model\ScopeInterface;
 class TypeSenseConfig implements TypeSenseConfigInterface
 {
     private const string CONFIG_PREFIX = 'run_as_root_typesense';
+    private const string DEFAULT_LISTING_IMAGE_ID = 'category_page_grid';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -249,6 +250,13 @@ class TypeSenseConfig implements TypeSenseConfigInterface
     public function isReplaceCategoryPage(?int $storeId = null): bool
     {
         return $this->getFlag('instant_search/replace_category_page', $storeId);
+    }
+
+    public function getListingImageId(?int $storeId = null): string
+    {
+        $value = (string) $this->getValue('instant_search/image_type', $storeId);
+
+        return $value === '' ? self::DEFAULT_LISTING_IMAGE_ID : $value;
     }
 
     // Autocomplete

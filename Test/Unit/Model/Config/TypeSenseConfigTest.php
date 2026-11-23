@@ -398,4 +398,20 @@ final class TypeSenseConfigTest extends TestCase
 
         self::assertTrue($this->sut->isDirectMatchesFirstEnabled(3));
     }
+
+    public function test_get_listing_image_id_returns_configured_value(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->with('run_as_root_typesense/instant_search/image_type', ScopeInterface::SCOPE_STORE, null)
+            ->willReturn('category_page_list');
+
+        self::assertSame('category_page_list', $this->sut->getListingImageId());
+    }
+
+    public function test_get_listing_image_id_falls_back_to_category_page_grid(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertSame('category_page_grid', $this->sut->getListingImageId());
+    }
 }

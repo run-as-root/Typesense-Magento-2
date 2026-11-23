@@ -17,6 +17,7 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
 
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
+        private readonly AttributeResolverInterface $attributeResolver,
     ) {
     }
 
@@ -62,8 +63,11 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'children', 'type' => 'object[]', 'optional' => true, 'index' => false],
         ];
 
-        foreach ($this->config->getAdditionalAttributes() as $attrCode) {
-            $fields[] = ['name' => $attrCode, 'type' => 'string', 'optional' => true, 'facet' => true];
+        $multiselectCodes = $this->attributeResolver->getMultiselectAttributeCodes();
+        $additionalAttributes = $this->config->getAdditionalAttributes();
+        foreach ($additionalAttributes as $attrCode) {
+            $type = in_array($attrCode, $multiselectCodes, true) ? 'string[]' : 'string';
+            $fields[] = ['name' => $attrCode, 'type' => $type, 'optional' => true, 'facet' => true];
         }
 
         // Text representation of categories for embedding

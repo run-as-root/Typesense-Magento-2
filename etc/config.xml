@@ -53,7 +53,7 @@
                 <enabled>1</enabled>
                 <products_per_page>12</products_per_page>
                 <replace_category_page>0</replace_category_page>
-                <image_type>small_image</image_type>
+                <image_type>category_page_grid</image_type>
                 <image_width>300</image_width>
                 <image_height>300</image_height>
                 <tile_attributes/>

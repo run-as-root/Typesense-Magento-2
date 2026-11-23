@@ -14,4 +14,11 @@ interface AttributeResolverInterface
      * @return array<string, mixed>
      */
     public function getExtraAttributes(Product $product): array;
+
+    /**
+     * Configured additional attributes that are indexed as label arrays.
+     *
+     * @return string[]
+     */
+    public function getMultiselectAttributeCodes(): array;
 }

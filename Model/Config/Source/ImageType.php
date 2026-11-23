@@ -11,9 +11,11 @@ class ImageType implements OptionSourceInterface
     public function toOptionArray(): array
     {
         return [
-            ['value' => 'image', 'label' => __('Base Image')],
-            ['value' => 'small_image', 'label' => __('Small Image')],
-            ['value' => 'thumbnail', 'label' => __('Thumbnail')],
+            ['value' => 'category_page_grid', 'label' => __('Category Page Grid')],
+            ['value' => 'category_page_list', 'label' => __('Category Page List')],
+            ['value' => 'product_small_image', 'label' => __('Small Image')],
+            ['value' => 'product_thumbnail_image', 'label' => __('Thumbnail')],
+            ['value' => 'product_base_image', 'label' => __('Base Image')],
         ];
     }
 }
