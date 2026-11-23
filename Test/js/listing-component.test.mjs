@@ -608,3 +608,22 @@ test('isAddedToCart is set for 1.5 s after a successful add and its timer is cle
     assert.equal(adding.isAddedToCart, false);
     assert.equal(timers.size, 0);
 });
+
+test('item numbers cover the current page and are 0 without results', async () => {
+    const env = createEnvironment('?page=2');
+    env.responder = results(30, Array.from({ length: 12 }, (_, i) => hit(i + 1)));
+    const listing = env.listing();
+    listing.init();
+    await settle();
+    assert.deepEqual([listing.firstItemNumber(), listing.lastItemNumber()], [13, 24]);
+
+    env.responder = results(30, Array.from({ length: 6 }, (_, i) => hit(i + 1)));
+    listing.setPage(3);
+    await settle();
+    assert.deepEqual([listing.firstItemNumber(), listing.lastItemNumber()], [25, 30]);
+
+    env.responder = results(0, []);
+    listing.setPage(1);
+    await settle();
+    assert.deepEqual([listing.firstItemNumber(), listing.lastItemNumber()], [0, 0]);
+});

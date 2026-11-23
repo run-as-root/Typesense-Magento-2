@@ -82,10 +82,18 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             hasAiAnswer() {
                 return this.aiAnswer !== '';
             },
+            pageLimit() {
+                return this.currentLimit || Number(this.config.perPage) || 1;
+            },
             totalPages() {
-                const limit = this.currentLimit || Number(this.config.perPage) || 1;
-
-                return Math.max(1, Math.ceil((Number(this.found) || 0) / limit));
+                return Math.max(1, Math.ceil((Number(this.found) || 0) / this.pageLimit()));
+            },
+            // For "Showing %1-%2 of %3"; both are 0 without results.
+            firstItemNumber() {
+                return Number(this.found) > 0 ? (this.state.page - 1) * this.pageLimit() + 1 : 0;
+            },
+            lastItemNumber() {
+                return Number(this.found) > 0 ? (this.state.page - 1) * this.pageLimit() + this.hits.length : 0;
             },
             showPagination() {
                 return this.hasLoaded && this.hits.length > 0 && this.totalPages() > 1;
