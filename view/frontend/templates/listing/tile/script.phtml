@@ -29,12 +29,20 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
         // Types whose tile can add one unit directly; others need the product page to choose options.
         const DIRECT_ADD_TYPES = ['simple', 'virtual', 'downloadable'];
         const FROM_PRICE_TYPES = ['grouped', 'configurable', 'bundle'];
+        // The cart rejects a quantity that is not a multiple of the increment and redirects to the product page.
+        const stepOf = child => (Number(child.qty_increment) > 0 ? Number(child.qty_increment) : 1);
+        const roundToStep = (quantity, child) => {
+            const step = stepOf(child);
+            return quantity > 0 ? Number((Math.ceil(quantity / step - 1e-9) * step).toFixed(4)) : 0;
+        };
 
         return {
             ...typesenseTileRequests(),
             isAddingToCart: false,
             isAddingToWishlist: false,
             childQuantities: {},
+            // iOS Safari can fire the add-to-cart click before the input's change event, so keystrokes are kept here too.
+            typedQuantities: {},
 
             doc() {
                 return (this.item && this.item.document) || {};
@@ -163,15 +171,25 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                 return this.childQuantities[this.child.id] || 0;
             },
             childQtyStep() {
-                return Number(this.child.qty_increment) > 0 ? Number(this.child.qty_increment) : 1;
+                return stepOf(this.child);
             },
-            // The cart rejects a quantity that is not a multiple of the increment and redirects to the product page.
+            recordChildQty() {
+                this.typedQuantities[this.child.id] = hyva.safeParseNumber(this.$event.target.value) || 0;
+            },
             setChildQty() {
-                const typed = hyva.safeParseNumber(this.$event.target.value) || 0;
-                const step = this.childQtyStep();
-                const value = typed > 0 ? Number((Math.ceil(typed / step - 1e-9) * step).toFixed(4)) : 0;
+                const value = roundToStep(hyva.safeParseNumber(this.$event.target.value) || 0, this.child);
+                delete this.typedQuantities[this.child.id];
                 this.$event.target.value = value;
                 this.childQuantities = Object.assign({}, this.childQuantities, { [this.child.id]: value });
+            },
+            cartQuantities() {
+                const quantities = {};
+                const children = this.children();
+                for (const child of children) {
+                    const typed = this.typedQuantities[child.id];
+                    quantities[child.id] = roundToStep(typed !== undefined ? typed : (this.childQuantities[child.id] || 0), child);
+                }
+                return quantities;
             },
             incrementChildQty() {
                 this.changeChildQty(this.childQtyStep());

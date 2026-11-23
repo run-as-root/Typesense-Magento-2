@@ -36,7 +36,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     this.doc().id,
                     hyva.getFormKey(),
                     hyva.getUenc(),
-                    this.isGrouped() ? this.childQuantities : null,
+                    this.isGrouped() ? this.cartQuantities() : null,
                     this.children().map(child => child.id),
                 );
                 if (params === null) {
@@ -65,6 +65,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                         return;
                     }
                     this.childQuantities = {};
+                    this.typedQuantities = {};
                     window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
                 } catch (error) {
                     console.error(error);

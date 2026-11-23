@@ -374,9 +374,31 @@ test('a typed child quantity is rounded up to the next multiple of its quantity 
     assert.deepEqual(type(single, '2.4'), [3, 3]);
 });
 
-test('the child quantity input is normalised on change, not on every keystroke', () => {
+test('the child quantity input is normalised on change and recorded on every keystroke', () => {
     const source = readFileSync(templates + 'tile/variants.phtml', 'utf8');
 
     assert.match(source, /@change="setChildQty"/);
+    assert.match(source, /@input="recordChildQty"/);
     assert.doesNotMatch(source, /@input="setChildQty"/);
+});
+
+test('add to cart sends a typed quantity rounded to its increment even when no change event fired', async () => {
+    const env = createEnvironment();
+    let sent;
+    env.context.fetch = (url, options) => {
+        sent = Object.fromEntries(options.body);
+        return Promise.resolve({ ok: true, redirected: false, json: async () => ({ success: true }) });
+    };
+    const tile = Object.assign(env.context.initTypesenseTile(), {
+        config: listingConfig, wishlistIds: [],
+        item: hit(9, { type_id: 'grouped', children: [{ id: 21, qty_increment: 6 }, { id: 22, qty_increment: 0 }] }),
+    });
+    const [sixPack, single] = tile.variants();
+    Object.assign(tile, { child: sixPack, $event: { target: { value: '7' } } }).recordChildQty();
+    Object.assign(tile, { child: single, $event: { target: { value: '2' } } }).recordChildQty();
+
+    await tile.addToCart();
+
+    assert.equal(sent['super_group[21]'], '12');
+    assert.equal(sent['super_group[22]'], '2');
 });
