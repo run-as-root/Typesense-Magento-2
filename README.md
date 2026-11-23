@@ -441,6 +441,64 @@ The listing block takes `eager_load_images_count` (default 4). `listing-core.js`
 
 URL state uses `q`, `page`, `sort` (e.g. `price:asc`), `limit`, `price` (`min-max`) and one parameter per facet field with values joined by `|`. Unknown keys are dropped, invalid values fall back to the defaults and `page` is clamped to the available pages.
 
+#### Tile API for theme overrides
+
+Every method below is argument-free, so it works with Alpine's CSP build as `x-text="…"`, `x-show="…"` or `@click="…"`. Child methods read `child` from the variants' `x-for` scope, the way `childQty`/`childPriceText` already do. Nothing here is shown by the module's own templates: a theme opts in by binding it.
+
+The tile root (`listing/tile/tile.phtml`, `x-data="typesenseTile"`) reads two optional data attributes in `init()`:
+
+| Attribute | Default | Effect |
+|---|---|---|
+| `data-visible-variants` | all children | How many child rows `visibleVariants()` returns before the rest go into a variants panel |
+| `data-notify-hash-prefix` | `notify-` | Prefix of the stock alert anchor in `notifyUrl()`/`childNotifyUrl()` |
+
+`typesenseTile`:
+
+| Method / state | Returns |
+|---|---|
+| `labels()`, `hasLabels()` | `labels` as strings (`[]` when absent or not an array) |
+| `shortDescription()`, `hasShortDescription()` | `short_description` as trimmed plain text: parsed with `DOMParser` and read as `textContent`, so entities are decoded and markup is never inserted |
+| `stockText()` | `stock_text` when non-empty, else the translated "Out of stock" |
+| `notifyUrl()` | Product URL + `#` + prefix + id of the first child with `in_stock: false`, else of the first child, else of the product |
+| `visibleVariants()`, `hasMoreVariants()` | The first `data-visible-variants` children, and whether there are more |
+| `variantsPanelOpen` (state), `isVariantsPanelOpen()`, `openVariantsPanel()`, `closeVariantsPanel()`, `toggleVariantsPanel()` | Panel state; bind `@keydown.escape.window` and `@click.outside` to `closeVariantsPanel` |
+| `totalQty()`, `hasTotalQty()` | Sum of the quantities that would be sent to the cart (rounded up to each child's `qty_increment`) |
+| `totalPriceText()` | `hyva.formatPrice` of Σ quantity × child `final_price`; `''` when prices are hidden |
+| `showTotal()` | `showPrices` is on and the tile has variants |
+| `isAddedToCart` (state) | `true` for 1.5 s after a successful add to cart; reset when a new add starts |
+| `sizeParts()` (child) | The parts of the child name after the first ` - ` (`"Gin - 0.5 l - 40 %"` → `["0.5 l", "40 %"]`) |
+| `childPanelInputId()` (child) | `childInputId()` + `-panel`, for a panel that repeats the visible rows |
+| `isChildQtyEmpty()` (child) | The child's quantity is 0, e.g. for `:disabled` on a minus button |
+| `hasChildBasePrice()`, `childBasePrice()` (child) | `children[].base_price` as it is; hidden when prices are hidden |
+| `childStockText()` (child) | `children[].stock_text` when non-empty, else "Out of stock" |
+| `childNotifyUrl()` (child) | Product URL + `#` + prefix + child id |
+
+Other components:
+
+| Component | Method / state | Returns |
+|---|---|---|
+| `typesenseListing` | `firstItemNumber()`, `lastItemNumber()` | First and last item number of the current page for "Showing %1-%2 of %3"; both 0 without results |
+| `typesenseSorting` | `selectSort()` | For a native `<select @change="selectSort">`: sends `typesense-sort-change` when the value differs from the current sort |
+| `typesenseActiveFilters` | `priceRangeText()` | The price chip value without the "Price:" label |
+| `typesenseFilterBar` | `filtersExpanded` (state), `toggleFiltersExpanded()`, `isFilterContentVisible()` | A filter block collapsible below `md` and always visible from `md` |
+
+#### Optional document fields
+
+The tile API reads these fields when they exist and falls back to the defaults above when they do not. The module does not index them; a project adds them with after plugins:
+
+| Field | Type | Use |
+|---|---|---|
+| `labels` | `string[]` | Product labels (`labels()`) |
+| `short_description` | `string` | Indexed by the module (tags stripped, entities kept) |
+| `stock_text` | `string` | Out-of-stock text of the product (`stockText()`) |
+| `children[].base_price` | `string` | Preformatted base price per child, e.g. "EUR 20.00 / l" (`childBasePrice()`) |
+| `children[].stock_text` | `string` | Out-of-stock text of a child (`childStockText()`) |
+
+- `RunAsRoot\TypeSense\Model\Indexer\Product\ProductDataBuilder::build()` (after plugin): add the values to the returned document (it returns `null` for products that are not indexed, leave that as it is). `children` entries are plain arrays, so `base_price`/`stock_text` are added to each entry.
+- `RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProvider::getFields()` (after plugin on `ProductSchemaProviderInterface`): declare top-level fields such as `['name' => 'labels', 'type' => 'string[]', 'optional' => true]` and `['name' => 'stock_text', 'type' => 'string', 'optional' => true, 'index' => false]` (add `'facet' => true` to filter by labels). Fields inside `children` need no declaration: `children` is an unindexed `object[]`. Leave out a field that is already declared (e.g. an additional attribute of the same code), since Typesense rejects duplicate field names.
+
+The module leaves the declaration to the plugin that writes the values, so the schema only holds fields that are actually indexed. Schema changes need a full product reindex.
+
 #### JSON config
 
 Each listing renders its config as JSON in `<script type="application/json" data-typesense-listing-config>` (`ListingConfigViewModel::getJsonConfig()`). Plug the view model to change it.
