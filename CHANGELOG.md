@@ -57,6 +57,7 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- `composer.json` now requires `magento/module-inventory-sales-api` and `magento/module-inventory-configuration-api` (`^1.2`; Mage-OS packages replace them), which the product indexer calls for salable stock and quantity increments.
 - Breaking for customisations: `ProductSchemaProviderInterface` now extends `Api\CollectionSettingsProviderInterface`, so a custom implementation (preference) must add `getCollectionSettings(): array` and return at least `['enable_nested_fields' => true]` for the grouped `children` field. `ProductEntityIndexer` also implements `CollectionSettingsProviderInterface`; other entity indexers may implement it to set collection-level schema options.
 - Breaking for customisations: `ViewModel\Frontend\CategorySearchConfigViewModel` is removed and `InstantSearchConfigViewModel` keeps only `isEnabled()`; the listing configuration comes from `ViewModel\Frontend\ListingConfigViewModel::getConfig('search'|'category')`. `ProductDataBuilder` takes a new `NewProductResolverInterface` constructor argument. `view/frontend/web/css/instant-search.css` and the search page's direct-matches block are removed. Conversational search on the search page now shows its answer above the keyword results; the product grid always comes from the keyword search, so facets and paging stay consistent.
 - `openai-php/client` constraint widened to `^0.19 || ^0.20` (installs that already lock 0.20 can require the module).
