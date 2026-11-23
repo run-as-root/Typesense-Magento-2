@@ -259,6 +259,18 @@ test('view_item_list is pushed once per listing state and never for empty result
     assert.deepEqual(tracker.events('typesense:results', detail('?q=none', [])), []);
 });
 
+test('autocomplete product searches request the configured product fields plus the group-by field', () => {
+    const plan = core.buildAutocompleteSearches('gin', acConfig({
+        productFields: ['id', 'name', 'brand', 'variant_group'], groupBy: 'variant_group', directMatchesFirst: true,
+    }));
+
+    assert.equal(plan.searches[0].include_fields, 'id,name,brand,variant_group');
+    assert.equal(plan.searches[1].include_fields, 'id,name,brand,variant_group');
+
+    const legacy = core.buildAutocompleteSearches('gin', acConfig({ productFields: undefined, groupBy: 'variant_group' }));
+    assert.equal(legacy.searches[0].include_fields, 'id,name,sku,url,image_url,final_price,price,variant_group');
+});
+
 test('autocomplete product searches return only the fields the rows and GA4 items read', () => {
     const plan = core.buildAutocompleteSearches('gin', acConfig({ directMatchesFirst: true }));
     const fields = plan.searches[0].include_fields.split(',');

@@ -177,6 +177,36 @@ final class AutocompleteConfigViewModelTest extends TestCase
         self::assertTrue($result['showPrices']);
     }
 
+    public function test_config_carries_the_product_fields_the_dropdown_reads(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+
+        self::assertSame(
+            ['id', 'name', 'sku', 'url', 'image_url', 'final_price', 'price'],
+            $this->sut->getConfig()['productFields'],
+        );
+    }
+
+    public function test_product_fields_follow_get_product_fields(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $sut = $this->getMockBuilder(AutocompleteConfigViewModel::class)
+            ->setConstructorArgs([
+                $this->config,
+                $this->storeManager,
+                $this->collectionNameResolver,
+                $this->requestParamsBuilder,
+                $this->searchParametersProvider,
+                $this->searchHelper,
+                $this->schemaProvider,
+            ])
+            ->onlyMethods(['getProductFields'])
+            ->getMock();
+        $sut->method('getProductFields')->willReturn(['id', 'name', 'brand']);
+
+        self::assertSame(['id', 'name', 'brand'], $sut->getConfig()['productFields']);
+    }
+
     public function test_search_form_values_come_from_magento_search_settings(): void
     {
         $this->searchHelper->method('getMinQueryLength')->willReturn('2');

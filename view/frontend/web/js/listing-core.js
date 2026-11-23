@@ -997,7 +997,16 @@
 
     const AUTOCOMPLETE_LIST_NAME = 'search_suggestions';
     // Everything a product row and its GA4 item read; keystrokes must not fetch children[] or descriptions.
+    // Fallback for configs without productFields (AutocompleteConfigViewModel::getProductFields()).
     const AUTOCOMPLETE_PRODUCT_FIELDS = ['id', 'name', 'sku', 'url', 'image_url', 'final_price', 'price'];
+
+    function autocompleteProductFields(config) {
+        const fields = Array.isArray(config.productFields) && config.productFields.length > 0
+            ? config.productFields
+            : AUTOCOMPLETE_PRODUCT_FIELDS;
+
+        return config.groupBy && !fields.includes(config.groupBy) ? fields.concat([config.groupBy]) : fields;
+    }
     // Magento's 404 CMS page is indexed like any other page but is no search result.
     const HIDDEN_PAGE_KEYS = ['no-route'];
 
@@ -1012,7 +1021,7 @@
             q: query,
             filter_by: 'visibility:[3,4]',
             per_page: Number(config.productCount) || 6,
-            include_fields: AUTOCOMPLETE_PRODUCT_FIELDS.concat(config.groupBy ? [config.groupBy] : []).join(','),
+            include_fields: autocompleteProductFields(config).join(','),
         });
         if (config.relevanceSortBy) {
             product.sort_by = config.relevanceSortBy;

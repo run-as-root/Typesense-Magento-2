@@ -45,6 +45,17 @@ class AutocompleteConfigViewModel implements ArgumentInterface
         return true;
     }
 
+    /**
+     * Document fields the product searches return (`include_fields`); the group-by field is added in the browser.
+     * A theme whose dropdown shows more fields adds them with an after plugin.
+     *
+     * @return string[]
+     */
+    public function getProductFields(): array
+    {
+        return ['id', 'name', 'sku', 'url', 'image_url', 'final_price', 'price'];
+    }
+
     public function getMinQueryLength(): int
     {
         return max(1, (int) $this->searchHelper->getMinQueryLength());
@@ -106,6 +117,7 @@ class AutocompleteConfigViewModel implements ArgumentInterface
             'groupBy'              => $this->getGroupByField($storeId),
             'highlight'            => $this->config->isHighlightEnabled($storeId),
             'showPrices'           => $this->canShowPrices(),
+            'productFields'        => $this->getProductFields(),
             'requestParams'        => $this->requestParamsBuilder->build(SearchRequestParamsBuilder::CONTEXT_AUTOCOMPLETE, $storeId),
             'directMatchesFirst'   => $this->config->isDirectMatchesFirstEnabled($storeId),
             'cacheParams'          => $this->searchParametersProvider->getCacheParameters($storeId),
