@@ -1,0 +1,103 @@
+<?php
+/**
+ * Mixin of `typesenseListing`: suggested products for empty listings and the optional conversational answer.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<script>
+    function typesenseListingExtras() {
+        const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
+        // Kept out of the reactive data: they only decide which response may still render.
+        let listSequencers = null;
+        const sequencers = () => listSequencers
+            || (listSequencers = { suggested: core().createSequencer(), answer: core().createSequencer() });
+
+        return {
+            cancelSuggested() {
+                sequencers().suggested.next();
+                this.isLoadingSuggested = false;
+            },
+
+            async fetchSuggested() {
+                const listing = core();
+                const categoryId = Number(this.config.noResultsCategoryId);
+                if (!categoryId) {
+                    this.suggestedHits = [];
+                    return;
+                }
+                const id = sequencers().suggested.next();
+                this.isLoadingSuggested = true;
+                const search = Object.assign({}, this.config.requestParams, this.config.cacheParams, {
+                    collection: this.config.productCollection,
+                    q: '*',
+                    filter_by: 'category_ids:=' + categoryId + ' && visibility:[2,4]',
+                    per_page: Number(this.config.perPage) || 12,
+                });
+                const sortBy = listing.buildSortBy(listing.defaultSort(this.config), this.config);
+                if (sortBy !== '') {
+                    search.sort_by = sortBy;
+                }
+                try {
+                    const client = await window.runAsRootTypesense.getClient();
+                    const response = await client.multiSearch.perform({ searches: [search] }, this.config.cacheParams);
+                    const result = (response.results || [])[0];
+                    if (sequencers().suggested.isCurrent(id)) {
+                        this.suggestedHits = listing.prepareHits(result && result.hits, 0);
+                    }
+                } catch (error) {
+                    if (sequencers().suggested.isCurrent(id)) {
+                        this.suggestedHits = [];
+                    }
+                } finally {
+                    if (sequencers().suggested.isCurrent(id)) {
+                        this.isLoadingSuggested = false;
+                    }
+                }
+            },
+
+            // Conversational search (off unless enabled in the admin) adds an answer above the keyword results.
+            async fetchAiAnswer() {
+                const conversational = this.config.conversationalSearch || {};
+                const id = sequencers().answer.next();
+                if (!conversational.enabled || this.state.q.length <= 5 || this.state.page > 1) {
+                    this.aiAnswer = '';
+                    return;
+                }
+                const params = { q: this.state.q, conversation: true, conversation_model_id: conversational.modelId };
+                if (this.conversationId) {
+                    params.conversation_id = this.conversationId;
+                }
+                try {
+                    const client = await window.runAsRootTypesense.getClient();
+                    const response = await client.multiSearch.perform({ searches: [{
+                        collection: this.config.productCollection,
+                        query_by: 'embedding',
+                        exclude_fields: 'embedding',
+                        filter_by: this.config.baseFilter,
+                        per_page: 3,
+                    }] }, params);
+                    if (sequencers().answer.isCurrent(id)) {
+                        this.aiAnswer = (response.conversation && response.conversation.answer) || '';
+                        this.conversationId = (response.conversation && response.conversation.conversation_id) || null;
+                    }
+                } catch (error) {
+                    if (sequencers().answer.isCurrent(id)) {
+                        this.aiAnswer = '';
+                    }
+                }
+            },
+        };
+    }
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

@@ -1,0 +1,25 @@
+<?php
+/**
+ * Stars as two overlaid rows; the filled row is clipped to the rating, so no x-for over a number is needed.
+ */
+
+declare(strict_types=1);
+
+$star = '<path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L10 14.9l-5.2 2.7 1-5.8L1.5 7.7l5.9-.9z"/>';
+?>
+<div x-show="showRating" class="typesense-tile-rating flex items-center gap-1.5 text-xs text-gray-600">
+    <span class="relative inline-block" role="img" :aria-label="ratingLabel">
+        <span class="flex text-gray-300" aria-hidden="true">
+            <?php for ($i = 0; $i < 5; $i++): ?>
+                <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><?= /* @noEscape */ $star ?></svg>
+            <?php endfor; ?>
+        </span>
+        <span class="absolute inset-y-0 left-0 flex overflow-hidden text-yellow-500" :style="ratingStyle" aria-hidden="true">
+            <?php for ($i = 0; $i < 5; $i++): ?>
+                <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><?= /* @noEscape */ $star ?></svg>
+            <?php endfor; ?>
+        </span>
+    </span>
+    <span class="font-semibold" x-text="ratingValueText" aria-hidden="true"></span>
+    <span x-text="reviewCountText"></span>
+</div>

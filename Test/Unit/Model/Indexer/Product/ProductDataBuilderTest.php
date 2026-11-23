@@ -25,6 +25,7 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\CompoundTailExtractor;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\NameDecompounder;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\SplitterProvider;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ImageResolverInterface;
+use RunAsRoot\TypeSense\Model\Indexer\Product\NewProductResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\PriceCalculatorInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductDataBuilder;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\GroupedChildrenResolver;
@@ -50,6 +51,7 @@ final class ProductDataBuilderTest extends TestCase
     private CatalogWordsProvider&MockObject $catalogWordsProvider;
     private NameDecompounder $nameDecompounder;
     private GroupedChildrenResolver $groupedChildrenResolver;
+    private NewProductResolverInterface&MockObject $newProductResolver;
     private ProductDataBuilder $sut;
 
     protected function setUp(): void
@@ -82,6 +84,7 @@ final class ProductDataBuilderTest extends TestCase
         );
 
         $this->groupedChildrenResolver = new GroupedChildrenResolver($this->priceCalculator, $this->salableResolver);
+        $this->newProductResolver = $this->createMock(NewProductResolverInterface::class);
 
         $this->sut = $this->buildSut();
     }
@@ -257,6 +260,21 @@ final class ProductDataBuilderTest extends TestCase
         $this->sut->getProductCollection([], 3);
     }
 
+    public function test_build_marks_product_new_from_news_date_resolver(): void
+    {
+        $product = $this->createProductMock(id: 10);
+        $this->categoryResolver->method('getCategoryData')->willReturn([
+            'categories' => [], 'category_ids' => [],
+            'categories.lvl0' => [], 'categories.lvl1' => [], 'categories.lvl2' => [],
+        ]);
+        $this->attributeResolver->method('getExtraAttributes')->willReturn([]);
+        $this->newProductResolver->expects(self::once())->method('isNew')->with($product, 2)->willReturn(true);
+
+        $document = $this->sut->build($product, 2);
+
+        self::assertTrue($document['is_new']);
+    }
+
     private function buildSut(): ProductDataBuilder
     {
         return new ProductDataBuilder(
@@ -273,6 +291,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->config,
             $this->nameDecompounder,
             $this->groupedChildrenResolver,
+            $this->newProductResolver,
         );
     }
 
@@ -445,6 +464,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->config,
             $this->nameDecompounder,
             $this->groupedChildrenResolver,
+            $this->newProductResolver,
         );
 
         $document = $sut->build($product, 1);
@@ -488,6 +508,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->config,
             $this->nameDecompounder,
             $this->groupedChildrenResolver,
+            $this->newProductResolver,
         );
 
         $document = $sut->build($product, 2);
@@ -531,6 +552,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->config,
             $this->nameDecompounder,
             $this->groupedChildrenResolver,
+            $this->newProductResolver,
         );
 
         $document = $sut->build($product, 2);

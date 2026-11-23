@@ -102,6 +102,21 @@ interface TypeSenseConfigInterface
 
     public function getListingImageId(?int $storeId = null): string;
 
+    public function getListingImageWidth(?int $storeId = null): int;
+
+    public function getListingImageHeight(?int $storeId = null): int;
+
+    public function isInStockFirst(?int $storeId = null): bool;
+
+    /** Category whose products are suggested when a listing has no results; null disables the suggestions. */
+    public function getNoResultsCategoryId(?int $storeId = null): ?int;
+
+    /** CSS selector of the SEO text hidden on listing pages after the first; empty disables it. */
+    public function getSeoTextSelector(?int $storeId = null): string;
+
+    /** @return array<string, array{type: 'dropdown'|'checkbox'|'slider', searchable: bool}> */
+    public function getFacetTypes(?int $storeId = null): array;
+
     public function isAutocompleteEnabled(?int $storeId = null): bool;
 
     public function getAutocompleteProductCount(?int $storeId = null): int;

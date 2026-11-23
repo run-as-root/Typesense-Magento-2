@@ -30,58 +30,23 @@ final class LayoutLoadBeforeTest extends TestCase
         $this->config->method('isEnabled')->willReturn(true);
         $this->config->method('isReplaceCategoryPage')->willReturn(true);
 
-        $layoutUpdate = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['addHandle'])
-            ->getMock();
-        $layoutUpdate->expects(self::once())
-            ->method('addHandle')
-            ->with('typesense_category_search');
-
-        $layout = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['getUpdate'])
-            ->getMock();
-        $layout->method('getUpdate')->willReturn($layoutUpdate);
-
-        $observer = $this->createMock(Observer::class);
-        $observer->method('getData')
-            ->willReturnMap([
-                ['full_action_name', null, 'catalog_category_view'],
-                ['layout', null, $layout],
-            ]);
-
-        $this->sut->execute($observer);
+        $this->sut->execute($this->createObserver('catalog_category_view', ['typesense_category_search']));
     }
 
-    public function test_does_not_add_handle_when_not_on_category_page(): void
+    public function test_does_not_add_handle_when_not_on_a_listing_page(): void
     {
         $this->config->method('isEnabled')->willReturn(true);
         $this->config->method('isReplaceCategoryPage')->willReturn(true);
+        $this->config->method('isInstantSearchEnabled')->willReturn(true);
 
-        $layoutUpdate = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['addHandle'])
-            ->getMock();
-        $layoutUpdate->expects(self::never())
-            ->method('addHandle');
-
-        $layout = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['getUpdate'])
-            ->getMock();
-        $layout->method('getUpdate')->willReturn($layoutUpdate);
-
-        $observer = $this->createMock(Observer::class);
-        $observer->method('getData')
-            ->willReturnMap([
-                ['full_action_name', null, 'cms_index_index'],
-                ['layout', null, $layout],
-            ]);
-
-        $this->sut->execute($observer);
+        $this->sut->execute($this->createObserver('cms_index_index', []));
     }
 
     public function test_does_not_add_handle_when_config_is_disabled(): void
     {
         $this->config->method('isEnabled')->willReturn(false);
         $this->config->method('isReplaceCategoryPage')->willReturn(true);
+        $this->config->method('isInstantSearchEnabled')->willReturn(true);
 
         $observer = $this->createMock(Observer::class);
         $observer->expects(self::never())->method('getData');
@@ -94,10 +59,7 @@ final class LayoutLoadBeforeTest extends TestCase
         $this->config->method('isEnabled')->willReturn(true);
         $this->config->method('isReplaceCategoryPage')->willReturn(false);
 
-        $observer = $this->createMock(Observer::class);
-        $observer->expects(self::never())->method('getData');
-
-        $this->sut->execute($observer);
+        $this->sut->execute($this->createObserver('catalog_category_view', []));
     }
 
     public function test_category_in_page_display_mode_keeps_magento_listing(): void
@@ -108,16 +70,44 @@ final class LayoutLoadBeforeTest extends TestCase
         $category->method('getDisplayMode')->willReturn(Category::DM_PAGE);
         $this->registry->method('registry')->with('current_category')->willReturn($category);
 
+        $this->sut->execute($this->createObserver('catalog_category_view', []));
+    }
+
+    public function test_search_page_gets_typesense_handle_when_instant_search_is_enabled(): void
+    {
+        $this->config->method('isEnabled')->willReturn(true);
+        $this->config->method('isInstantSearchEnabled')->willReturn(true);
+
+        $this->sut->execute($this->createObserver('catalogsearch_result_index', ['typesense_search_result']));
+    }
+
+    public function test_search_page_keeps_magento_results_when_instant_search_is_disabled(): void
+    {
+        $this->config->method('isEnabled')->willReturn(true);
+        $this->config->method('isInstantSearchEnabled')->willReturn(false);
+        $this->config->method('isReplaceCategoryPage')->willReturn(true);
+
+        $this->sut->execute($this->createObserver('catalogsearch_result_index', []));
+    }
+
+    /** @param string[] $expectedHandles */
+    private function createObserver(string $fullActionName, array $expectedHandles): Observer&MockObject
+    {
         $layoutUpdate = $this->getMockBuilder(\stdClass::class)->addMethods(['addHandle'])->getMock();
-        $layoutUpdate->expects(self::never())->method('addHandle');
+        $layoutUpdate->expects(self::exactly(count($expectedHandles)))
+            ->method('addHandle')
+            ->willReturnCallback(static function (string $handle) use ($expectedHandles): void {
+                self::assertContains($handle, $expectedHandles);
+            });
         $layout = $this->getMockBuilder(\stdClass::class)->addMethods(['getUpdate'])->getMock();
         $layout->method('getUpdate')->willReturn($layoutUpdate);
+
         $observer = $this->createMock(Observer::class);
         $observer->method('getData')->willReturnMap([
-            ['full_action_name', null, 'catalog_category_view'],
+            ['full_action_name', null, $fullActionName],
             ['layout', null, $layout],
         ]);
 
-        $this->sut->execute($observer);
+        return $observer;
     }
 }

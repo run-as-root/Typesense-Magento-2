@@ -1,0 +1,26 @@
+<?php
+/**
+ * One product tile (`typesenseTile`), rendered inside the grid's x-for. Slots: image, badges, wishlist, rating,
+ * price, variants, actions. Only the image and the name link to the product, so no button sits inside a link.
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+?>
+<div x-data="typesenseTile" class="typesense-tile relative flex flex-col h-full min-h-80 md:min-h-[26rem]" data-typesense-tile>
+    <div class="relative">
+        <?= $block->getChildHtml('image') ?>
+        <?= $block->getChildHtml('badges') ?>
+        <?= $block->getChildHtml('wishlist') ?>
+    </div>
+    <div class="flex flex-col grow gap-2 pt-3">
+        <?= $block->getChildHtml('rating') ?>
+        <a :href="productUrl" class="typesense-tile-name line-clamp-2 min-h-10 text-sm font-medium text-gray-900 hover:underline" x-text="productName"></a>
+        <?= $block->getChildHtml('price') ?>
+        <?= $block->getChildHtml('variants') ?>
+        <?= $block->getChildHtml('actions') ?>
+    </div>
+</div>

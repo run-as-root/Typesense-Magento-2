@@ -77,8 +77,7 @@
         const base = String(baseFilter || '').trim();
 
         if (base !== '') {
-            // && binds tighter than ||, so an OR in the base filter must not absorb the facet clauses.
-            parts.push(base.includes('||') ? '(' + base + ')' : base);
+            parts.push(base);
         }
 
         const entries = Object.entries(filters || {});
@@ -95,6 +94,12 @@
         const range = excluded.includes('price') ? null : priceRange(price);
         if (range !== null) {
             parts.push('price:[' + range.min + '..' + range.max + ']');
+        }
+
+        // && binds tighter than ||, so an OR in the base filter must not absorb the facet clauses. Alone
+        // it stays untouched: merchandising overrides only apply when filter_by equals their rule exactly.
+        if (base !== '' && parts.length > 1 && base.includes('||')) {
+            parts[0] = '(' + base + ')';
         }
 
         return parts.join(' && ');
@@ -581,15 +586,17 @@
         return Number.isFinite(price) ? price : null;
     }
 
+    // With prices hidden (config.showPrices false) products are listed without offers.
     function buildItemListJsonLd(hits, config) {
         const itemListElement = [];
+        const showPrices = config.showPrices !== false;
 
         for (const hit of hits || []) {
             const doc = hitDocument(hit);
             const sku = firstValue(doc.sku);
             const price = hitPrice(doc);
-            // A product without a positive price is invalid markup (e.g. a grouped product with no salable child).
-            if (!doc.name || !sku || price === null || price <= 0) {
+            // An offer without a positive price is invalid markup (e.g. a grouped product with no salable child).
+            if (!doc.name || !sku || (showPrices && (price === null || price <= 0))) {
                 continue;
             }
 
@@ -600,12 +607,14 @@
             if (doc.image_url) {
                 product.image = String(doc.image_url);
             }
-            product.offers = {
-                '@type': 'Offer',
-                price,
-                priceCurrency: config.currencyCode,
-                availability: doc.in_stock === false ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
-            };
+            if (showPrices) {
+                product.offers = {
+                    '@type': 'Offer',
+                    price,
+                    priceCurrency: config.currencyCode,
+                    availability: doc.in_stock === false ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
+                };
+            }
             const reviewCount = Number(doc.review_count) || 0;
             // Google rejects an AggregateRating with zero reviews.
             if (reviewCount > 0) {
@@ -622,14 +631,14 @@
         return { '@context': 'https://schema.org', '@type': 'ItemList', itemListElement };
     }
 
-    function toGa4Items(hits, offset, listName) {
+    function toGa4Items(hits, offset, listName, showPrices = true) {
         const start = Number(offset) || 0;
 
         return (hits || []).map((hit, i) => {
             const doc = hitDocument(hit);
             const item = { item_id: String(firstValue(doc.sku) || ''), item_name: String(doc.name || '') };
             const price = hitPrice(doc);
-            if (price !== null) {
+            if (showPrices && price !== null) {
                 item.price = price;
             }
             item.index = start + i;
@@ -637,6 +646,62 @@
 
             return item;
         });
+    }
+
+    // Images above the fold load eagerly for LCP; x-for needs one unique key per tile.
+    function prepareHits(hits, eagerCount) {
+        const eager = Math.max(0, Number(eagerCount) || 0);
+        const seen = [];
+        const prepared = [];
+
+        for (const hit of hits || []) {
+            const key = String(hitDocument(hit).id);
+            if (seen.includes(key)) {
+                continue;
+            }
+            seen.push(key);
+            const isEager = prepared.length < eager;
+            prepared.push(Object.assign({}, hit, {
+                _key: key,
+                _loading: isEager ? 'eager' : 'lazy',
+                _priority: isEager ? 'high' : 'auto',
+            }));
+        }
+
+        return prepared;
+    }
+
+    // Core's wishlist section only lists the last few items; a project can add the full product_ids list.
+    function wishlistProductIds(section) {
+        const ids = [].concat((section && section.product_ids) || []);
+        const items = (section && section.items) || [];
+        for (const item of items) {
+            ids.push(item && item.product_id);
+        }
+
+        return valueList(ids);
+    }
+
+    // Grouped products are added per child (super_group[childId]); returns null when no child has a quantity.
+    function buildCartParams(productId, formKey, uenc, childQuantities) {
+        const params = [['product', String(productId)], ['form_key', String(formKey)], ['uenc', String(uenc)]];
+        if (childQuantities === null || childQuantities === undefined) {
+            params.push(['qty', '1']);
+
+            return params;
+        }
+
+        const entries = Object.entries(childQuantities);
+        let selected = 0;
+        for (const [childId, quantity] of entries) {
+            const qty = Number(quantity);
+            if (Number.isInteger(qty) && qty > 0) {
+                params.push(['super_group[' + childId + ']', String(qty)]);
+                selected++;
+            }
+        }
+
+        return selected > 0 ? params : null;
     }
 
     // typesense-js errors carry httpStatus; a failed search inside multi_search comes back as {code, error}.
@@ -686,6 +751,9 @@
         buildItemListJsonLd,
         toGa4Items,
         normalizeError,
+        prepareHits,
+        wishlistProductIds,
+        buildCartParams,
     };
 
     if (typeof window !== 'undefined') {

@@ -267,6 +267,62 @@ class TypeSenseConfig implements TypeSenseConfigInterface
     }
 
     // Autocomplete
+    public function getListingImageWidth(?int $storeId = null): int
+    {
+        return max(0, (int) $this->getValue('instant_search/image_width', $storeId));
+    }
+
+    public function getListingImageHeight(?int $storeId = null): int
+    {
+        return max(0, (int) $this->getValue('instant_search/image_height', $storeId));
+    }
+
+    public function isInStockFirst(?int $storeId = null): bool
+    {
+        return $this->getFlag('instant_search/in_stock_first', $storeId);
+    }
+
+    public function getNoResultsCategoryId(?int $storeId = null): ?int
+    {
+        $categoryId = (int) trim((string) $this->getValue('instant_search/no_results_category_id', $storeId));
+
+        return $categoryId > 0 ? $categoryId : null;
+    }
+
+    public function getSeoTextSelector(?int $storeId = null): string
+    {
+        return trim((string) $this->getValue('instant_search/seo_text_selector', $storeId));
+    }
+
+    public function getFacetTypes(?int $storeId = null): array
+    {
+        $value = (string) $this->getValue('instant_search/facet_types', $storeId);
+        $rows = $value === '' ? null : $this->serializer->unserialize($value);
+
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $types = [];
+        foreach ($rows as $row) {
+            $attribute = is_array($row) ? trim((string) ($row['attribute'] ?? '')) : '';
+            if ($attribute === '') {
+                continue;
+            }
+
+            $types[$attribute] = [
+                'type' => match ($row['type'] ?? '') {
+                    'checkbox' => 'checkbox',
+                    'slider' => 'slider',
+                    default => 'dropdown',
+                },
+                'searchable' => (bool) ($row['searchable'] ?? false),
+            ];
+        }
+
+        return $types;
+    }
+
     public function isAutocompleteEnabled(?int $storeId = null): bool
     {
         return $this->getFlag('autocomplete/enabled', $storeId);

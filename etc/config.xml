@@ -60,6 +60,10 @@
                 <tile_attributes/>
                 <sort_options>relevance,price_asc,price_desc,newest</sort_options>
                 <facet_filters/>
+                <facet_types/>
+                <in_stock_first>1</in_stock_first>
+                <no_results_category_id/>
+                <seo_text_selector>.page-bottom .category-description</seo_text_selector>
             </instant_search>
             <autocomplete>
                 <enabled>1</enabled>

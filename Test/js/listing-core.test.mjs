@@ -468,3 +468,49 @@ test('reorderByDirectMatches keeps its behaviour and the legacy window alias', (
         sandbox.window.runAsRootTypesense.listing.reorderByDirectMatches,
     );
 });
+
+test('buildFilterBy keeps a lone OR base filter byte-identical so merchandising overrides still match', () => {
+    const base = '(category_ids:[3] || color:=`Red`) && visibility:[2,4]';
+
+    assert.equal(core.buildFilterBy(base, {}, null), base);
+    assert.equal(core.buildFilterBy(base, { color: ['Red'] }, null), '(' + base + ') && color:=[`Red`]');
+});
+
+test('buildItemListJsonLd and toGa4Items leave prices out when prices are hidden', () => {
+    const jsonLd = core.buildItemListJsonLd(hits, searchConfig({ showPrices: false }));
+
+    assert.equal(jsonLd.itemListElement.length, 3);
+    for (const element of jsonLd.itemListElement) {
+        assert.equal('offers' in element.item, false);
+    }
+    assert.deepEqual(core.toGa4Items(hits.slice(0, 1), 0, 'Gin', false), [
+        { item_id: 'WB-1', item_name: 'Williams Birne', index: 0, item_list_name: 'Gin' },
+    ]);
+});
+
+test('prepareHits marks the first images eager and keys every hit once', () => {
+    const prepared = core.prepareHits([
+        { document: { id: '1' } }, { document: { id: '2' } }, { document: { id: '1' } }, { document: { id: '3' } },
+    ], 2);
+
+    assert.deepEqual(prepared.map(hit => [hit._key, hit._loading, hit._priority]), [
+        ['1', 'eager', 'high'], ['2', 'eager', 'high'], ['3', 'lazy', 'auto'],
+    ]);
+    assert.deepEqual(core.prepareHits(undefined, 4), []);
+});
+
+test('wishlistProductIds reads product ids from the wishlist customer section', () => {
+    assert.deepEqual(core.wishlistProductIds({ items: [{ product_id: 5 }, { product_id: '7' }, { product_id: 5 }, {}] }), ['5', '7']);
+    assert.deepEqual(core.wishlistProductIds({ product_ids: [9, 10], items: [{ product_id: 5 }] }), ['9', '10', '5']);
+    assert.deepEqual(core.wishlistProductIds(undefined), []);
+});
+
+test('buildCartParams posts qty 1 for a simple tile and super_group for grouped children', () => {
+    assert.deepEqual(core.buildCartParams('42', 'fk', 'uenc', null), [
+        ['product', '42'], ['form_key', 'fk'], ['uenc', 'uenc'], ['qty', '1'],
+    ]);
+    assert.deepEqual(core.buildCartParams('42', 'fk', 'uenc', { 7: 2, 8: 0, 9: '3', 10: -1, 11: 'x' }), [
+        ['product', '42'], ['form_key', 'fk'], ['uenc', 'uenc'], ['super_group[7]', '2'], ['super_group[9]', '3'],
+    ]);
+    assert.equal(core.buildCartParams('42', 'fk', 'uenc', { 7: 0 }), null);
+});

@@ -137,6 +137,15 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertTrue($field['facet']);
     }
 
+    public function test_is_new_is_an_optional_bool_facet_for_the_new_badge(): void
+    {
+        $field = $this->findField($this->sut->getFields(), 'is_new');
+
+        self::assertSame('bool', $field['type']);
+        self::assertTrue($field['facet'] ?? false);
+        self::assertTrue($field['optional'] ?? false);
+    }
+
     public function test_price_is_a_float_facet_for_the_price_slider_stats(): void
     {
         $field = $this->findField($this->sut->getFields(), 'price');
@@ -272,7 +281,7 @@ final class ProductSchemaProviderTest extends TestCase
 
         $coreNames = ['id', 'product_id', 'name', 'sku', 'url', 'image_url', 'price',
             'final_price', 'regular_price', 'description', 'short_description', 'categories', 'category_ids',
-            'categories.lvl0', 'categories.lvl1', 'categories.lvl2', 'in_stock', 'type_id',
+            'categories.lvl0', 'categories.lvl1', 'categories.lvl2', 'in_stock', 'is_new', 'type_id',
             'visibility', 'created_at', 'updated_at', 'sales_count', 'rating_summary', 'review_count',
             'children', 'categories_text'];
 

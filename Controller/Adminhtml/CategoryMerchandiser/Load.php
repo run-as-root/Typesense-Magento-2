@@ -84,7 +84,7 @@ class Load extends Action implements HttpGetActionInterface
         // "category_ids:={$categoryId}" — that hardcoded filter only ever matches statically
         // assigned categories, so the merchandiser browse-grid always showed "No products found"
         // for a virtual category even though the storefront listing (which already goes through
-        // the resolver, see CategorySearchConfigViewModel/CategoryMerchandisingSync) found matches
+        // the resolver, see ListingConfigViewModel/CategoryMerchandisingSync) found matches
         // fine. Mirrors Task 10's identical fix to CategoryMerchandisingSync::sync().
         $searchResult = $client->collections[$collectionName]->documents->search([
             'q'         => '*',

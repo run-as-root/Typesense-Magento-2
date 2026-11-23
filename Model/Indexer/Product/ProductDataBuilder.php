@@ -32,6 +32,7 @@ class ProductDataBuilder
         private readonly TypeSenseConfigInterface $config,
         private readonly NameDecompounder $nameDecompounder,
         private readonly GroupedChildrenResolver $groupedChildrenResolver,
+        private readonly NewProductResolverInterface $newProductResolver,
     ) {
     }
 
@@ -67,6 +68,7 @@ class ProductDataBuilder
             'categories.lvl2' => $categoryData['categories.lvl2'],
             'categories_text' => implode(', ', $categoryData['categories']),
             'in_stock' => $listingData['in_stock'],
+            'is_new' => $this->newProductResolver->isNew($product, $storeId),
             'type_id' => (string) $product->getTypeId(),
             'visibility' => (int) $product->getVisibility(),
             'created_at' => $this->toTimestamp((string) $product->getCreatedAt()),

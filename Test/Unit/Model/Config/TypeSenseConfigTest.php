@@ -430,4 +430,51 @@ final class TypeSenseConfigTest extends TestCase
 
         self::assertSame('category_page_grid', $this->sut->getListingImageId());
     }
+
+    public function test_listing_settings_read_instant_search_group_per_store(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/instant_search/in_stock_first', ScopeInterface::SCOPE_STORE, 2)
+            ->willReturn(true);
+        $this->scopeConfig->method('getValue')->willReturnMap([
+            ['run_as_root_typesense/instant_search/no_results_category_id', ScopeInterface::SCOPE_STORE, 2, ' 17 '],
+            ['run_as_root_typesense/instant_search/seo_text_selector', ScopeInterface::SCOPE_STORE, 2, ' .page-bottom .seo '],
+            ['run_as_root_typesense/instant_search/image_width', ScopeInterface::SCOPE_STORE, 2, '240'],
+            ['run_as_root_typesense/instant_search/image_height', ScopeInterface::SCOPE_STORE, 2, '300'],
+        ]);
+
+        self::assertTrue($this->sut->isInStockFirst(2));
+        self::assertSame(17, $this->sut->getNoResultsCategoryId(2));
+        self::assertSame('.page-bottom .seo', $this->sut->getSeoTextSelector(2));
+        self::assertSame(240, $this->sut->getListingImageWidth(2));
+        self::assertSame(300, $this->sut->getListingImageHeight(2));
+    }
+
+    public function test_empty_listing_settings_disable_trending_products_and_seo_text_hiding(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertNull($this->sut->getNoResultsCategoryId());
+        self::assertSame('', $this->sut->getSeoTextSelector());
+        self::assertSame(0, $this->sut->getListingImageWidth());
+        self::assertSame([], $this->sut->getFacetTypes());
+    }
+
+    public function test_facet_types_are_keyed_by_attribute_and_skip_incomplete_rows(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->with('run_as_root_typesense/instant_search/facet_types', ScopeInterface::SCOPE_STORE, null)
+            ->willReturn(json_encode([
+                '_1' => ['attribute' => 'color', 'type' => 'dropdown', 'searchable' => '1'],
+                '_2' => ['attribute' => 'in_stock', 'type' => 'checkbox', 'searchable' => '0'],
+                '_3' => ['attribute' => '', 'type' => 'slider'],
+                '_4' => ['attribute' => 'size', 'type' => 'bogus'],
+            ]));
+
+        self::assertSame([
+            'color' => ['type' => 'dropdown', 'searchable' => true],
+            'in_stock' => ['type' => 'checkbox', 'searchable' => false],
+            'size' => ['type' => 'dropdown', 'searchable' => false],
+        ], $this->sut->getFacetTypes());
+    }
 }

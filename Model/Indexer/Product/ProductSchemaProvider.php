@@ -54,6 +54,7 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'categories.lvl2', 'type' => 'string[]', 'facet' => true],
             // Typesense sorts bools by default; explicit because listings rely on in_stock:desc (out of stock last).
             ['name' => 'in_stock', 'type' => 'bool', 'facet' => true, 'sort' => true],
+            ['name' => 'is_new', 'type' => 'bool', 'facet' => true, 'optional' => true],
             ['name' => 'type_id', 'type' => 'string', 'facet' => true],
             ['name' => 'visibility', 'type' => 'int32'],
             ['name' => 'created_at', 'type' => 'int64'],

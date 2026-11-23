@@ -2,96 +2,63 @@ import { test, expect } from '@playwright/test';
 import { SearchResultsPage } from '../../pages/frontend/search-results';
 
 test.describe('Search Results Page', () => {
-  let searchPage: SearchResultsPage;
+  test('renders Typesense tiles with image, name link and count', async ({ page }) => {
+    const searchPage = new SearchResultsPage(page);
+    await searchPage.gotoQuery('bag');
 
-  test('searching navigates to search results page', async ({ page }) => {
-    searchPage = new SearchResultsPage(page);
-    await searchPage.goto('bag');
-    expect(page.url()).toContain('/catalogsearch/result/');
     expect(page.url()).toContain('q=bag');
+    await expect(searchPage.skeletons.first()).toBeHidden();
+    const tile = searchPage.tiles.first();
+    await expect(tile.locator('img')).toBeVisible();
+    await expect(tile.locator('a.typesense-tile-name')).not.toBeEmpty();
+    await expect(searchPage.count).toHaveText(/\d+ products?/);
   });
 
-  test('products render with images, names, prices, and view buttons', async ({ page }) => {
-    searchPage = new SearchResultsPage(page);
-    await searchPage.goto('bag');
-    const cards = await searchPage.getProductCards();
-    await expect(cards.first()).toBeVisible();
-    const firstCard = cards.first();
-    await expect(firstCard.locator('img')).toBeVisible();
-    await expect(firstCard.locator('h3')).not.toBeEmpty();
-    await expect(firstCard.locator('a:has-text("View Product")')).toBeVisible();
-  });
+  test('first images load eagerly, the rest lazily', async ({ page }) => {
+    const searchPage = new SearchResultsPage(page);
+    await searchPage.gotoQuery('*');
 
-  test('facet filters appear in sidebar', async ({ page }) => {
-    searchPage = new SearchResultsPage(page);
-    await searchPage.goto('jacket');
-    await expect(searchPage.facets).toBeVisible();
-    expect(await searchPage.facets.locator('h3').count()).toBeGreaterThanOrEqual(1);
-  });
-
-  test('clicking a facet filters results', async ({ page }) => {
-    searchPage = new SearchResultsPage(page);
-    await searchPage.goto('jacket');
-    const statsText = await searchPage.stats.textContent();
-    const firstCheckbox = searchPage.facets.locator('.ts-facet-checkbox').first();
-    if (await firstCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await firstCheckbox.click();
-      await page.waitForTimeout(1500);
-      const newStatsText = await searchPage.stats.textContent();
-      expect(newStatsText).not.toBe(statsText);
+    await expect(searchPage.tiles.nth(0).locator('img')).toHaveAttribute('loading', 'eager');
+    await expect(searchPage.tiles.nth(0).locator('img')).toHaveAttribute('fetchpriority', 'high');
+    if (await searchPage.tiles.count() > 4) {
+      await expect(searchPage.tiles.nth(4).locator('img')).toHaveAttribute('loading', 'lazy');
     }
   });
 
-  test('sort dropdown changes product order', async ({ page }) => {
-    searchPage = new SearchResultsPage(page);
-    await searchPage.goto('shirt');
-    const firstProduct = (await searchPage.getProductCards()).first();
-    await expect(firstProduct).toBeVisible();
-    await searchPage.selectSort('price:asc');
-    const newFirstProduct = (await searchPage.getProductCards()).first();
-    await expect(newFirstProduct).toBeVisible();
+  test('pagination writes the page to the URL and back restores it', async ({ page }) => {
+    const searchPage = new SearchResultsPage(page);
+    await searchPage.gotoQuery('*');
+    test.skip(!(await searchPage.pagination.isVisible()), 'catalog has a single page');
+
+    const firstName = await searchPage.tiles.first().locator('a.typesense-tile-name').textContent();
+    await searchPage.nextButton.click();
+    await expect(page).toHaveURL(/page=2/);
+    await expect(searchPage.tiles.first().locator('a.typesense-tile-name')).not.toHaveText(firstName ?? '');
+
+    await page.goBack();
+    await expect(page).not.toHaveURL(/page=2/);
+    await expect(searchPage.tiles.first().locator('a.typesense-tile-name')).toHaveText(firstName ?? '');
   });
 
-  test('pagination works', async ({ page }) => {
-    searchPage = new SearchResultsPage(page);
-    await searchPage.goto('*');
-    const nextBtn = searchPage.nextButton;
-    if (await nextBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(nextBtn).toBeEnabled();
-      await nextBtn.click();
-      await page.waitForTimeout(1500);
-      await expect(searchPage.pagination.locator('span')).toContainText('2 /');
-    }
-  });
+  test('hostile URL parameters are ignored or clamped', async ({ page }) => {
+    const searchPage = new SearchResultsPage(page);
+    await searchPage.gotoQuery('bag', '&page=999&sort=bogus&color=%3Cscript%3Ewindow.pwned%3D1%3C%2Fscript%3E&utm_x=1');
 
-  test('price range slider filters by price', async ({ page }) => {
-    searchPage = new SearchResultsPage(page);
-    await searchPage.goto('bag');
-    if (await searchPage.priceApplyButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await searchPage.priceSliderMax.fill('100');
-      await searchPage.priceApplyButton.click();
-      await page.waitForTimeout(1500);
-      const stats = await searchPage.stats.textContent();
-      expect(stats).toContain('results found');
-    }
+    await expect(page).not.toHaveURL(/page=999|sort=bogus|utm_x/);
+    expect(await page.evaluate(() => (window as unknown as { pwned?: number }).pwned)).toBeUndefined();
   });
 
   test('no results message for nonsense query', async ({ page }) => {
-    searchPage = new SearchResultsPage(page);
-    await searchPage.goto('xyznonexistent99999');
-    await expect(searchPage.noResults).toBeVisible({ timeout: 5000 });
-  });
+    const searchPage = new SearchResultsPage(page);
+    await searchPage.gotoQuery('xyznonexistent99999');
 
-  test('stats line shows result count and timing', async ({ page }) => {
-    searchPage = new SearchResultsPage(page);
-    await searchPage.goto('bag');
-    const stats = await searchPage.stats.textContent();
-    expect(stats).toMatch(/\d+ results found in \d+ms/);
+    await expect(searchPage.noResults).toContainText('xyznonexistent99999');
   });
 
   test('AI answer box is hidden when conversational search disabled', async ({ page }) => {
-    searchPage = new SearchResultsPage(page);
-    await searchPage.goto('bag');
-    await expect(searchPage.aiAnswerBox).not.toBeVisible();
+    const searchPage = new SearchResultsPage(page);
+    await searchPage.gotoQuery('bag');
+
+    await expect(searchPage.aiAnswerBox).toBeHidden();
   });
 });

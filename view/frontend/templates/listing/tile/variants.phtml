@@ -1,0 +1,32 @@
+<?php
+/**
+ * Grouped products: one row per child with a quantity input; the actions slot posts them as super_group[childId].
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+?>
+<ul x-show="hasVariants" class="typesense-tile-variants flex flex-col gap-1.5 text-sm">
+    <template x-for="child in variants" :key="child.id">
+        <li class="flex items-center justify-between gap-2">
+            <label :for="childInputId" class="min-w-0 flex-1 truncate" x-text="childName"></label>
+            <span x-show="showChildPrice" class="whitespace-nowrap" x-text="childPriceText"></span>
+            <span x-show="isChildOutOfStock" class="whitespace-nowrap text-xs text-gray-500">
+                <?= $escaper->escapeHtml(__('Out of stock')) ?>
+            </span>
+            <input x-show="isChildInStock"
+                   type="number"
+                   min="0"
+                   inputmode="numeric"
+                   :id="childInputId"
+                   :step="childQtyStep"
+                   :value="childQty"
+                   :aria-label="childQtyLabel"
+                   @input="setChildQty"
+                   class="form-input w-16 px-2 py-1 text-center"/>
+        </li>
+    </template>
+</ul>

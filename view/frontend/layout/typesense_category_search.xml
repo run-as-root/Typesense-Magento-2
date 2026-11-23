@@ -1,23 +1,18 @@
 <?xml version="1.0"?>
+<!-- Added by Observer\LayoutLoadBefore on category pages while the module and "Replace Category Pages" are enabled. -->
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       layout="1column"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <update handle="typesense_listing"/>
     <body>
-        <referenceContainer name="content">
-            <block class="Magento\Framework\View\Element\Template"
-                   name="typesense.category.search"
-                   template="RunAsRoot_TypeSense::category/typesense-listing.phtml"
-                   before="-">
-                <arguments>
-                    <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\CategorySearchConfigViewModel</argument>
-                </arguments>
-            </block>
-        </referenceContainer>
+        <referenceBlock name="typesense.listing">
+            <arguments>
+                <argument name="listing_context" xsi:type="string">category</argument>
+            </arguments>
+        </referenceBlock>
 
-        <!-- Remove default Magento product listing and toolbar -->
+        <!-- Magento's product listing, toolbar and layered navigation are replaced by the Typesense listing. -->
         <referenceBlock name="category.products" remove="true"/>
-
-        <!-- Remove layered navigation sidebar (we have our own facets) -->
         <referenceBlock name="catalog.leftnav" remove="true"/>
     </body>
 </page>

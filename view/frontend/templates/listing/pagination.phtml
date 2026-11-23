@@ -1,0 +1,49 @@
+<?php
+/**
+ * Numbered page window with previous/next. Links carry real URLs (built by serializeUrlState) for crawlers and
+ * new tabs; a plain click is handled in place.
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+?>
+<div class="typesense-pagination mt-8 flex min-h-12 justify-center">
+    <nav x-cloak x-show="showPagination" aria-label="<?= $escaper->escapeHtmlAttr(__('Pagination')) ?>">
+        <ol class="flex items-center gap-1">
+            <li>
+                <a :href="prevPageHref"
+                   @click.prevent="goToPrevPage"
+                   :aria-disabled="isFirstPage"
+                   :class="prevPageClasses"
+                   class="flex h-10 w-10 items-center justify-center rounded border border-gray-300 hover:bg-gray-100">
+                    <span class="sr-only"><?= $escaper->escapeHtml(__('Previous')) ?></span>
+                    <span aria-hidden="true">&lsaquo;</span>
+                </a>
+            </li>
+            <template x-for="pageNumber in pages" :key="pageNumber">
+                <li>
+                    <a :href="pageHref"
+                       @click.prevent="goToPage"
+                       :aria-current="currentPageMarker"
+                       :aria-label="pageLabel"
+                       :class="pageClasses"
+                       class="flex h-10 min-w-10 items-center justify-center rounded border border-gray-300 px-2"
+                       x-text="pageNumber"></a>
+                </li>
+            </template>
+            <li>
+                <a :href="nextPageHref"
+                   @click.prevent="goToNextPage"
+                   :aria-disabled="isLastPage"
+                   :class="nextPageClasses"
+                   class="flex h-10 w-10 items-center justify-center rounded border border-gray-300 hover:bg-gray-100">
+                    <span class="sr-only"><?= $escaper->escapeHtml(__('Next')) ?></span>
+                    <span aria-hidden="true">&rsaquo;</span>
+                </a>
+            </li>
+        </ol>
+    </nav>
+</div>

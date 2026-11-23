@@ -1,10 +1,11 @@
 <?xml version="1.0"?>
+<!-- Added by Observer\LayoutLoadBefore on the search page only while the module and instant search are enabled. -->
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       layout="1column"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <update handle="typesense_listing"/>
     <head>
         <title>Search Results</title>
-        <css src="RunAsRoot_TypeSense::css/instant-search.css"/>
     </head>
     <body>
         <referenceBlock name="page.main.title">
@@ -12,28 +13,24 @@
                 <argument translate="true" name="title" xsi:type="string">Search Results</argument>
             </action>
         </referenceBlock>
-        <!-- Remove the default Magento/Hyva search result blocks to avoid duplicate results -->
+        <!-- Magento's own result list and layered navigation are replaced by the Typesense listing. -->
         <referenceBlock name="search.result" remove="true"/>
         <referenceBlock name="catalogsearch.leftnav" remove="true"/>
         <referenceBlock name="search.search_terms_log" remove="true"/>
 
+        <referenceBlock name="typesense.listing">
+            <arguments>
+                <argument name="listing_context" xsi:type="string">search</argument>
+            </arguments>
+        </referenceBlock>
+        <!-- Search result pages are not indexed, so they carry no ItemList. -->
+        <referenceBlock name="typesense.listing.json-ld" remove="true"/>
+
         <referenceContainer name="content">
-            <block class="Magento\Framework\View\Element\Template"
-                   name="typesense.direct.matches.search"
-                   template="RunAsRoot_TypeSense::search/direct-matches.phtml"
-                   before="typesense.instant.search"/>
-            <block class="Magento\Framework\View\Element\Template"
-                   name="typesense.instant.search"
-                   template="RunAsRoot_TypeSense::search/results.phtml"
-                   before="-">
-                <arguments>
-                    <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\InstantSearchConfigViewModel</argument>
-                </arguments>
-            </block>
             <block class="Magento\Framework\View\Element\Template"
                    name="typesense.search.title"
                    template="RunAsRoot_TypeSense::search/title.phtml"
-                   after="typesense.instant.search">
+                   after="typesense.listing">
                 <arguments>
                     <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\InstantSearchConfigViewModel</argument>
                 </arguments>

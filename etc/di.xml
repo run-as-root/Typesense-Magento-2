@@ -47,6 +47,8 @@
 
     <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\ReviewResolverInterface"
                 type="RunAsRoot\TypeSense\Model\Indexer\Product\ReviewResolver"/>
+    <preference for="RunAsRoot\TypeSense\Model\Indexer\Product\NewProductResolverInterface"
+                type="RunAsRoot\TypeSense\Model\Indexer\Product\NewProductResolver"/>
 
     <preference for="RunAsRoot\TypeSense\Model\Indexer\Category\CategorySchemaProviderInterface"
                 type="RunAsRoot\TypeSense\Model\Indexer\Category\CategorySchemaProvider"/>

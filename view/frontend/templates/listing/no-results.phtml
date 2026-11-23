@@ -1,0 +1,55 @@
+<?php
+/**
+ * Empty and error state. Messages depend on the page type (PHP) and on active filters (Alpine); optional
+ * suggested products from the "No Results" category use the child `tile` block tree.
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+/** @var Escaper $escaper */
+
+$isSearch = $block->getParentBlock()?->getData('listing_context') !== 'category';
+?>
+<div x-cloak x-show="showNoResults" class="typesense-no-results w-full">
+    <div class="flex flex-col items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center">
+        <div x-show="hasError" role="alert">
+            <p class="text-lg font-semibold text-gray-900"><?= $escaper->escapeHtml(__('Search is temporarily unavailable')) ?></p>
+            <p class="mt-2 text-sm text-gray-700"><?= $escaper->escapeHtml(__('Please try again in a moment.')) ?></p>
+        </div>
+        <div x-show="showFilteredMessage">
+            <?php if ($isSearch): ?>
+                <p class="text-lg font-semibold text-gray-900" x-text="noFilteredResultsForQueryText"></p>
+                <p class="mt-2 text-sm text-gray-700"><?= $escaper->escapeHtml(__('Please adjust your filters or try a different search term.')) ?></p>
+            <?php else: ?>
+                <p class="text-lg font-semibold text-gray-900"><?= $escaper->escapeHtml(__('No products match the selected filters.')) ?></p>
+                <p class="mt-2 text-sm text-gray-700"><?= $escaper->escapeHtml(__('Please adjust your filters.')) ?></p>
+            <?php endif; ?>
+            <button type="button" @click="clearFilters" class="btn mt-4"><?= $escaper->escapeHtml(__('Clear All Filters')) ?></button>
+        </div>
+        <div x-show="showUnfilteredMessage">
+            <?php if ($isSearch): ?>
+                <p class="text-lg font-semibold text-gray-900" x-text="noResultsForQueryText"></p>
+                <p class="mt-2 text-sm text-gray-700"><?= $escaper->escapeHtml(__('Please check your spelling or try a more general term.')) ?></p>
+                <a href="<?= $escaper->escapeUrl($block->getBaseUrl()) ?>" class="btn btn-primary mt-4"><?= $escaper->escapeHtml(__('Back to the Shop')) ?></a>
+            <?php else: ?>
+                <p class="text-lg font-semibold text-gray-900"><?= $escaper->escapeHtml(__('There are no products in this category yet.')) ?></p>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div x-show="hasSuggestedHits" class="relative mt-8">
+        <div x-show="showSuggestedOverlay" class="absolute inset-0 z-20 bg-white/75" role="status">
+            <span class="sr-only"><?= $escaper->escapeHtml(__('Loading products…')) ?></span>
+        </div>
+        <h2 class="mb-4 text-xl font-bold"><?= $escaper->escapeHtml(__('Discover our popular products')) ?></h2>
+        <div class="grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-3 md:gap-6 xl:grid-cols-4">
+            <template x-for="item in suggestedHits" :key="item._key">
+                <?= $block->getChildHtml('tile') ?>
+            </template>
+        </div>
+    </div>
+</div>

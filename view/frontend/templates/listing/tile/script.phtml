@@ -1,0 +1,208 @@
+<?php
+/**
+ * Alpine component `typesenseTile`, one per product tile. It reads `item` (a prepared hit) from the x-for scope and
+ * the listing's `config` and `wishlistIds` from the parent `typesenseListing`; cart and wishlist requests come from
+ * the `typesenseTileRequests` mixin (child block).
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<?= $block->getChildHtml() ?>
+<script>
+    function initTypesenseTile() {
+        const strings = {
+            rating: '<?= $escaper->escapeJs(__('Rating: %1 out of 5')) ?>',
+            quantityFor: '<?= $escaper->escapeJs(__('Quantity for %1')) ?>',
+            addToWishlist: '<?= $escaper->escapeJs(__('Add to Wish List')) ?>',
+            inWishlist: '<?= $escaper->escapeJs(__('In your Wish List')) ?>',
+        };
+        // Types whose tile can add one unit directly; others need the product page to choose options.
+        const DIRECT_ADD_TYPES = ['simple', 'virtual', 'downloadable'];
+        const FROM_PRICE_TYPES = ['grouped', 'configurable', 'bundle'];
+
+        return {
+            ...typesenseTileRequests(),
+            isAddingToCart: false,
+            isAddingToWishlist: false,
+            childQuantities: {},
+
+            doc() {
+                return (this.item && this.item.document) || {};
+            },
+            children() {
+                return Array.isArray(this.doc().children) ? this.doc().children : [];
+            },
+            formatPrice(value) {
+                return hyva.formatPrice(Number(value) || 0);
+            },
+
+            productUrl() {
+                return this.doc().url || '#';
+            },
+            productName() {
+                return this.doc().name || '';
+            },
+            hasImage() {
+                return Boolean(this.doc().image_url);
+            },
+            hasNoImage() {
+                return !this.hasImage();
+            },
+            imageUrl() {
+                return this.doc().image_url || '';
+            },
+            imageLoading() {
+                return this.item._loading || 'lazy';
+            },
+            imagePriority() {
+                return this.item._priority || 'auto';
+            },
+            imageWidth() {
+                return this.config.imageWidth || false;
+            },
+            imageHeight() {
+                return this.config.imageHeight || false;
+            },
+
+            isNew() {
+                return this.doc().is_new === true;
+            },
+            isInStock() {
+                return this.doc().in_stock !== false;
+            },
+            isOutOfStock() {
+                return !this.isInStock();
+            },
+
+            showRating() {
+                return Boolean(this.config.showRatings) && Number(this.doc().review_count) > 0;
+            },
+            ratingPercent() {
+                return Math.min(100, Math.max(0, Number(this.doc().rating_summary) || 0));
+            },
+            ratingStyle() {
+                return { width: this.ratingPercent() + '%' };
+            },
+            ratingValueText() {
+                const value = Math.round(this.ratingPercent() / 2) / 10;
+                try {
+                    return new Intl.NumberFormat(this.config.locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value);
+                } catch (e) {
+                    return value.toLocaleString();
+                }
+            },
+            ratingLabel() {
+                return hyva.str(strings.rating, this.ratingValueText());
+            },
+            reviewCountText() {
+                return '(' + (Number(this.doc().review_count) || 0) + ')';
+            },
+
+            // A price of 0 means no salable price (e.g. a grouped product without buyable sizes): never show it.
+            showPrice() {
+                return this.config.showPrices !== false && Number(this.doc().final_price) > 0;
+            },
+            finalPriceText() {
+                return this.formatPrice(this.doc().final_price);
+            },
+            showRegularPrice() {
+                return this.showPrice() && Number(this.doc().regular_price) > Number(this.doc().final_price);
+            },
+            regularPriceText() {
+                return this.formatPrice(this.doc().regular_price);
+            },
+            showFromLabel() {
+                return FROM_PRICE_TYPES.includes(this.doc().type_id);
+            },
+
+            isGrouped() {
+                return this.doc().type_id === 'grouped';
+            },
+            hasVariants() {
+                return this.isGrouped() && this.children().length > 0;
+            },
+            variants() {
+                return this.children();
+            },
+            childName() {
+                return this.child.name || '';
+            },
+            childInputId() {
+                return 'typesense-qty-' + this.doc().id + '-' + this.child.id;
+            },
+            childQtyLabel() {
+                return hyva.str(strings.quantityFor, this.child.name || '');
+            },
+            childQty() {
+                return this.childQuantities[this.child.id] || 0;
+            },
+            childQtyStep() {
+                return Number(this.child.qty_increment) > 0 ? Number(this.child.qty_increment) : 1;
+            },
+            setChildQty() {
+                const value = Math.max(0, Math.floor(hyva.safeParseNumber(this.$event.target.value) || 0));
+                this.childQuantities = Object.assign({}, this.childQuantities, { [this.child.id]: value });
+            },
+            incrementChildQty() {
+                this.changeChildQty(this.childQtyStep());
+            },
+            decrementChildQty() {
+                this.changeChildQty(-this.childQtyStep());
+            },
+            changeChildQty(delta) {
+                const value = Math.max(0, this.childQty() + delta);
+                this.childQuantities = Object.assign({}, this.childQuantities, { [this.child.id]: value });
+            },
+            isChildInStock() {
+                return this.child.in_stock !== false;
+            },
+            isChildOutOfStock() {
+                return !this.isChildInStock();
+            },
+            showChildPrice() {
+                return this.config.showPrices !== false && Number(this.child.final_price) > 0;
+            },
+            childPriceText() {
+                return this.formatPrice(this.child.final_price);
+            },
+
+            canAddToCart() {
+                return this.isInStock() && DIRECT_ADD_TYPES.includes(this.doc().type_id);
+            },
+            canAddGroupedToCart() {
+                return this.isInStock() && this.hasVariants();
+            },
+            needsProductPage() {
+                return this.isInStock() && !this.canAddToCart() && !this.canAddGroupedToCart();
+            },
+
+            showWishlist() {
+                return Boolean(this.config.wishlistEnabled);
+            },
+            isWished() {
+                return this.wishlistIds.includes(String(this.doc().id));
+            },
+            isNotWished() {
+                return !this.isWished();
+            },
+            wishlistLabel() {
+                return this.isWished() ? strings.inWishlist : strings.addToWishlist;
+            },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => Alpine.data('typesenseTile', initTypesenseTile), { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

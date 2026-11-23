@@ -1,0 +1,139 @@
+<?php
+/**
+ * Mixin of `typesenseListing`: window event handlers and the state-changing API used by filters, toolbar and themes.
+ * Event details are structured objects, never '-'-joined strings.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<script>
+    function typesenseListingEvents() {
+        const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
+
+        return {
+            onPopState() {
+                if (this.isReady) {
+                    this.state = core().parseUrlState(window.location.search, this.config);
+                    this.fetchResults('popstate');
+                }
+            },
+            onFilterChange() {
+                this.applyFilterChange(this.$event.detail);
+            },
+            onSortChange() {
+                this.setSort((this.$event.detail || {}).sort);
+            },
+            onLimitChange() {
+                this.setLimit((this.$event.detail || {}).limit);
+            },
+            onPageChange() {
+                this.setPage((this.$event.detail || {}).page);
+            },
+            onPrivateContentLoaded() {
+                const data = (this.$event.detail && this.$event.detail.data) || {};
+                if (core()) {
+                    this.wishlistIds = core().wishlistProductIds(data.wishlist);
+                }
+            },
+
+            /**
+             * detail: {clear: true} | {field, value, action: 'toggle'|'add'|'remove'} | {field, values: []}
+             * | {field, facetQuery} | {price: {min, max} | null}. Keys can be combined; clear applies first.
+             * Only configured facet fields are accepted; a facet value search alone keeps the page.
+             */
+            applyFilterChange(detail) {
+                const change = detail || {};
+                if (!this.isReady) {
+                    return;
+                }
+                let filters = Object.assign({}, this.state.filters);
+                let facetQueries = Object.assign({}, this.state.facetQueries);
+                let price = this.state.price;
+                let filtersChanged = false;
+
+                if (change.clear) {
+                    filters = {};
+                    facetQueries = {};
+                    price = null;
+                    filtersChanged = true;
+                }
+                if (this.isFacetField(change.field)) {
+                    const field = change.field;
+                    if (Array.isArray(change.values)) {
+                        filters[field] = change.values.map(String);
+                        filtersChanged = true;
+                    } else if (change.value !== undefined && change.value !== null) {
+                        filters[field] = this.changeValues(filters[field] || [], String(change.value), change.action);
+                        filtersChanged = true;
+                    }
+                    if (!filters[field] || filters[field].length === 0) {
+                        delete filters[field];
+                    }
+                    if (change.facetQuery !== undefined) {
+                        facetQueries[field] = String(change.facetQuery || '');
+                    }
+                }
+                if (change.price !== undefined) {
+                    price = change.price ? { min: Number(change.price.min), max: Number(change.price.max) } : null;
+                    filtersChanged = true;
+                }
+
+                const patch = { filters, facetQueries, price };
+                if (filtersChanged) {
+                    patch.page = 1;
+                }
+                this.updateState(patch, filtersChanged ? 'filter' : 'facet-query');
+            },
+
+            changeValues(values, value, action) {
+                const has = values.includes(value);
+                if (action === 'remove' || (action !== 'add' && has)) {
+                    return values.filter(existing => existing !== value);
+                }
+
+                return has ? values : values.concat(value);
+            },
+
+            isFacetField(field) {
+                return typeof field === 'string'
+                    && (this.config.facets || []).some(facet => facet.field === field && field !== 'price');
+            },
+
+            setSort(sort) {
+                if (this.isReady) {
+                    this.updateState({ sort: String(sort === undefined || sort === null ? '' : sort), page: 1 }, 'sort');
+                }
+            },
+
+            setLimit(limit) {
+                if (this.isReady) {
+                    this.updateState({ limit: Number(limit), page: 1 }, 'limit');
+                }
+            },
+
+            setPage(page) {
+                const value = Number(page);
+                if (!this.isReady || !Number.isInteger(value) || value < 1 || value === this.state.page) {
+                    return;
+                }
+                this.updateState({ page: value }, 'page');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+
+            clearFilters() {
+                this.applyFilterChange({ clear: true });
+            },
+        };
+    }
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

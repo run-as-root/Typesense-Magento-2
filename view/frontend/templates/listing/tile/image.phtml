@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+?>
+<a :href="productUrl" tabindex="-1" class="typesense-tile-image block aspect-square w-full overflow-hidden bg-white">
+    <!-- loading/fetchpriority are bound before src so lazy images do not start loading eagerly. -->
+    <img x-show="hasImage"
+         :loading="imageLoading"
+         :fetchpriority="imagePriority"
+         :src="imageUrl"
+         :alt="productName"
+         :width="imageWidth"
+         :height="imageHeight"
+         decoding="async"
+         class="h-full w-full object-contain"/>
+    <span x-show="hasNoImage" class="block h-full w-full bg-gray-100" aria-hidden="true"></span>
+</a>

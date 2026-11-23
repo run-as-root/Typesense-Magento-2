@@ -1,0 +1,13 @@
+<?php
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+?>
+<div class="typesense-tile-badges absolute left-2 top-2 z-10 flex flex-wrap gap-1 pointer-events-none">
+    <span x-show="isNew" class="rounded bg-white px-2 py-0.5 text-xs font-bold uppercase text-gray-900 shadow-sm">
+        <?= $escaper->escapeHtml(__('New')) ?>
+    </span>
+</div>

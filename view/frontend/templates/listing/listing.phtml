@@ -1,0 +1,52 @@
+<?php
+/**
+ * Root of the Typesense listing (`typesenseListing`). Slots: filters, toolbar, ai-answer, products-count,
+ * loading-overlay, grid, no-results, pagination, script, json-ld.
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+use RunAsRoot\TypeSense\ViewModel\Frontend\ListingConfigViewModel;
+
+/** @var Template $block */
+/** @var Escaper $escaper */
+
+/** @var ListingConfigViewModel $viewModel */
+$viewModel = $block->getData('view_model');
+$context = (string) $block->getData('listing_context');
+if (!$viewModel->isEnabled($context)) {
+    return;
+}
+?>
+<div x-data="typesenseListing"
+     @popstate.window="onPopState"
+     @typesense-filter-change.window="onFilterChange"
+     @typesense-sort-change.window="onSortChange"
+     @typesense-limit-change.window="onLimitChange"
+     @typesense-page-change.window="onPageChange"
+     @private-content-loaded.window="onPrivateContentLoaded"
+     data-eager-images="<?= (int) $block->getData('eager_load_images_count') ?>"
+     data-listing-context="<?= $escaper->escapeHtmlAttr($context) ?>"
+     class="typesense-listing flex flex-col gap-6 lg:flex-row">
+    <script type="application/json" data-typesense-listing-config><?= /* @noEscape */ $viewModel->getJsonConfig($context) ?></script>
+
+    <?= $block->getChildHtml('filters') ?>
+
+    <div class="typesense-listing-main flex-1 min-w-0">
+        <?= $block->getChildHtml('toolbar') ?>
+        <?= $block->getChildHtml('ai-answer') ?>
+        <?= $block->getChildHtml('products-count') ?>
+
+        <div class="relative">
+            <?= $block->getChildHtml('loading-overlay') ?>
+            <?= $block->getChildHtml('grid') ?>
+            <?= $block->getChildHtml('no-results') ?>
+        </div>
+
+        <?= $block->getChildHtml('pagination') ?>
+    </div>
+</div>
+<?= $block->getChildHtml('script') ?>
+<?= $block->getChildHtml('json-ld') ?>
