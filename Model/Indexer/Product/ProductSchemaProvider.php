@@ -41,7 +41,8 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'sku', 'type' => 'string'],
             ['name' => 'url', 'type' => 'string'],
             ['name' => 'image_url', 'type' => 'string'],
-            ['name' => 'price', 'type' => 'float'],
+            // Faceted for the listing price slider's min/max stats.
+            ['name' => 'price', 'type' => 'float', 'facet' => true],
             ['name' => 'final_price', 'type' => 'float'],
             ['name' => 'regular_price', 'type' => 'float'],
             ['name' => 'description', 'type' => 'string', 'optional' => true],
@@ -51,7 +52,7 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
             ['name' => 'categories.lvl1', 'type' => 'string[]', 'facet' => true],
             ['name' => 'categories.lvl2', 'type' => 'string[]', 'facet' => true],
-            // Sortable so listings can put out-of-stock products last (sort_by in_stock:desc).
+            // Typesense sorts bools by default; explicit because listings rely on in_stock:desc (out of stock last).
             ['name' => 'in_stock', 'type' => 'bool', 'facet' => true, 'sort' => true],
             ['name' => 'type_id', 'type' => 'string', 'facet' => true],
             ['name' => 'visibility', 'type' => 'int32'],

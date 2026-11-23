@@ -137,6 +137,14 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertTrue($field['facet']);
     }
 
+    public function test_price_is_a_float_facet_for_the_price_slider_stats(): void
+    {
+        $field = $this->findField($this->sut->getFields(), 'price');
+
+        self::assertSame('float', $field['type']);
+        self::assertTrue($field['facet'] ?? false);
+    }
+
     public function test_in_stock_is_sortable_for_out_of_stock_last_listings(): void
     {
         $field = $this->findField($this->sut->getFields(), 'in_stock');

@@ -11,10 +11,15 @@
     const NETWORK_CODES = ['ECONNABORTED', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT', 'ERR_NETWORK'];
     const NETWORK_MESSAGE = /network|failed to fetch|load failed|could not be loaded|timeout|timed out|aborted/i;
 
+    // A trailing backslash would escape the closing backtick and silently match nothing.
     function quoteValue(value) {
         const text = String(value);
 
-        return text.includes('`') ? null : '`' + text + '`';
+        return text.includes('`') || text.endsWith('\\') ? null : '`' + text + '`';
+    }
+
+    function isBooleanValue(value) {
+        return value === 'true' || value === 'false';
     }
 
     function valueList(values) {
@@ -47,14 +52,16 @@
         return min <= max ? { min, max } : { min: max, max: min };
     }
 
-    function facetClause(field, values) {
-        const list = valueList(values);
+    function facetClause(field, values, isBoolean) {
+        const all = valueList(values);
+        // Typesense answers 400 to any other value on a bool field, which would fail the whole listing.
+        const list = isBoolean ? all.filter(isBooleanValue) : all;
         if (list.length === 0) {
             return null;
         }
 
-        // Typesense rejects quoted values on bool fields; selecting both true and false filters nothing.
-        if (list.every(value => value === 'true' || value === 'false')) {
+        // Bool values must not be quoted; selecting both true and false filters nothing.
+        if (list.every(isBooleanValue)) {
             return list.length === 1 ? field + ':=' + list[0] : null;
         }
 
@@ -63,8 +70,9 @@
         return quoted.length > 0 ? field + ':=[' + quoted.join(',') + ']' : null;
     }
 
-    function buildFilterBy(baseFilter, filters, price, exclude) {
+    function buildFilterBy(baseFilter, filters, price, exclude, booleanFields) {
         const excluded = [].concat(exclude || []);
+        const booleans = [].concat(booleanFields || []);
         const parts = [];
         const base = String(baseFilter || '').trim();
 
@@ -78,7 +86,7 @@
             if (field === 'price' || excluded.includes(field) || !FIELD_NAME.test(field)) {
                 continue;
             }
-            const clause = facetClause(field, values);
+            const clause = facetClause(field, values, booleans.includes(field));
             if (clause !== null) {
                 parts.push(clause);
             }
@@ -96,6 +104,12 @@
         return (config.facets || [])
             .map(facet => (typeof facet === 'string' ? facet : facet && facet.field))
             .filter(field => typeof field === 'string' && FIELD_NAME.test(field));
+    }
+
+    function booleanFacetFields(config) {
+        return (config.facets || [])
+            .filter(facet => facet && typeof facet === 'object' && (facet.type === 'checkbox' || facet.boolean === true))
+            .map(facet => facet.field);
     }
 
     function sortValues(config) {
@@ -211,7 +225,8 @@
         });
         const withFilter = (search, filterBy) => (filterBy === '' ? search : Object.assign(search, { filter_by: filterBy }));
 
-        const mainFilter = buildFilterBy(config.baseFilter, filters, price);
+        const booleans = booleanFacetFields(config);
+        const mainFilter = buildFilterBy(config.baseFilter, filters, price, [], booleans);
         const main = withFilter(Object.assign({}, common, { page, per_page: resolveLimit(state.limit, config) }), mainFilter);
         const sortBy = buildSortBy(state.sort, config);
         if (sortBy !== '') {
@@ -229,30 +244,44 @@
         const rest = [];
         const fields = facetFields(config);
         for (const field of fields) {
-            const active = field === 'price' ? price !== null : valueList(filters[field]).length > 0;
+            const values = valueList(filters[field]);
+            const active = field === 'price'
+                ? price !== null
+                : (booleans.includes(field) ? values.filter(isBooleanValue) : values).length > 0;
             const valueSearch = String(facetQueries[field] || '').trim() !== '';
             (active || valueSearch ? own : rest).push(field);
         }
 
+        const sources = {};
         // Counts for a filtered facet come from a search without its own filter, so its other values stay visible.
         for (const field of own) {
             const search = withFilter(
                 Object.assign({}, common, { per_page: 0, facet_by: field, max_facet_values: maxFacetValues }),
-                buildFilterBy(config.baseFilter, filters, price, [field]),
+                buildFilterBy(config.baseFilter, filters, price, [field], booleans),
             );
             const valueSearch = String(facetQueries[field] || '').trim();
             if (valueSearch !== '') {
                 search.facet_query = field + ':' + valueSearch;
             }
-            searches.push(search);
+            sources[field] = searches.push(search) - 1;
         }
 
         if (rest.length > 0) {
-            searches.push(withFilter(
+            const index = searches.push(withFilter(
                 Object.assign({}, common, { per_page: 0, facet_by: rest.join(','), max_facet_values: maxFacetValues }),
                 mainFilter,
-            ));
+            )) - 1;
+            for (const field of rest) {
+                sources[field] = index;
+            }
         }
+
+        // Non-enumerable, so typesense-js never sends it; key order follows the configured facet order.
+        const facetSources = {};
+        for (const field of fields) {
+            facetSources[field] = sources[field];
+        }
+        Object.defineProperty(searches, 'facetSources', { value: facetSources });
 
         return searches;
     }
@@ -286,7 +315,26 @@
         return result && typeof result.field_name === 'string' ? [result] : [];
     }
 
-    function mergeFacetCounts(results, state) {
+    function sourceEntry(results, searches, field) {
+        const index = searches.facetSources[field];
+        const entries = facetEntries((results || [])[index]);
+
+        return entries.find(facet => facet && facet.field_name === field) || null;
+    }
+
+    function hasFacetSources(searches) {
+        return Boolean(searches && searches.facetSources);
+    }
+
+    // Pass the buildSearches() list to read each facet from the search built for it; without it, a
+    // single-facet result counts as the facet's own disjunctive search.
+    function mergeFacetCounts(results, state, searches) {
+        if (hasFacetSources(searches)) {
+            const fields = Object.keys(searches.facetSources);
+
+            return fields.map(field => sourceEntry(results, searches, field)).filter(facet => facet !== null);
+        }
+
         const active = activeFacets(state || {});
         const merged = new Map();
 
@@ -307,23 +355,27 @@
         return Array.from(merged.values());
     }
 
-    function facetStats(results, field) {
+    function statsOf(facet) {
+        const min = Number(facet && facet.stats && facet.stats.min);
+        const max = Number(facet && facet.stats && facet.stats.max);
+
+        return Number.isFinite(min) && Number.isFinite(max) ? { min: Math.floor(min), max: Math.ceil(max) } : null;
+    }
+
+    function facetStats(results, field, searches) {
+        if (hasFacetSources(searches)) {
+            return Object.keys(searches.facetSources).includes(field) ? statsOf(sourceEntry(results, searches, field)) : null;
+        }
+
         let stats = null;
 
         for (const result of results || []) {
             const entries = facetEntries(result);
             for (const facet of entries) {
-                if (!facet || facet.field_name !== field || !facet.stats) {
-                    continue;
-                }
-                const min = Number(facet.stats.min);
-                const max = Number(facet.stats.max);
-                if (!Number.isFinite(min) || !Number.isFinite(max)) {
-                    continue;
-                }
+                const facetRange = facet && facet.field_name === field ? statsOf(facet) : null;
                 // The facet's own search ignores the active price filter, so it holds the full range.
-                if (stats === null || entries.length === 1) {
-                    stats = { min: Math.floor(min), max: Math.ceil(max) };
+                if (facetRange !== null && (stats === null || entries.length === 1)) {
+                    stats = facetRange;
                 }
             }
         }
@@ -362,6 +414,7 @@
     function parseUrlState(search, config) {
         const state = emptyState(config);
         const fields = facetFields(config).filter(field => field !== 'price');
+        const booleans = booleanFacetFields(config);
         const seen = [];
         const pairs = rawPairs(search);
 
@@ -373,9 +426,10 @@
             seen.push(key);
 
             if (fields.includes(key)) {
+                const accept = booleans.includes(key) ? isBooleanValue : value => quoteValue(value) !== null;
                 // Values are encoded one by one, so a literal | can only be the separator.
                 const values = valueList(rawValue.split('|').map(decode))
-                    .filter(value => !value.includes('`'))
+                    .filter(accept)
                     .slice(0, MAX_VALUES_PER_FACET);
                 if (values.length > 0) {
                     state.filters[key] = values;

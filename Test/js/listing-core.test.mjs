@@ -2,11 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
-const corePath = new URL('../../view/frontend/web/js/listing-core.js', import.meta.url);
-const core = require(corePath.pathname);
+const corePath = fileURLToPath(new URL('../../view/frontend/web/js/listing-core.js', import.meta.url));
+const core = require(corePath);
 
 const EVAL = '_eval([ (color:=`Red`):10, (size:=`L`):5 ])';
 
@@ -49,12 +50,18 @@ test('quoteValue wraps commas, spaces and parentheses and rejects backticks', ()
     assert.equal(core.quoteValue('Gin (Dry) 0,7 l'), '`Gin (Dry) 0,7 l`');
     assert.equal(core.quoteValue('Black-White'), '`Black-White`');
     assert.equal(core.quoteValue('a`b'), null);
+    assert.equal(core.quoteValue('grouped\\'), null);
+    assert.equal(core.quoteValue('a\\b'), '`a\\b`');
 
     assert.equal(
         core.buildFilterBy('visibility:[3,4]', { color: ['Birne, Williams', 'a`b', 'Gin (Dry)'] }, null),
         'visibility:[3,4] && color:=[`Birne, Williams`,`Gin (Dry)`]',
     );
     assert.equal(core.buildFilterBy('visibility:[3,4]', { color: ['x`y'] }, null), 'visibility:[3,4]');
+    assert.equal(
+        core.buildFilterBy('', { type_id: ['grouped\\', 'simple'] }, null),
+        'type_id:=[`simple`]',
+    );
 });
 
 test('buildFilterBy writes booleans unquoted, price as a range and leaves out excluded fields', () => {
@@ -68,6 +75,29 @@ test('buildFilterBy writes booleans unquoted, price as a range and leaves out ex
         'visibility:[3,4] && in_stock:=true');
     assert.equal(core.buildFilterBy('visibility:[3,4]', { 'bad field;': ['x'] }, null), 'visibility:[3,4]');
     assert.equal(core.buildFilterBy('a:=1 || b:=2', {}, { min: 1, max: 2 }), '(a:=1 || b:=2) && price:[1..2]');
+});
+
+test('buildFilterBy accepts only true and false on boolean facets', () => {
+    assert.equal(core.buildFilterBy('', { in_stock: ['true', 'foo'] }, null, [], ['in_stock']), 'in_stock:=true');
+    assert.equal(core.buildFilterBy('', { in_stock: ['false'] }, null, [], ['in_stock']), 'in_stock:=false');
+    assert.equal(core.buildFilterBy('v:=1', { in_stock: ['foo'] }, null, [], ['in_stock']), 'v:=1');
+    assert.equal(core.buildFilterBy('', { in_stock: ['true', 'false'] }, null, [], ['in_stock']), '');
+
+    const searches = core.buildSearches(state({ filters: { in_stock: ['true', 'foo'], size: ['foo'] } }), searchConfig({
+        facets: [
+            { field: 'size', type: 'dropdown' },
+            { field: 'in_stock', type: 'checkbox' },
+            { field: 'is_new', type: 'dropdown', boolean: true },
+        ],
+    }));
+    assert.equal(searches[0].filter_by, 'visibility:[3,4] && in_stock:=true && size:=[`foo`]');
+
+    const onlyHostile = core.buildSearches(state({ filters: { in_stock: ['foo'], is_new: ['1'] } }), searchConfig({
+        facets: [{ field: 'in_stock', type: 'checkbox' }, { field: 'is_new', boolean: true }],
+    }));
+    assert.equal(onlyHostile.length, 2);
+    assert.equal(onlyHostile[0].filter_by, 'visibility:[3,4]');
+    assert.equal(onlyHostile[1].facet_by, 'in_stock,is_new');
 });
 
 test('buildSearches adds disjunctive facet searches with facet_query and search params on both page types', () => {
@@ -106,6 +136,9 @@ test('buildSearches adds disjunctive facet searches with facet_query and search 
     assert.equal(rest.per_page, 0);
     assert.equal(rest.facet_by, 'size,in_stock');
     assert.equal(rest.filter_by, main.filter_by);
+
+    assert.deepEqual(searches.facetSources, { color: 2, size: 4, in_stock: 4, price: 3 });
+    assert.equal(JSON.stringify({ searches }).includes('facetSources'), false);
 
     for (const search of searches) {
         assert.equal(search.query_by, 'name,sku');
@@ -154,6 +187,18 @@ test('mergeFacetCounts prefers each facet own disjunctive counts', () => {
 
     assert.deepEqual(merged.map(facet => facet.field_name).sort(), ['color', 'in_stock', 'size']);
     assert.deepEqual(merged.find(facet => facet.field_name === 'color'), ownColor);
+
+    // With the search list, each facet is read from the search built for it, in configured order,
+    // even when the main search also returns a single facet.
+    const config = searchConfig({ facets: ['color', 'size', 'in_stock'] });
+    const current = state({ q: 'gin', filters: { color: ['Red'] } });
+    const searches = core.buildSearches(current, config);
+    assert.deepEqual(searches.facetSources, { color: 2, size: 3, in_stock: 3 });
+
+    const mapped = core.mergeFacetCounts(results.slice(0, 4), current, searches);
+    assert.deepEqual(mapped, [ownColor, size, inStock]);
+    assert.deepEqual(core.mergeFacetCounts([results[0], results[1], { code: 500, error: 'down' }, results[3]], current, searches),
+        [size, inStock]);
 });
 
 test('facetStats floors min and ceils max', () => {
@@ -165,6 +210,20 @@ test('facetStats floors min and ceils max', () => {
     assert.deepEqual(core.facetStats(results, 'price'), { min: 9, max: 121 });
     assert.equal(core.facetStats(results, 'weight'), null);
     assert.equal(core.facetStats([{ facet_counts: [{ field_name: 'price', counts: [] }] }], 'price'), null);
+
+    const config = searchConfig();
+    const searches = core.buildSearches(state({ q: 'gin', price: { min: 20, max: 30 } }), config);
+    const ownPrice = { field_name: 'price', counts: [], stats: { min: 4.5, max: 99.2 } };
+    const filteredPrice = { field_name: 'price', counts: [], stats: { min: 20, max: 30 } };
+    const mapped = [
+        { facet_counts: [filteredPrice] },
+        { facet_counts: [] },
+        { facet_counts: [ownPrice] },
+        { facet_counts: [] },
+    ];
+    assert.equal(searches.facetSources.price, 2);
+    assert.deepEqual(core.facetStats(mapped, 'price', searches), { min: 4, max: 100 });
+    assert.equal(core.facetStats(mapped, 'weight', searches), null);
 });
 
 test('buildSortBy puts in_stock first and never exceeds three fields', () => {
@@ -228,6 +287,10 @@ test('parseUrlState ignores unknown keys, bad sort, non-numeric and negative pag
     assert.deepEqual(core.parseUrlState('?price=50-10', config).price, { min: 10, max: 50 });
     assert.equal(core.parseUrlState('?price=-5-10', config).price, null);
     assert.equal(core.parseUrlState('?color=%E0%A4%A', config).filters.color, undefined);
+    assert.equal(core.parseUrlState('?color=a%5C', config).filters.color, undefined);
+    assert.equal(core.parseUrlState('?in_stock=foo', config).filters.in_stock, undefined);
+    assert.deepEqual(core.parseUrlState('?in_stock=true|foo', config).filters.in_stock, ['true']);
+    assert.deepEqual(core.parseUrlState('?in_stock=false', config).filters.in_stock, ['false']);
     assert.deepEqual(core.parseUrlState('', config), state());
 });
 
@@ -267,17 +330,27 @@ test('historyAction replaces on initial load and pushes on user change', () => {
 test('sequencer discards a slower earlier response', async () => {
     const sequencer = core.createSequencer();
     const rendered = [];
-    const delay = (ms, value) => new Promise(resolve => setTimeout(() => resolve(value), ms));
+    const deferred = () => {
+        let resolve;
+        const promise = new Promise(done => { resolve = done; });
+        return { promise, resolve };
+    };
 
-    const fetchAndRender = async (ms, value) => {
+    const fetchAndRender = async response => {
         const id = sequencer.next();
-        const result = await delay(ms, value);
+        const result = await response.promise;
         if (sequencer.isCurrent(id)) {
             rendered.push(result);
         }
     };
 
-    await Promise.all([fetchAndRender(30, 'slow, older'), fetchAndRender(5, 'fast, newer')]);
+    const older = deferred();
+    const newer = deferred();
+    const renders = Promise.all([fetchAndRender(older), fetchAndRender(newer)]);
+    newer.resolve('fast, newer');
+    await newer.promise;
+    older.resolve('slow, older');
+    await renders;
 
     assert.deepEqual(rendered, ['fast, newer']);
     const first = sequencer.next();
