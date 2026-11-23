@@ -204,3 +204,55 @@ test('tile buttons show a busy class while their request runs', async () => {
     assert.equal(tile.isWished(), true);
     assert.equal(tile.wishlistUrl(), '/wishlist/');
 });
+
+test('a facet value search requests only that facet and leaves products, overlay and history alone', async () => {
+    const env = createEnvironment();
+    env.responder = body => ({ results: body.searches.map((s, i) => (i === 0
+        ? { found: 1, hits: [hit(1)] }
+        : { facet_counts: [{ field_name: 'color', counts: [{ value: 'Red', count: 1 }, { value: 'Blue', count: 1 }] }] })) });
+    const listing = env.listing();
+    listing.init();
+    await settle();
+    const historyLength = env.history.length;
+    const hits = listing.hits;
+
+    const requests = [];
+    env.responder = body => {
+        requests.push(body.searches);
+        return { results: [{ facet_counts: [{ field_name: 'color', counts: [{ value: 'Blue', count: 1 }] }] }] };
+    };
+    listing.applyFilterChange({ field: 'color', facetQuery: 'bl' });
+    assert.equal(listing.isLoading, false);
+    assert.equal(listing.showOverlay(), false);
+    await settle();
+
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].length, 1);
+    assert.equal(requests[0][0].facet_by, 'color');
+    assert.equal(requests[0][0].facet_query, 'color:bl');
+    assert.equal(listing.hits, hits);
+    assert.deepEqual(listing.facets.find(f => f.field_name === 'color').counts.map(c => c.value), ['Blue']);
+    assert.equal(env.history.length, historyLength);
+    assert.equal(env.events.filter(e => e.type === 'typesense-state').pop().detail.state.facetQueries.color, 'bl');
+});
+
+test('a facet value search response is dropped once a full request has started', async () => {
+    const env = createEnvironment();
+    env.responder = results(1, [hit(1)]);
+    const listing = env.listing();
+    listing.init();
+    await settle();
+
+    let releaseFacet;
+    env.responder = body => (body.searches.length === 1
+        ? new Promise(resolve => { releaseFacet = () => resolve({ results: [{ facet_counts: [{ field_name: 'color', counts: [{ value: 'Stale', count: 9 }] }] }] }); })
+        : { results: body.searches.map((s, i) => (i === 0 ? { found: 1, hits: [hit(1)] } : { facet_counts: [{ field_name: 'color', counts: [{ value: 'Fresh', count: 1 }] }] })) });
+    listing.applyFilterChange({ field: 'color', facetQuery: 'st' });
+    await settle();
+    listing.setSort('price:asc');
+    await settle();
+    releaseFacet();
+    await settle();
+
+    assert.deepEqual(listing.facets.find(f => f.field_name === 'color').counts.map(c => c.value), ['Fresh']);
+});

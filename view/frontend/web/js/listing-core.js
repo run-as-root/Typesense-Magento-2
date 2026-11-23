@@ -5,6 +5,7 @@
     const FIELD_NAME = /^[A-Za-z0-9_][A-Za-z0-9_.]*$/;
     const PRICE_PARAM = /^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/;
     const PAGE_PARAM = /^[1-9]\d{0,5}$/;
+    const NUMBER_VALUE = /^-?\d+(?:\.\d+)?$/;
     const MAX_VALUES_PER_FACET = 50;
     const MAX_SORT_FIELDS = 3;
     const IN_STOCK_SORT = 'in_stock:desc';
@@ -20,6 +21,14 @@
 
     function isBooleanValue(value) {
         return value === 'true' || value === 'false';
+    }
+
+    function isNumberValue(value) {
+        return NUMBER_VALUE.test(String(value)) && Number.isFinite(Number(value));
+    }
+
+    function pricesShown(config) {
+        return config.showPrices !== false;
     }
 
     function valueList(values) {
@@ -52,12 +61,24 @@
         return min <= max ? { min, max } : { min: max, max: min };
     }
 
-    function facetClause(field, values, isBoolean) {
+    // Typesense answers 400 to any other value on a bool or numeric field, which would fail the whole listing.
+    function validValues(values, isBoolean, isNumeric) {
         const all = valueList(values);
-        // Typesense answers 400 to any other value on a bool field, which would fail the whole listing.
-        const list = isBoolean ? all.filter(isBooleanValue) : all;
+        if (isBoolean) {
+            return all.filter(isBooleanValue);
+        }
+
+        return isNumeric ? all.filter(isNumberValue) : all;
+    }
+
+    function facetClause(field, values, isBoolean, isNumeric) {
+        const list = validValues(values, isBoolean, isNumeric);
         if (list.length === 0) {
             return null;
+        }
+        // Numeric fields reject backtick-quoted values ("Numerical field has an invalid comparator").
+        if (isNumeric && !isBoolean) {
+            return field + ':=[' + list.join(',') + ']';
         }
 
         // Bool values must not be quoted; selecting both true and false filters nothing.
@@ -70,9 +91,10 @@
         return quoted.length > 0 ? field + ':=[' + quoted.join(',') + ']' : null;
     }
 
-    function buildFilterBy(baseFilter, filters, price, exclude, booleanFields) {
+    function buildFilterBy(baseFilter, filters, price, exclude, booleanFields, numericFields) {
         const excluded = [].concat(exclude || []);
         const booleans = [].concat(booleanFields || []);
+        const numerics = [].concat(numericFields || []);
         const parts = [];
         const base = String(baseFilter || '').trim();
 
@@ -85,7 +107,7 @@
             if (field === 'price' || excluded.includes(field) || !FIELD_NAME.test(field)) {
                 continue;
             }
-            const clause = facetClause(field, values, booleans.includes(field));
+            const clause = facetClause(field, values, booleans.includes(field), numerics.includes(field));
             if (clause !== null) {
                 parts.push(clause);
             }
@@ -114,6 +136,12 @@
     function booleanFacetFields(config) {
         return (config.facets || [])
             .filter(facet => facet && typeof facet === 'object' && (facet.type === 'checkbox' || facet.boolean === true))
+            .map(facet => facet.field);
+    }
+
+    function numericFacetFields(config) {
+        return (config.facets || [])
+            .filter(facet => facet && typeof facet === 'object' && facet.numeric === true && facet.field !== 'price')
             .map(facet => facet.field);
     }
 
@@ -217,21 +245,51 @@
         return Number.isInteger(value) && value > 0 ? value : 1;
     }
 
-    function buildSearches(state, config) {
+    function searchContext(state, config) {
         const q = String(state.q || '').trim();
-        const page = positivePage(state.page);
-        const filters = state.filters || {};
-        const price = priceRange(state.price);
-        const facetQueries = state.facetQueries || {};
-        const maxFacetValues = Number(config.maxFacetValues) || 50;
-        const common = Object.assign({}, config.requestParams, config.cacheParams, {
-            collection: config.productCollection,
-            q: q || '*',
-        });
-        const withFilter = (search, filterBy) => (filterBy === '' ? search : Object.assign(search, { filter_by: filterBy }));
 
-        const booleans = booleanFacetFields(config);
-        const mainFilter = buildFilterBy(config.baseFilter, filters, price, [], booleans);
+        return {
+            q,
+            filters: state.filters || {},
+            price: pricesShown(config) ? priceRange(state.price) : null,
+            facetQueries: state.facetQueries || {},
+            booleans: booleanFacetFields(config),
+            numerics: numericFacetFields(config),
+            common: Object.assign({}, config.requestParams, config.cacheParams, {
+                collection: config.productCollection,
+                q: q || '*',
+            }),
+        };
+    }
+
+    function withFilter(search, filterBy) {
+        return filterBy === '' ? search : Object.assign(search, { filter_by: filterBy });
+    }
+
+    // Counts for a filtered facet come from a search without its own filter, so its other values stay visible.
+    function ownFacetSearch(context, config, field) {
+        const search = withFilter(
+            Object.assign({}, context.common, {
+                per_page: 0,
+                facet_by: field,
+                max_facet_values: Number(config.maxFacetValues) || 50,
+            }),
+            buildFilterBy(config.baseFilter, context.filters, context.price, [field], context.booleans, context.numerics),
+        );
+        const valueSearch = String(context.facetQueries[field] || '').trim();
+        if (valueSearch !== '') {
+            search.facet_query = field + ':' + valueSearch;
+        }
+
+        return search;
+    }
+
+    function buildSearches(state, config) {
+        const context = searchContext(state, config);
+        const page = positivePage(state.page);
+        const { q, filters, price, facetQueries, booleans, numerics, common } = context;
+
+        const mainFilter = buildFilterBy(config.baseFilter, filters, price, [], booleans, numerics);
         const main = withFilter(Object.assign({}, common, { page, per_page: resolveLimit(state.limit, config) }), mainFilter);
         const sortBy = buildSortBy(state.sort, config);
         if (sortBy !== '') {
@@ -249,31 +307,25 @@
         const rest = [];
         const fields = facetFields(config);
         for (const field of fields) {
-            const values = valueList(filters[field]);
             const active = field === 'price'
                 ? price !== null
-                : (booleans.includes(field) ? values.filter(isBooleanValue) : values).length > 0;
+                : validValues(filters[field], booleans.includes(field), numerics.includes(field)).length > 0;
             const valueSearch = String(facetQueries[field] || '').trim() !== '';
             (active || valueSearch ? own : rest).push(field);
         }
 
         const sources = {};
-        // Counts for a filtered facet come from a search without its own filter, so its other values stay visible.
         for (const field of own) {
-            const search = withFilter(
-                Object.assign({}, common, { per_page: 0, facet_by: field, max_facet_values: maxFacetValues }),
-                buildFilterBy(config.baseFilter, filters, price, [field], booleans),
-            );
-            const valueSearch = String(facetQueries[field] || '').trim();
-            if (valueSearch !== '') {
-                search.facet_query = field + ':' + valueSearch;
-            }
-            sources[field] = searches.push(search) - 1;
+            sources[field] = searches.push(ownFacetSearch(context, config, field)) - 1;
         }
 
         if (rest.length > 0) {
             const index = searches.push(withFilter(
-                Object.assign({}, common, { per_page: 0, facet_by: rest.join(','), max_facet_values: maxFacetValues }),
+                Object.assign({}, common, {
+                    per_page: 0,
+                    facet_by: rest.join(','),
+                    max_facet_values: Number(config.maxFacetValues) || 50,
+                }),
                 mainFilter,
             )) - 1;
             for (const field of rest) {
@@ -289,6 +341,13 @@
         Object.defineProperty(searches, 'facetSources', { value: facetSources });
 
         return searches;
+    }
+
+    // A facet value search only needs that facet's own search; the products and other facets stay as they are.
+    function facetValueSearch(state, config, field) {
+        const fields = facetFields(config).filter(candidate => candidate !== 'price');
+
+        return fields.includes(field) ? ownFacetSearch(searchContext(state, config), config, field) : null;
     }
 
     function activeFacets(state) {
@@ -420,6 +479,7 @@
         const state = emptyState(config);
         const fields = facetFields(config).filter(field => field !== 'price');
         const booleans = booleanFacetFields(config);
+        const numerics = numericFacetFields(config);
         const seen = [];
         const pairs = rawPairs(search);
 
@@ -431,7 +491,12 @@
             seen.push(key);
 
             if (fields.includes(key)) {
-                const accept = booleans.includes(key) ? isBooleanValue : value => quoteValue(value) !== null;
+                let accept = value => quoteValue(value) !== null;
+                if (booleans.includes(key)) {
+                    accept = isBooleanValue;
+                } else if (numerics.includes(key)) {
+                    accept = isNumberValue;
+                }
                 // Values are encoded one by one, so a literal | can only be the separator.
                 const values = valueList(rawValue.split('|').map(decode))
                     .filter(accept)
@@ -454,7 +519,7 @@
                 state.sort = resolveSort(value, config);
             } else if (key === 'limit') {
                 state.limit = resolveLimit(value, config);
-            } else if (key === 'price') {
+            } else if (key === 'price' && pricesShown(config)) {
                 const match = PRICE_PARAM.exec(value);
                 state.price = match ? priceRange({ min: match[1], max: match[2] }) : null;
             }
@@ -480,7 +545,7 @@
             }
         }
 
-        const range = priceRange(state.price);
+        const range = pricesShown(config) ? priceRange(state.price) : null;
         if (range !== null) {
             parts.push('price=' + range.min + '-' + range.max);
         }
@@ -716,7 +781,7 @@
             return isBooleanValue(value) ? String((labels || {})[value] || value) : null;
         }
 
-        return value;
+        return facet.numeric === true && !isNumberValue(value) ? null : value;
     }
 
     // Selected values stay listed without a count, so they can still be unchecked when a value search
@@ -818,6 +883,7 @@
         quoteValue,
         buildFilterBy,
         buildSearches,
+        facetValueSearch,
         mergeFacetCounts,
         facetStats,
         buildSortBy,

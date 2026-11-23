@@ -40,6 +40,8 @@ final class ListingConfigViewModelTest extends TestCase
     private ScopeConfigInterface&MockObject $scopeConfig;
     private LoggerInterface&MockObject $logger;
     private SubcategoryFacetResolver&MockObject $subcategoryFacetResolver;
+    /** @var list<mixed> */
+    private array $constructorArguments;
     private ListingConfigViewModel $sut;
 
     protected function setUp(): void
@@ -93,7 +95,7 @@ final class ListingConfigViewModelTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->subcategoryFacetResolver = $this->createMock(SubcategoryFacetResolver::class);
 
-        $this->sut = new ListingConfigViewModel(
+        $this->constructorArguments = [
             $this->config,
             $storeManager,
             $collectionNameResolver,
@@ -108,7 +110,8 @@ final class ListingConfigViewModelTest extends TestCase
             $conversationModelManager,
             $this->logger,
             $this->subcategoryFacetResolver,
-        );
+        ];
+        $this->sut = new ListingConfigViewModel(...$this->constructorArguments);
     }
 
     public function test_listing_config_for_category_uses_category_filter_default_sort_and_catalog_limits(): void
@@ -178,10 +181,10 @@ final class ListingConfigViewModelTest extends TestCase
         $facets = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH)['facets'];
 
         self::assertSame([
-            ['field' => 'categories.lvl0', 'label' => 'Category', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false],
-            ['field' => 'color', 'label' => 'Farbe', 'type' => 'dropdown', 'searchable' => true, 'boolean' => false],
-            ['field' => 'in_stock', 'label' => 'Availability', 'type' => 'dropdown', 'searchable' => false, 'boolean' => true],
-            ['field' => 'price', 'label' => 'Price', 'type' => 'slider', 'searchable' => false, 'boolean' => false],
+            ['field' => 'categories.lvl0', 'label' => 'Category', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => false],
+            ['field' => 'color', 'label' => 'Farbe', 'type' => 'dropdown', 'searchable' => true, 'boolean' => false, 'numeric' => false],
+            ['field' => 'in_stock', 'label' => 'Availability', 'type' => 'dropdown', 'searchable' => false, 'boolean' => true, 'numeric' => false],
+            ['field' => 'price', 'label' => 'Price', 'type' => 'slider', 'searchable' => false, 'boolean' => false, 'numeric' => true],
         ], $facets);
     }
 
@@ -260,6 +263,33 @@ final class ListingConfigViewModelTest extends TestCase
         self::assertCount(3, $this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH)['sortOptions']);
     }
 
+    public function test_category_with_an_empty_available_sort_by_keeps_every_sort_option(): void
+    {
+        $this->givenCategory(42, 'Gin', 'position', []);
+        $this->givenCatalogLimits('12', '12');
+
+        self::assertSame([
+            ['label' => 'Relevance', 'value' => ''],
+            ['label' => 'Price: Low to High', 'value' => 'price:asc'],
+            ['label' => 'Name: A–Z', 'value' => 'name:asc'],
+        ], $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY)['sortOptions']);
+    }
+
+    public function test_hidden_prices_remove_the_price_sorts(): void
+    {
+        $sut = $this->getMockBuilder(ListingConfigViewModel::class)
+            ->setConstructorArgs($this->constructorArguments)
+            ->onlyMethods(['canShowPrices'])
+            ->getMock();
+        $sut->method('canShowPrices')->willReturn(false);
+        $this->givenCatalogLimits('12', '12');
+
+        $config = $sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH);
+
+        self::assertFalse($config['showPrices']);
+        self::assertSame(['', 'name:asc'], array_column($config['sortOptions'], 'value'));
+    }
+
     public function test_category_tree_facets_are_replaced_by_the_subcategory_facet_on_category_pages(): void
     {
         $category = $this->givenCategory(42, 'Gin', 'position');
@@ -272,6 +302,7 @@ final class ListingConfigViewModelTest extends TestCase
             'type' => 'subcategory',
             'searchable' => false,
             'boolean' => false,
+            'numeric' => false,
             'prefix' => 'Gin > ',
         ];
         $this->subcategoryFacetResolver->method('resolve')->with($category, 1)->willReturn($subcategory);

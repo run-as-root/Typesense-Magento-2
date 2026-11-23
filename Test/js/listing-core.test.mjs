@@ -583,3 +583,54 @@ test('clampPriceRange keeps values inside the stats bounds and clears a full ran
     assert.equal(core.clampPriceRange(0, 999, bounds), null);
     assert.equal(core.clampPriceRange(20, 80, null), null);
 });
+
+test('numeric facets are filtered unquoted and accept only finite numbers', () => {
+    assert.equal(
+        core.buildFilterBy('', { visibility: ['4', '2', 'x', '1e3', ''], color: ['4'] }, null, [], [], ['visibility']),
+        'visibility:=[4,2] && color:=[`4`]',
+    );
+    assert.equal(core.buildFilterBy('v:=1', { visibility: ['abc'] }, null, [], [], ['visibility']), 'v:=1');
+    assert.equal(core.buildFilterBy('', { volume: ['-0.5', '12.75'] }, null, [], [], ['volume']), 'volume:=[-0.5,12.75]');
+
+    const config = searchConfig({ facets: [
+        { field: 'visibility', label: 'Visibility', type: 'dropdown', numeric: true },
+        { field: 'color', label: 'Color', type: 'dropdown' },
+    ] });
+    const parsed = core.parseUrlState('?visibility=4|abc|%60', config);
+    assert.deepEqual(parsed.filters.visibility, ['4']);
+    assert.equal(core.parseUrlState('?visibility=abc', config).filters.visibility, undefined);
+
+    const searches = core.buildSearches(state({ filters: { visibility: ['4', 'abc'] } }), config);
+    assert.equal(searches[0].filter_by, 'visibility:[3,4] && visibility:=[4]');
+    const hostile = core.buildSearches(state({ filters: { visibility: ['abc'] } }), config);
+    assert.equal(hostile[0].filter_by, 'visibility:[3,4]');
+    assert.equal(hostile.length, 2, 'a facet without a valid value gets no own disjunctive search');
+
+    const facet = config.facets[0];
+    const entry = { field_name: 'visibility', counts: [{ value: '4', count: 3 }, { value: 'x', count: 1 }] };
+    assert.deepEqual(core.facetOptions(facet, entry, [], {}).map(option => option.value), ['4']);
+});
+
+test('the price filter is ignored when prices are hidden', () => {
+    const config = searchConfig({ showPrices: false });
+
+    assert.equal(core.parseUrlState('?price=10-20', config).price, null);
+    const searches = core.buildSearches(state({ price: { min: 10, max: 20 } }), config);
+    assert.equal(searches[0].filter_by, 'visibility:[3,4]');
+    assert.equal(core.serializeUrlState(state({ price: { min: 10, max: 20 } }), config), '');
+    assert.deepEqual(core.parseUrlState('?price=10-20', searchConfig()).price, { min: 10, max: 20 });
+});
+
+test('facetValueSearch builds only the value search of one facet, without its own filter', () => {
+    const config = searchConfig();
+    const search = core.facetValueSearch(state({
+        q: 'gin', filters: { color: ['Red'], size: ['L'] }, facetQueries: { color: 'bl' },
+    }), config, 'color');
+
+    assert.equal(search.facet_by, 'color');
+    assert.equal(search.facet_query, 'color:bl');
+    assert.equal(search.per_page, 0);
+    assert.equal(search.q, 'gin');
+    assert.equal(search.filter_by, 'visibility:[3,4] && size:=[`L`]');
+    assert.equal(core.facetValueSearch(state(), config, 'unknown'), null);
+});

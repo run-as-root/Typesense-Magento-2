@@ -10,7 +10,8 @@ use Magento\Framework\Exception\NoSuchEntityException;
 
 /**
  * Facet for the children of the current category, read from the category path fields CategoryResolver
- * indexes: level 3 as "Top > Child" in categories.lvl1, every deeper level as a full path in categories.lvl2.
+ * indexes (each product carries the paths of its categories and all their ancestors): level 3 as
+ * "Top > Child" in categories.lvl1, every deeper level as a full path in categories.lvl2.
  * The counts come from the listing's own Typesense result instead of one product collection per child.
  */
 class SubcategoryFacetResolver
@@ -24,7 +25,9 @@ class SubcategoryFacetResolver
     }
 
     /**
-     * @return array{field: string, label: string, type: string, searchable: bool, boolean: bool, prefix: string}|null
+     * @return array{
+     *     field: string, label: string, type: string, searchable: bool, boolean: bool, numeric: bool, prefix: string
+     * }|null
      */
     public function resolve(Category $category, int $storeId): ?array
     {
@@ -44,6 +47,7 @@ class SubcategoryFacetResolver
             'type' => 'subcategory',
             'searchable' => false,
             'boolean' => false,
+            'numeric' => false,
             'prefix' => $path . self::PATH_SEPARATOR,
         ];
     }

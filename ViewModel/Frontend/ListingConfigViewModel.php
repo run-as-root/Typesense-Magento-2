@@ -195,8 +195,13 @@ class ListingConfigViewModel implements ArgumentInterface
     private function getSortOptions(?Category $category, int $storeId): array
     {
         $options = [];
+        $showPrices = $this->canShowPrices();
         $configured = $this->config->getEnabledSortOptions($storeId);
         foreach ($configured as $option) {
+            // Sorting by a hidden price would still reveal the price order.
+            if (!$showPrices && $this->toMagentoSortCode($option['value']) === 'price') {
+                continue;
+            }
             $options[] = ['label' => (string) __($option['label']), 'value' => $option['value']];
         }
 

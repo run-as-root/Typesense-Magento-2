@@ -100,7 +100,8 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             /**
              * detail: {clear: true} | {field, value, action: 'toggle'|'add'|'remove'} | {field, values: []}
              * | {field, facetQuery} | {price: {min, max} | null}. Keys can be combined; clear applies first.
-             * Only configured facet fields are accepted; a facet value search alone keeps the page.
+             * Only configured facet fields are accepted; a facet value search alone keeps the page and only
+             * refetches that facet's values (fetchFacetValues).
              */
             applyFilterChange(detail) {
                 const change = detail || {};
@@ -139,6 +140,11 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     filtersChanged = true;
                 }
 
+                if (!filtersChanged && this.isFacetField(change.field) && change.facetQuery !== undefined) {
+                    this.state = Object.assign({}, this.state, { facetQueries });
+                    this.fetchFacetValues(change.field);
+                    return;
+                }
                 const patch = { filters, facetQueries, price };
                 if (filtersChanged) {
                     patch.page = 1;

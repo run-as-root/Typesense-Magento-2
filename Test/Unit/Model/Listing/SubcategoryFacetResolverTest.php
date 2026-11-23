@@ -44,6 +44,7 @@ final class SubcategoryFacetResolverTest extends TestCase
             'type' => 'subcategory',
             'searchable' => false,
             'boolean' => false,
+            'numeric' => false,
             'prefix' => $expectedPrefix,
         ], $this->sut->resolve($category, 1));
     }

@@ -31,6 +31,7 @@ $heroicons = $viewModels->require(HeroiconsOutline::class);
          x-show="showSortMenu"
          @click.outside="closeSortMenu"
          @keydown.escape.stop="closeSortMenuAndFocus"
+         @focusout="onSortFocusOut"
          class="relative flex items-center gap-2">
         <span id="typesense-sort-label" class="text-xs"><?= $escaper->escapeHtml(__('Sort By:')) ?></span>
         <button type="button"
@@ -134,6 +135,14 @@ $heroicons = $viewModels->require(HeroiconsOutline::class);
             },
             closeSortMenu() {
                 this.isOpen = false;
+            },
+            // Tabbing out of the open listbox closes it. Focus moves without a related target on mouse clicks
+            // (Safari does not focus buttons), which the click-outside handler already covers.
+            onSortFocusOut() {
+                const event = this.$event;
+                if (this.isOpen && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) {
+                    this.isOpen = false;
+                }
             },
             closeSortMenuAndFocus() {
                 if (this.isOpen) {

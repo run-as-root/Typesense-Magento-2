@@ -23,8 +23,9 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
 <script>
     function initTypesenseListing() {
         const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
-        // Kept out of the reactive data: it only decides which response may still render.
+        // Kept out of the reactive data: they only decide which response may still render.
         let sequencer = null;
+        let facetSequencer = null;
         // Inline display values of the SEO text elements hidden on pages after the first.
         const hiddenSeoText = new Map();
 
@@ -74,6 +75,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     return;
                 }
                 sequencer = listing.createSequencer();
+                facetSequencer = listing.createSequencer();
                 this.state = listing.parseUrlState(window.location.search, this.config);
                 this.isReady = true;
                 this.fetchResults('init');
@@ -82,6 +84,8 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             async fetchResults(cause) {
                 const listing = core();
                 const id = sequencer.next();
+                // The full request carries every facet value search, so pending ones are outdated.
+                facetSequencer.next();
                 this.isLoading = true;
                 // Everything that can throw sits inside the try, so loading always ends in results or the error state.
                 try {
@@ -135,6 +139,38 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                         this.hasLoaded = true;
                         this.dispatchState();
                     }
+                }
+            },
+
+            // A facet value search replaces only that facet's counts: no grid overlay, no history entry. While a
+            // full request runs, it is repeated instead, so the older full response cannot overwrite the values.
+            async fetchFacetValues(field) {
+                const listing = core();
+                if (this.isLoading) {
+                    this.fetchResults('facet-query');
+                    return;
+                }
+                const id = facetSequencer.next();
+                try {
+                    const search = listing.facetValueSearch(this.state, this.config, field);
+                    if (search === null) {
+                        return;
+                    }
+                    const client = await window.runAsRootTypesense.getClient();
+                    const response = await client.multiSearch.perform({ searches: [search] }, this.config.cacheParams);
+                    const result = (response.results || [])[0];
+                    if (!facetSequencer.isCurrent(id) || !result || result.error) {
+                        return;
+                    }
+                    const entry = (result.facet_counts || []).find(facet => facet && facet.field_name === field)
+                        || { field_name: field, counts: [] };
+                    const known = this.facets.some(facet => facet.field_name === field);
+                    this.facets = known
+                        ? this.facets.map(facet => (facet.field_name === field ? entry : facet))
+                        : this.facets.concat(entry);
+                    this.dispatchState();
+                } catch (error) {
+                    console.warn('Typesense facet value search failed', error);
                 }
             },
 

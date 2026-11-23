@@ -10,6 +10,9 @@ use Magento\Catalog\Model\Product;
 
 class CategoryResolver implements CategoryResolverInterface
 {
+    private const int TOP_LEVEL = 2;
+    private const string PATH_SEPARATOR = ' > ';
+
     /** @var array<int, CategoryInterface> */
     private array $categoryCache = [];
 
@@ -19,6 +22,10 @@ class CategoryResolver implements CategoryResolverInterface
     }
 
     /**
+     * Hierarchical facet paths: every assigned category adds its own path and the paths of all its
+     * ancestors, each at its own level (level 2 as a name in lvl0, level 3 as "A > B" in lvl1, level 4
+     * and deeper as full paths in lvl2), so a parent's facet value counts the products of its whole subtree.
+     *
      * @return array{
      *     categories: string[],
      *     category_ids: int[],
@@ -32,9 +39,7 @@ class CategoryResolver implements CategoryResolverInterface
         $categoryIds = $product->getCategoryIds();
         $categories = [];
         $categoryIdsInt = [];
-        $lvl0 = [];
-        $lvl1 = [];
-        $lvl2 = [];
+        $paths = [0 => [], 1 => [], 2 => []];
 
         foreach ($categoryIds as $categoryId) {
             $category = $this->loadCategory((int) $categoryId);
@@ -42,28 +47,23 @@ class CategoryResolver implements CategoryResolverInterface
                 continue;
             }
 
-            $categoryName = (string) $category->getName();
             $categoryIdsInt[] = (int) $categoryId;
-            $categories[] = $categoryName;
+            $categories[] = (string) $category->getName();
 
-            $level = (int) $category->getLevel();
-            $path = $this->buildCategoryPath($category);
-
-            if ($level <= 2) {
-                $lvl0[] = $categoryName;
-            } elseif ($level === 3) {
-                $lvl1[] = $path;
-            } elseif ($level >= 4) {
-                $lvl2[] = $path;
+            $names = [];
+            $ancestry = $this->getAncestry($category);
+            foreach ($ancestry as $node) {
+                $names[] = (string) $node->getName();
+                $paths[min((int) $node->getLevel() - self::TOP_LEVEL, 2)][] = implode(self::PATH_SEPARATOR, $names);
             }
         }
 
         return [
             'categories' => array_values(array_unique($categories)),
             'category_ids' => array_values(array_unique($categoryIdsInt)),
-            'categories.lvl0' => array_values(array_unique($lvl0)),
-            'categories.lvl1' => array_values(array_unique($lvl1)),
-            'categories.lvl2' => array_values(array_unique($lvl2)),
+            'categories.lvl0' => array_values(array_unique($paths[0])),
+            'categories.lvl1' => array_values(array_unique($paths[1])),
+            'categories.lvl2' => array_values(array_unique($paths[2])),
         ];
     }
 
@@ -83,22 +83,21 @@ class CategoryResolver implements CategoryResolverInterface
         }
     }
 
-    private function buildCategoryPath(CategoryInterface $category): string
+    /**
+     * @return list<CategoryInterface> the category and its ancestors from the top level down; the root
+     *     catalog and the store root (levels 0 and 1) are not part of any path.
+     */
+    private function getAncestry(CategoryInterface $category): array
     {
-        $names = [];
+        $ancestry = [];
         $current = $category;
 
-        while ($current !== null && (int) $current->getLevel() > 1) {
-            array_unshift($names, (string) $current->getName());
-
+        while ($current !== null && (int) $current->getLevel() >= self::TOP_LEVEL) {
+            array_unshift($ancestry, $current);
             $parentId = (int) $current->getParentId();
-            if ($parentId <= 1) {
-                break;
-            }
-
-            $current = $this->loadCategory($parentId);
+            $current = (int) $current->getLevel() > self::TOP_LEVEL && $parentId > 1 ? $this->loadCategory($parentId) : null;
         }
 
-        return implode(' > ', $names);
+        return $ancestry;
     }
 }

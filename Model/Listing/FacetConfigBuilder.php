@@ -12,6 +12,8 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface;
 
 class FacetConfigBuilder
 {
+    private const string NUMERIC_TYPE = '/^(int32|int64|float)(\[\])?$/';
+
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
         private readonly ProductSchemaProviderInterface $schemaProvider,
@@ -23,8 +25,10 @@ class FacetConfigBuilder
      * A facet without a configured type is a dropdown. Price is always the slider and the only one, because
      * the listing state holds a single range (`price`) and never filters price by exact values. The listing
      * core only accepts true/false on checkbox facets, so a checkbox on a non-bool field becomes a dropdown.
+     * `numeric` tells the listing core to filter the values unquoted: Typesense rejects backtick-quoted
+     * values on numeric fields with a 400 that would fail the whole listing.
      *
-     * @return list<array{field: string, label: string, type: string, searchable: bool, boolean: bool}>
+     * @return list<array{field: string, label: string, type: string, searchable: bool, boolean: bool, numeric: bool}>
      */
     public function build(int $storeId): array
     {
@@ -34,7 +38,8 @@ class FacetConfigBuilder
 
         $facets = [];
         foreach ($fields as $field) {
-            $isBoolean = ($schemaTypes[$field] ?? 'string') === 'bool';
+            $schemaType = $schemaTypes[$field] ?? 'string';
+            $isBoolean = $schemaType === 'bool';
             $type = $field === 'price' ? 'slider' : ($types[$field]['type'] ?? 'dropdown');
 
             if (($type === 'checkbox' && !$isBoolean) || ($type === 'slider' && $field !== 'price')) {
@@ -47,6 +52,7 @@ class FacetConfigBuilder
                 'type' => $type,
                 'searchable' => $type === 'dropdown' && ($types[$field]['searchable'] ?? false),
                 'boolean' => $isBoolean,
+                'numeric' => preg_match(self::NUMERIC_TYPE, $schemaType) === 1,
             ];
         }
 

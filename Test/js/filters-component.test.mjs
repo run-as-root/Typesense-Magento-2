@@ -298,3 +298,21 @@ test('sorting and page size send the chosen value as events', () => {
     pageSize.selectLimit();
     assert.deepEqual([env.lastEvent().type, { ...env.lastEvent().detail }], ['typesense-limit-change', { limit: 12 }]);
 });
+
+test('the sort listbox closes when focus leaves it, not when it moves inside or on a plain click', () => {
+    const env = createEnvironment();
+    const sorting = env.component('initTypesenseSorting');
+    const inside = {};
+    const wrapper = { contains: element => element === inside };
+    sorting.isOpen = true;
+
+    sorting.$event = { currentTarget: wrapper, relatedTarget: inside };
+    sorting.onSortFocusOut();
+    assert.equal(sorting.isOpen, true);
+    sorting.$event = { currentTarget: wrapper, relatedTarget: null };
+    sorting.onSortFocusOut();
+    assert.equal(sorting.isOpen, true);
+    sorting.$event = { currentTarget: wrapper, relatedTarget: {} };
+    sorting.onSortFocusOut();
+    assert.equal(sorting.isOpen, false);
+});
