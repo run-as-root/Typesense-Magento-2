@@ -524,6 +524,14 @@ test('buildCartParams posts qty 1 for a simple tile and super_group for grouped 
     assert.equal(core.buildCartParams('42', 'fk', 'uenc', { 7: 0 }), null);
 });
 
+test('buildCartParams sends every grouped child, unselected ones as 0, as Magento rejects a partial super_group', () => {
+    assert.deepEqual(core.buildCartParams('42', 'fk', 'uenc', { 9: 2 }, [7, 9, '11']), [
+        ['product', '42'], ['form_key', 'fk'], ['uenc', 'uenc'],
+        ['super_group[7]', '0'], ['super_group[9]', '2'], ['super_group[11]', '0'],
+    ]);
+    assert.equal(core.buildCartParams('42', 'fk', 'uenc', {}, [7, 9]), null);
+});
+
 const yesNo = { true: 'Yes', false: 'No' };
 
 test('facetOptions lists counted values, keeps selected values without a count and labels booleans', () => {

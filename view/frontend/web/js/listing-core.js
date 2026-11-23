@@ -784,7 +784,9 @@
     }
 
     // Grouped products are added per child (super_group[childId]); returns null when no child has a quantity.
-    function buildCartParams(productId, formKey, uenc, childQuantities) {
+    // Magento's grouped type answers "Please specify the quantity" when a salable child is missing from
+    // super_group, so every child of childIds is sent, unselected ones as 0 (as the product page form does).
+    function buildCartParams(productId, formKey, uenc, childQuantities, childIds) {
         const params = [['product', String(productId)], ['form_key', String(formKey)], ['uenc', String(uenc)]];
         if (childQuantities === null || childQuantities === undefined) {
             params.push(['qty', '1']);
@@ -792,17 +794,30 @@
             return params;
         }
 
+        const quantities = {};
+        const allChildIds = childIds || [];
+        for (const childId of allChildIds) {
+            quantities[childId] = 0;
+        }
         const entries = Object.entries(childQuantities);
         let selected = 0;
         for (const [childId, quantity] of entries) {
             const qty = Number(quantity);
             if (Number.isInteger(qty) && qty > 0) {
-                params.push(['super_group[' + childId + ']', String(qty)]);
+                quantities[childId] = qty;
                 selected++;
             }
         }
+        if (selected === 0) {
+            return null;
+        }
 
-        return selected > 0 ? params : null;
+        const quantityEntries = Object.entries(quantities);
+        for (const [childId, qty] of quantityEntries) {
+            params.push(['super_group[' + childId + ']', String(qty)]);
+        }
+
+        return params;
     }
 
     // Subcategory values are full category paths; only direct children of the prefix are offered, by name.

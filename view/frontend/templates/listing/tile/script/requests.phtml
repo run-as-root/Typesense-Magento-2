@@ -37,6 +37,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     hyva.getFormKey(),
                     hyva.getUenc(),
                     this.isGrouped() ? this.childQuantities : null,
+                    this.children().map(child => child.id),
                 );
                 if (params === null) {
                     message('warning', strings.chooseQuantity);
