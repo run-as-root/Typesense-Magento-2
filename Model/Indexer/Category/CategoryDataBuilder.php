@@ -7,11 +7,14 @@ namespace RunAsRoot\TypeSense\Model\Indexer\Category;
 use Magento\Catalog\Model\Category;
 use Magento\Catalog\Model\ResourceModel\Category\Collection as CategoryCollection;
 use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory as CategoryCollectionFactory;
+use Magento\Store\Model\Store;
+use Magento\Store\Model\StoreManagerInterface;
 
 class CategoryDataBuilder
 {
     public function __construct(
         private readonly CategoryCollectionFactory $collectionFactory,
+        private readonly StoreManagerInterface $storeManager,
     ) {
     }
 
@@ -23,6 +26,8 @@ class CategoryDataBuilder
     public function build(Category $category, int $storeId): array
     {
         $categoryId = (int) $category->getId();
+        // getUrl() only needs store_id; setStoreId() would also re-scope the shared category resource model.
+        $category->setData('store_id', $storeId);
 
         $document = [
             'id' => (string) $categoryId,
@@ -49,7 +54,7 @@ class CategoryDataBuilder
     }
 
     /**
-     * Load a category collection filtered by entity IDs, scoped to a store.
+     * Load the store's active categories below its root category, optionally limited to entity IDs.
      *
      * @param int[] $entityIds
      */
@@ -59,6 +64,7 @@ class CategoryDataBuilder
         $collection->setStoreId($storeId);
         $collection->addAttributeToSelect('*');
         $collection->addAttributeToFilter('is_active', 1);
+        $collection->addFieldToFilter('path', ['like' => sprintf('1/%d/%%', $this->getRootCategoryId($storeId))]);
         $collection->addFieldToFilter('level', ['gteq' => 2]);
 
         if ($entityIds !== []) {
@@ -66,5 +72,13 @@ class CategoryDataBuilder
         }
 
         return $collection;
+    }
+
+    private function getRootCategoryId(int $storeId): int
+    {
+        /** @var Store $store */
+        $store = $this->storeManager->getStore($storeId);
+
+        return (int) $store->getRootCategoryId();
     }
 }
