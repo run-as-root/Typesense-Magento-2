@@ -9,14 +9,11 @@ declare(strict_types=1);
 
 use Hyva\Theme\Model\ViewModelRegistry;
 use Hyva\Theme\ViewModel\HeroiconsOutline;
-use Hyva\Theme\ViewModel\HyvaCsp;
 use Magento\Framework\Escaper;
 
 /** @var Escaper $escaper */
 /** @var ViewModelRegistry $viewModels */
 
-/** @var HyvaCsp $hyvaCsp */
-$hyvaCsp = $viewModels->require(HyvaCsp::class);
 /** @var HeroiconsOutline $heroicons */
 $heroicons = $viewModels->require(HeroiconsOutline::class);
 ?>
@@ -69,121 +66,3 @@ $heroicons = $viewModels->require(HeroiconsOutline::class);
         </ul>
     </div>
 </div>
-<script>
-    function initTypesenseSorting() {
-        const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
-
-        return {
-            ...typesenseListingState(),
-            isOpen: false,
-
-            init() {
-                this.initListingState();
-            },
-            sortOptions() {
-                return this.listingConfig.sortOptions || [];
-            },
-            hasSortOptions() {
-                return this.sortOptions().length > 1;
-            },
-            showSortMenu() {
-                return this.showControls() && this.hasSortOptions();
-            },
-            // parseUrlState already resolved an unknown or missing sort to the default.
-            currentSort() {
-                if (this.listing.hasLoaded) {
-                    return String(this.listing.state.sort || '');
-                }
-
-                return core() ? core().defaultSort(this.listingConfig) : '';
-            },
-            currentSortLabel() {
-                const current = this.currentSort();
-                const option = this.sortOptions().find(candidate => String(candidate.value) === current);
-
-                return option ? option.label : '';
-            },
-            chevronClasses() {
-                return this.isOpen ? 'rotate-180' : '';
-            },
-            isSortOptionSelected() {
-                return String(this.sortOption.value) === this.currentSort();
-            },
-            sortOptionLabel() {
-                return this.sortOption.label;
-            },
-            sortOptionClasses() {
-                return this.isSortOptionSelected() ? 'font-semibold' : '';
-            },
-
-            toggleSortMenu() {
-                if (this.isOpen) {
-                    this.isOpen = false;
-                } else {
-                    this.openSortMenu();
-                }
-            },
-            openSortMenu() {
-                this.isOpen = true;
-                this.$nextTick(() => {
-                    const list = this.$refs.sortList;
-                    const option = list && (list.querySelector('[aria-selected="true"]') || list.querySelector('[role="option"]'));
-                    if (option) {
-                        option.focus();
-                    }
-                });
-            },
-            closeSortMenu() {
-                this.isOpen = false;
-            },
-            // Tabbing out of the open listbox closes it. Focus moves without a related target on mouse clicks
-            // (Safari does not focus buttons), which the click-outside handler already covers.
-            onSortFocusOut() {
-                const event = this.$event;
-                if (this.isOpen && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) {
-                    this.isOpen = false;
-                }
-            },
-            closeSortMenuAndFocus() {
-                if (this.isOpen) {
-                    this.isOpen = false;
-                    this.$refs.sortButton.focus();
-                }
-            },
-            moveSortFocus(step) {
-                const options = Array.from(this.$refs.sortList.querySelectorAll('[role="option"]'));
-                const index = options.indexOf(document.activeElement);
-                const next = options[Math.min(options.length - 1, Math.max(0, index + step))];
-                if (next) {
-                    next.focus();
-                }
-            },
-            focusNextSortOption() {
-                this.moveSortFocus(1);
-            },
-            focusPreviousSortOption() {
-                this.moveSortFocus(-1);
-            },
-            selectSortOption() {
-                const value = String(this.sortOption.value);
-                if (value !== this.currentSort()) {
-                    this.dispatchListingEvent('typesense-sort-change', { sort: value });
-                }
-            },
-            // For a native <select>; selectSortOption() needs the x-for option scope.
-            selectSort() {
-                const value = String(this.$event.target.value);
-                if (value !== this.currentSort()) {
-                    this.dispatchListingEvent('typesense-sort-change', { sort: value });
-                }
-            },
-            chooseSortOption() {
-                this.selectSortOption();
-                this.closeSortMenuAndFocus();
-            },
-        };
-    }
-
-    window.addEventListener('alpine:init', () => Alpine.data('typesenseSorting', initTypesenseSorting), { once: true });
-</script>
-<?php $hyvaCsp->registerInlineScript() ?>

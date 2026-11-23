@@ -1,0 +1,160 @@
+<?php
+/**
+ * Alpine component `typesenseFilterBar` of listing/filters/bar.phtml, with the `typesenseListingState` and
+ * `typesenseFilterDrawer` mixins.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $viewModels->require(HyvaCsp::class);
+?>
+<script>
+    function initTypesenseFilterBar() {
+        const core = () => window.runAsRootTypesense && window.runAsRootTypesense.listing;
+        const strings = {
+            yes: '<?= $escaper->escapeJs(__('Yes')) ?>',
+            no: '<?= $escaper->escapeJs(__('No')) ?>',
+        };
+        // Kept out of the reactive data: only its `matches` is read.
+        let viewport = null;
+
+        return {
+            ...typesenseListingState(),
+            ...typesenseFilterDrawer(),
+            openPanels: {},
+            isDesktop: true,
+            filtersExpanded: false,
+
+            init() {
+                this.initListingState();
+                viewport = window.matchMedia('(min-width: 768px)');
+                this.isDesktop = viewport.matches;
+                viewport.addEventListener('change', () => this.onViewportChange());
+            },
+            onViewportChange() {
+                this.isDesktop = viewport.matches;
+                this.openPanels = {};
+                if (this.isDesktop) {
+                    this.resetDrawer();
+                }
+            },
+            onEscape() {
+                if (this.drawerOpen) {
+                    this.closeDrawer();
+                } else if (this.isDesktop) {
+                    this.openPanels = {};
+                }
+            },
+
+            // For a filter block that is collapsible below md and always open from md.
+            toggleFiltersExpanded() {
+                this.filtersExpanded = !this.filtersExpanded;
+            },
+            isFilterContentVisible() {
+                return this.isDesktop || this.filtersExpanded;
+            },
+
+            booleanLabels() {
+                return { true: strings.yes, false: strings.no };
+            },
+            facetEntry(field) {
+                return (this.listing.facets || []).find(entry => entry && entry.field_name === field) || null;
+            },
+            selectedValues(field) {
+                return (this.listing.state.filters || {})[field] || [];
+            },
+            facetValueSearch(field) {
+                return String((this.listing.state.facetQueries || {})[field] || '');
+            },
+            facetOptionsFor(facet) {
+                const listing = core();
+
+                return listing
+                    ? listing.facetOptions(facet, this.facetEntry(facet.field), this.selectedValues(facet.field), this.booleanLabels())
+                    : [];
+            },
+            facetsOfType(type) {
+                return (this.listingConfig.facets || []).filter(facet => facet && facet.type === type);
+            },
+            subcategoryFacets() {
+                return this.facetsOfType('subcategory').filter(facet => this.facetOptionsFor(facet).length > 0);
+            },
+            // A facet whose value search matches nothing stays, so its search field does not vanish while typing.
+            dropdownFacets() {
+                return this.facetsOfType('dropdown').filter(facet => this.facetOptionsFor(facet).length > 0
+                    || this.facetValueSearch(facet.field) !== '');
+            },
+            checkboxFacets() {
+                return this.facetsOfType('checkbox')
+                    .filter(facet => this.facetOptionsFor(facet).some(option => option.value === 'true'));
+            },
+            // Prinz HidePrice and similar plugins turn showPrices off: no price slider then.
+            sliderFacets() {
+                const stats = this.listing.priceStats;
+                if (this.listingConfig.showPrices === false || !stats) {
+                    return [];
+                }
+
+                return this.facetsOfType('slider')
+                    .filter(facet => facet.field === 'price' && (stats.min < stats.max || Boolean(this.listing.state.price)));
+            },
+            hasFacets() {
+                return this.subcategoryFacets().length + this.dropdownFacets().length + this.checkboxFacets().length
+                    + this.sliderFacets().length > 0;
+            },
+            hasSortChoice() {
+                return (this.listingConfig.sortOptions || []).length > 1;
+            },
+            showFacets() {
+                return this.showControls() && this.hasFacets();
+            },
+            showDrawerToggle() {
+                return this.showControls() && (this.hasFacets() || this.hasSortChoice());
+            },
+            hasPriceFilter() {
+                return this.listingConfig.showPrices !== false && Boolean(this.listing.state.price);
+            },
+            activeFilterCount() {
+                const listing = core();
+                const chips = listing ? listing.activeFilterChips(this.listing.state, this.listingConfig, this.booleanLabels()) : [];
+
+                return chips.length + (this.hasPriceFilter() ? 1 : 0);
+            },
+            hasActiveFilterCount() {
+                return this.activeFilterCount() > 0;
+            },
+
+            // Desktop shows one popover at a time; the drawer is an accordion with any number open.
+            isPanelOpen(key) {
+                return Boolean(this.openPanels[key]);
+            },
+            togglePanel(key) {
+                const isOpen = this.isPanelOpen(key);
+                if (this.isDesktop) {
+                    this.openPanels = isOpen ? {} : { [key]: true };
+                } else {
+                    this.openPanels = Object.assign({}, this.openPanels, { [key]: !isOpen });
+                }
+            },
+            closePanel(key) {
+                if (this.isDesktop && this.isPanelOpen(key)) {
+                    this.openPanels = {};
+                }
+            },
+            dispatchFilterChange(detail) {
+                this.dispatchListingEvent('typesense-filter-change', detail);
+            },
+        };
+    }
+
+    window.addEventListener('alpine:init', () => Alpine.data('typesenseFilterBar', initTypesenseFilterBar), { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>

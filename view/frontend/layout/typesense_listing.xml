@@ -164,6 +164,33 @@ these blocks; `listing_context` is set by typesense_search_result.xml and typese
                     <block class="Magento\Framework\View\Element\Template"
                            name="typesense.listing.script.extras"
                            template="RunAsRoot_TypeSense::listing/script/extras.phtml"/>
+                    <!-- Components of the filters and toolbar slots, kept here so slot templates stay markup-only. -->
+                    <container name="typesense.listing.script.filters">
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.script.filters.bar"
+                               template="RunAsRoot_TypeSense::listing/script/filters/bar.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.script.filters.drawer"
+                               template="RunAsRoot_TypeSense::listing/script/filters/mobile-drawer.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.script.filters.dropdown"
+                               template="RunAsRoot_TypeSense::listing/script/filters/dropdown.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.script.filters.slider"
+                               template="RunAsRoot_TypeSense::listing/script/filters/slider.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.script.filters.checkbox"
+                               template="RunAsRoot_TypeSense::listing/script/filters/checkbox.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.script.filters.active-filters"
+                               template="RunAsRoot_TypeSense::listing/script/filters/active-filters.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.script.filters.sorting"
+                               template="RunAsRoot_TypeSense::listing/script/filters/sorting.phtml"/>
+                        <block class="Magento\Framework\View\Element\Template"
+                               name="typesense.listing.script.filters.page-size"
+                               template="RunAsRoot_TypeSense::listing/script/filters/page-size.phtml"/>
+                    </container>
                     <block class="Magento\Framework\View\Element\Template"
                            name="typesense.listing.script.tile"
                            template="RunAsRoot_TypeSense::listing/tile/script.phtml">
