@@ -36,7 +36,6 @@ $labelCategories  = $escaper->escapeJs(__('Categories'));
 $labelNoResults   = $escaper->escapeJs(__('No results found'));
 ?>
 
-<script src="https://cdn.jsdelivr.net/npm/typesense@1.8.2/dist/typesense.min.js" integrity="sha384-b1Uj2Udv6vFZ+nH6F6SaFpWpjpTqGXdfReSsqJhHUVr8yp2AehtZG/2EpA1dw0SN" crossorigin="anonymous"></script>
 <script>
     function initTypesenseAutocomplete() {
         const config = <?= /* @noEscape */ $config ?>;
@@ -53,26 +52,20 @@ $labelNoResults   = $escaper->escapeJs(__('No results found'));
             isOpen: false,
             hasSearched: false,
             selectedIndex: -1,
-            client: null,
             _input: null,
             _dropdown: null,
             _debounceTimer: null,
             _outsideClickHandler: null,
 
             init() {
-                this.client = new Typesense.Client({
-                    nodes: [{
-                        host: config.typesenseHost,
-                        port: String(config.typesensePort),
-                        protocol: config.typesenseProtocol,
-                    }],
-                    apiKey: config.typesenseSearchOnlyApiKey,
-                    connectionTimeoutSeconds: 2,
-                });
-
                 this._input = this.$el.querySelector('[data-ac-input]');
                 this._dropdown = this.$el.querySelector('[data-ac-dropdown]');
                 if (!this._input || !this._dropdown) return;
+
+                // typesense-js is only fetched once the shopper shows intent to search.
+                const warmUp = () => window.runAsRootTypesense.getClient().catch(() => {});
+                this._input.addEventListener('focus', warmUp, { once: true });
+                this._input.addEventListener('pointerenter', warmUp, { once: true });
 
                 this._input.addEventListener('input', (e) => {
                     this.query = e.target.value;
@@ -141,7 +134,8 @@ $labelNoResults   = $escaper->escapeJs(__('No results found'));
                     if (config.directMatchesFirst) {
                         searches.push(Object.assign({}, productSearch, { enable_synonyms: false, page: 1 }));
                     }
-                    const response = await this.client.multiSearch.perform({ searches }, config.cacheParams);
+                    const client = await window.runAsRootTypesense.getClient();
+                    const response = await client.multiSearch.perform({ searches }, config.cacheParams);
 
                     const main = response.results[0];
                     if (main.error || (main.code && !main.hits)) {

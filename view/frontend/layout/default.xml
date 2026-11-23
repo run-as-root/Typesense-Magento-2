@@ -2,6 +2,24 @@
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <body>
+        <referenceContainer name="head.additional">
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.preconnect"
+                   template="RunAsRoot_TypeSense::head/typesense-preconnect.phtml">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\ClientConfigViewModel</argument>
+                </arguments>
+            </block>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.client.loader"
+                   template="RunAsRoot_TypeSense::js/client-loader.phtml"
+                   after="typesense.preconnect">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\ClientConfigViewModel</argument>
+                </arguments>
+            </block>
+        </referenceContainer>
+
         <referenceBlock name="header-search">
             <block class="Magento\Framework\View\Element\Template"
                    name="typesense.direct.matches"

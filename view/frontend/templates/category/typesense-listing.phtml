@@ -32,7 +32,10 @@ $config = $viewModel->getJsonConfig();
 $sortOptions = $viewModel->getSortOptions();
 ?>
 
-<script src="https://cdn.jsdelivr.net/npm/typesense@1.8.2/dist/typesense.min.js" integrity="sha384-b1Uj2Udv6vFZ+nH6F6SaFpWpjpTqGXdfReSsqJhHUVr8yp2AehtZG/2EpA1dw0SN" crossorigin="anonymous"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => window.runAsRootTypesense.getClient().catch(() => {}), { once: true });
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>
 <script>
     function initTypesenseCategorySearch() {
         const config = <?= /* @noEscape */ $config ?>;
@@ -47,15 +50,8 @@ $sortOptions = $viewModel->getSortOptions();
             sortBy: '',
             filters: {},
             priceRange: null, // e.g., {min: 0, max: 25}
-            client: null,
 
             init() {
-                this.client = new Typesense.Client({
-                    nodes: [{ host: config.typesenseHost, port: String(config.typesensePort), protocol: config.typesenseProtocol }],
-                    apiKey: config.typesenseSearchOnlyApiKey,
-                    connectionTimeoutSeconds: 2,
-                });
-
                 // Bind sort change via native event (CSP blocks @change with method names)
                 const sortSelect = this.$el.querySelector('[data-sort-select]');
                 if (sortSelect) {
@@ -95,7 +91,8 @@ $sortOptions = $viewModel->getSortOptions();
                 try {
                     // documents().search() takes client-side options as its second argument, so the
                     // server-side cache params have to travel with the search params.
-                    const result = await this.client.collections(config.productCollection).documents()
+                    const client = await window.runAsRootTypesense.getClient();
+                    const result = await client.collections(config.productCollection).documents()
                         .search(Object.assign({}, searchParams, config.cacheParams));
                     this.hits = result.hits || [];
                     this.facets = result.facet_counts || [];

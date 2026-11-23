@@ -3,9 +3,15 @@
       layout="1column"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <head>
+        <title>Search Results</title>
         <css src="RunAsRoot_TypeSense::css/instant-search.css"/>
     </head>
     <body>
+        <referenceBlock name="page.main.title">
+            <action method="setPageTitle">
+                <argument translate="true" name="title" xsi:type="string">Search Results</argument>
+            </action>
+        </referenceBlock>
         <!-- Remove the default Magento/Hyva search result blocks to avoid duplicate results -->
         <referenceBlock name="search.result" remove="true"/>
         <referenceBlock name="catalogsearch.leftnav" remove="true"/>
@@ -20,6 +26,14 @@
                    name="typesense.instant.search"
                    template="RunAsRoot_TypeSense::search/results.phtml"
                    before="-">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\InstantSearchConfigViewModel</argument>
+                </arguments>
+            </block>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.search.title"
+                   template="RunAsRoot_TypeSense::search/title.phtml"
+                   after="typesense.instant.search">
                 <arguments>
                     <argument name="view_model" xsi:type="object">RunAsRoot\TypeSense\ViewModel\Frontend\InstantSearchConfigViewModel</argument>
                 </arguments>

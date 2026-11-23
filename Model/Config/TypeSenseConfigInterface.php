@@ -98,6 +98,8 @@ interface TypeSenseConfigInterface
 
     public function isReplaceCategoryPage(?int $storeId = null): bool;
 
+    public function isCacheableSearchPageEnabled(?int $storeId = null): bool;
+
     public function getListingImageId(?int $storeId = null): string;
 
     public function isAutocompleteEnabled(?int $storeId = null): bool;

@@ -399,6 +399,15 @@ final class TypeSenseConfigTest extends TestCase
         self::assertTrue($this->sut->isDirectMatchesFirstEnabled(3));
     }
 
+    public function test_cacheable_search_page_reads_instant_search_group_per_store(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/instant_search/cacheable_search_page', ScopeInterface::SCOPE_STORE, 2)
+            ->willReturn(true);
+
+        self::assertTrue($this->sut->isCacheableSearchPageEnabled(2));
+    }
+
     public function test_get_listing_image_id_returns_configured_value(): void
     {
         $this->scopeConfig->method('getValue')

@@ -253,6 +253,11 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return $this->getFlag('instant_search/replace_category_page', $storeId);
     }
 
+    public function isCacheableSearchPageEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('instant_search/cacheable_search_page', $storeId);
+    }
+
     public function getListingImageId(?int $storeId = null): string
     {
         $value = (string) $this->getValue('instant_search/image_type', $storeId);

@@ -330,6 +330,15 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Use TypeSense for category product listings.</comment>
                 </field>
+                <field id="cacheable_search_page" translate="label comment" type="select"
+                       sortOrder="35" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Cacheable Search Page</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Serve the search page as a full-page-cacheable shell (results load from TypeSense in the browser). Magento then no longer records search terms: popularity, the Search Terms report and the autocomplete suggestions built from them stop updating. Search terms with a redirect URL still redirect.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
                 <field id="image_type" translate="label" type="select"
                        sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Image Type</label>
