@@ -21,13 +21,12 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
         'id', 'product_id', 'name', 'sku', 'url', 'image_url', 'price', 'final_price', 'regular_price',
         'description', 'short_description', 'categories', 'category_ids', 'categories.lvl0', 'categories.lvl1',
         'categories.lvl2', 'in_stock', 'is_new', 'type_id', 'visibility', 'created_at', 'updated_at',
-        'sales_count', 'rating_summary', 'review_count', 'children', 'categories_text',
+        'sales_count', 'rating_summary', 'review_count', 'children', 'children_text', 'categories_text',
         NameDecompounder::FIELD, 'embedding',
     ];
 
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
-        private readonly AttributeResolverInterface $attributeResolver,
     ) {
     }
 
@@ -72,17 +71,18 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'sales_count', 'type' => 'int32'],
             ['name' => 'rating_summary', 'type' => 'int32'],
             ['name' => 'review_count', 'type' => 'int32'],
-            // Display-only listing data for grouped products; filtering and sorting use the parent's fields.
+            // Display-only listing data for grouped products; the parent's attribute fields and children_text
+            // carry the children's values for filtering and search.
             ['name' => 'children', 'type' => 'object[]', 'optional' => true, 'index' => false],
+            ['name' => 'children_text', 'type' => 'string[]', 'optional' => true],
         ];
 
-        $multiselectCodes = $this->attributeResolver->getMultiselectAttributeCodes();
         // Config imported from files bypasses the admin source that hides core attributes, and Typesense
         // rejects a schema with duplicate field names.
         $additionalAttributes = array_diff($this->config->getAdditionalAttributes(), self::RESERVED_FIELDS);
         foreach ($additionalAttributes as $attrCode) {
-            $type = in_array($attrCode, $multiselectCodes, true) ? 'string[]' : 'string';
-            $fields[] = ['name' => $attrCode, 'type' => $type, 'optional' => true, 'facet' => true];
+            // An array even for a single select: a composite parent holds the values of all its children.
+            $fields[] = ['name' => $attrCode, 'type' => 'string[]', 'optional' => true, 'facet' => true];
         }
 
         // Text representation of categories for embedding

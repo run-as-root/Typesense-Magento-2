@@ -9,16 +9,10 @@ use Magento\Catalog\Model\Product;
 interface AttributeResolverInterface
 {
     /**
-     * Return extra EAV attribute key/value pairs for the given product.
+     * Values of the configured additional attributes, option attributes by label. Every attribute is a list
+     * because a composite parent also holds its children's values.
      *
-     * @return array<string, mixed>
+     * @return array<string, list<string>>
      */
     public function getExtraAttributes(Product $product): array;
-
-    /**
-     * Configured additional attributes that are indexed as label arrays.
-     *
-     * @return string[]
-     */
-    public function getMultiselectAttributeCodes(): array;
 }

@@ -52,7 +52,7 @@ final class SearchableAttributesProviderTest extends TestCase
             ['attribute' => 'material', 'weight' => 3],
         ]);
 
-        self::assertSame(['name' => 10, 'material' => 3], $this->sut->getWeightedFields());
+        self::assertSame(['name' => 10, 'children_text' => 10, 'material' => 3], $this->sut->getWeightedFields());
     }
 
     public function test_weighted_fields_keep_name_decompounded_when_decompounding_is_enabled_for_the_store(): void
@@ -64,7 +64,7 @@ final class SearchableAttributesProviderTest extends TestCase
             ['attribute' => 'name_decompounded', 'weight' => 7],
         ]);
 
-        self::assertSame(['name' => 10, 'name_decompounded' => 7], $this->sut->getWeightedFields(5));
+        self::assertSame(['name' => 10, 'children_text' => 10, 'name_decompounded' => 7], $this->sut->getWeightedFields(5));
     }
 
     public function test_weighted_fields_fall_back_to_name_when_nothing_valid(): void
@@ -72,7 +72,7 @@ final class SearchableAttributesProviderTest extends TestCase
         $this->config->method('getAdditionalAttributes')->willReturn([]);
         $this->config->method('getSearchableAttributes')->willReturn([['attribute' => 'color', 'weight' => 5]]);
 
-        self::assertSame(['name' => 1], $this->sut->getWeightedFields());
+        self::assertSame(['name' => 1, 'children_text' => 1], $this->sut->getWeightedFields());
     }
 
     public function test_weighted_fields_keep_first_row_of_duplicate_attribute(): void
@@ -84,6 +84,36 @@ final class SearchableAttributesProviderTest extends TestCase
             ['attribute' => 'sku', 'weight' => 2],
         ]);
 
-        self::assertSame(['sku' => 9, 'name' => 5], $this->sut->getWeightedFields());
+        self::assertSame(['sku' => 9, 'name' => 5, 'children_text' => 5], $this->sut->getWeightedFields());
+    }
+
+    public function test_children_text_keeps_its_configured_weight(): void
+    {
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+        $this->config->method('getSearchableAttributes')->willReturn([
+            ['attribute' => 'name', 'weight' => 10],
+            ['attribute' => 'sku', 'weight' => 9],
+            ['attribute' => 'children_text', 'weight' => 2],
+        ]);
+
+        self::assertSame(['name' => 10, 'sku' => 9, 'children_text' => 2], $this->sut->getWeightedFields());
+    }
+
+    public function test_children_text_gets_the_lowest_weight_when_name_is_not_searched(): void
+    {
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+        $this->config->method('getSearchableAttributes')->willReturn([
+            ['attribute' => 'sku', 'weight' => 9],
+            ['attribute' => 'description', 'weight' => 3],
+        ]);
+
+        self::assertSame(['sku' => 9, 'description' => 3, 'children_text' => 3], $this->sut->getWeightedFields());
+    }
+
+    public function test_children_text_is_offered_as_a_searchable_attribute(): void
+    {
+        $this->config->method('getAdditionalAttributes')->willReturn([]);
+
+        self::assertSame('Child Products', $this->sut->getOptions()['children_text']);
     }
 }

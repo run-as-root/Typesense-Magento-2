@@ -13,6 +13,7 @@ use Magento\GroupedProduct\Model\Product\Type\Grouped;
 use Magento\Store\Model\StoreManagerInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\NameDecompounder;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\CompositeChildrenDataResolver;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\GroupedChildrenResolver;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\SalableResolverInterface;
 
@@ -33,7 +34,25 @@ class ProductDataBuilder
         private readonly NameDecompounder $nameDecompounder,
         private readonly GroupedChildrenResolver $groupedChildrenResolver,
         private readonly NewProductResolverInterface $newProductResolver,
+        private readonly CompositeChildrenDataResolver $compositeChildrenResolver,
     ) {
+    }
+
+    /**
+     * Resolves the children of the batch's composite products at once, so build() does not query them per parent.
+     */
+    public function preloadChildren(ProductCollection $collection, int $storeId): void
+    {
+        $parentIds = [];
+        /** @var Product[] $products */
+        $products = $collection->getItems();
+        foreach ($products as $product) {
+            if ($product->isComposite()) {
+                $parentIds[] = (int) $product->getId();
+            }
+        }
+
+        $this->compositeChildrenResolver->preload($parentIds, $storeId);
     }
 
     /**
@@ -101,7 +120,17 @@ class ProductDataBuilder
         $document['rating_summary'] = $this->reviewResolver->getRatingSummary($productId, $storeId);
         $document['review_count'] = $this->reviewResolver->getReviewCount($productId, $storeId);
 
-        return $document + $this->attributeResolver->getExtraAttributes($product);
+        $attributes = $this->attributeResolver->getExtraAttributes($product);
+        if ($product->isComposite()) {
+            $children = $this->compositeChildrenResolver->getChildren($productId, $storeId);
+            $attributes = $this->mergeChildAttributes($attributes, $children);
+            $childrenText = $this->getChildrenText($children);
+            if ($childrenText !== []) {
+                $document['children_text'] = $childrenText;
+            }
+        }
+
+        return $document + $attributes;
     }
 
     /**
@@ -178,6 +207,33 @@ class ProductDataBuilder
         }
 
         return $cheapest;
+    }
+
+    /**
+     * @param array<string, list<string>> $attributes
+     * @param list<array{name: string, sku: string, attributes: array<string, list<string>>}> $children
+     * @return array<string, list<string>>
+     */
+    private function mergeChildAttributes(array $attributes, array $children): array
+    {
+        foreach ($children as $child) {
+            foreach ($child['attributes'] as $code => $values) {
+                $attributes[$code] = array_values(array_unique([...($attributes[$code] ?? []), ...$values]));
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * @param list<array{name: string, sku: string, attributes: array<string, list<string>>}> $children
+     * @return list<string>
+     */
+    private function getChildrenText(array $children): array
+    {
+        $texts = [...array_column($children, 'name'), ...array_column($children, 'sku')];
+
+        return array_values(array_unique(array_filter($texts, static fn (string $text): bool => $text !== '')));
     }
 
     private function getSkipWordsSource(Product $product, int $storeId): string

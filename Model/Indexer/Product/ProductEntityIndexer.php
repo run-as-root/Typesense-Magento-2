@@ -39,6 +39,7 @@ class ProductEntityIndexer implements EntityIndexerInterface, CollectionSettings
     public function buildDocuments(array $entityIds, int $storeId): iterable
     {
         $collection = $this->dataBuilder->getProductCollection($entityIds, $storeId);
+        $this->dataBuilder->preloadChildren($collection, $storeId);
 
         /** @var Product $product */
         foreach ($collection as $product) {

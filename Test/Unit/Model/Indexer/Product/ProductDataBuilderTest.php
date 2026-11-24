@@ -28,6 +28,7 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\ImageResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\NewProductResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\PriceCalculatorInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductDataBuilder;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\CompositeChildrenDataResolver;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\GroupedChildrenResolver;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\SalableResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ReviewResolverInterface;
@@ -52,6 +53,7 @@ final class ProductDataBuilderTest extends TestCase
     private NameDecompounder $nameDecompounder;
     private GroupedChildrenResolver $groupedChildrenResolver;
     private NewProductResolverInterface&MockObject $newProductResolver;
+    private CompositeChildrenDataResolver&MockObject $compositeChildrenResolver;
     private ProductDataBuilder $sut;
 
     protected function setUp(): void
@@ -85,6 +87,7 @@ final class ProductDataBuilderTest extends TestCase
 
         $this->groupedChildrenResolver = new GroupedChildrenResolver($this->priceCalculator, $this->salableResolver);
         $this->newProductResolver = $this->createMock(NewProductResolverInterface::class);
+        $this->compositeChildrenResolver = $this->createMock(CompositeChildrenDataResolver::class);
 
         $this->sut = $this->buildSut();
     }
@@ -313,6 +316,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->nameDecompounder,
             $this->groupedChildrenResolver,
             $this->newProductResolver,
+            $this->compositeChildrenResolver,
         );
     }
 
@@ -486,6 +490,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->nameDecompounder,
             $this->groupedChildrenResolver,
             $this->newProductResolver,
+            $this->compositeChildrenResolver,
         );
 
         $document = $sut->build($product, 1);
@@ -530,6 +535,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->nameDecompounder,
             $this->groupedChildrenResolver,
             $this->newProductResolver,
+            $this->compositeChildrenResolver,
         );
 
         $document = $sut->build($product, 2);
@@ -574,6 +580,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->nameDecompounder,
             $this->groupedChildrenResolver,
             $this->newProductResolver,
+            $this->compositeChildrenResolver,
         );
 
         $document = $sut->build($product, 2);
@@ -752,6 +759,104 @@ final class ProductDataBuilderTest extends TestCase
         $parent = $this->createGroupedProduct([]);
 
         self::assertNull($this->sut->build($parent, 1));
+    }
+
+    public function test_composite_parent_holds_the_distinct_attribute_values_of_itself_and_its_children(): void
+    {
+        $parent = $this->createProductMock(id: 10, sku: 'JT', name: 'Jagertee', typeId: 'configurable');
+        $parent->method('isComposite')->willReturn(true);
+        $parent->method('getData')->willReturn(null);
+        $this->priceCalculator->method('getFinalPrice')->willReturn(9.9);
+        $this->categoryResolver->method('getCategoryData')->willReturn([
+            'categories' => [], 'category_ids' => [],
+            'categories.lvl0' => [], 'categories.lvl1' => [], 'categories.lvl2' => [],
+        ]);
+        $this->attributeResolver->method('getExtraAttributes')->with($parent)->willReturn([
+            'trade_name' => ['Jagertee'],
+            'color' => ['Braun'],
+        ]);
+        $this->compositeChildrenResolver->method('getChildren')->with(10, 1)->willReturn([
+            ['name' => 'Jagertee 0,02l', 'sku' => 'JT-002', 'attributes' => ['trade_name' => ['Likör'], 'volume_percent' => ['40']]],
+            ['name' => 'Jagertee 0,5l', 'sku' => 'JT-05', 'attributes' => ['trade_name' => ['Jagertee'], 'volume_percent' => ['40']]],
+        ]);
+
+        $document = $this->sut->build($parent, 1);
+
+        self::assertNotNull($document);
+        self::assertSame(['Jagertee', 'Likör'], $document['trade_name']);
+        self::assertSame(['Braun'], $document['color']);
+        self::assertSame(['40'], $document['volume_percent']);
+        self::assertSame(['Jagertee 0,02l', 'Jagertee 0,5l', 'JT-002', 'JT-05'], $document['children_text']);
+        self::assertSame(9.9, $document['price']);
+    }
+
+    public function test_child_values_never_overwrite_core_document_fields(): void
+    {
+        $parent = $this->createProductMock(id: 10, typeId: 'bundle');
+        $parent->method('isComposite')->willReturn(true);
+        $this->stubEmptyProductData($parent);
+        $this->compositeChildrenResolver->method('getChildren')->willReturn([
+            ['name' => 'Child', 'sku' => 'C', 'attributes' => ['price' => ['1.00']]],
+        ]);
+
+        $document = $this->sut->build($parent, 1);
+
+        self::assertNotNull($document);
+        self::assertSame(0.0, $document['price']);
+    }
+
+    public function test_product_that_is_not_composite_resolves_no_children(): void
+    {
+        $product = $this->createProductMock();
+        $this->stubEmptyProductData($product);
+        $this->compositeChildrenResolver->expects(self::never())->method('getChildren');
+
+        $document = $this->sut->build($product, 1);
+
+        self::assertNotNull($document);
+        self::assertArrayNotHasKey('children_text', $document);
+    }
+
+    public function test_composite_parent_without_children_gets_no_children_text(): void
+    {
+        $parent = $this->createProductMock(id: 10, typeId: 'configurable');
+        $parent->method('isComposite')->willReturn(true);
+        $this->stubEmptyProductData($parent);
+        $this->compositeChildrenResolver->method('getChildren')->willReturn([]);
+
+        self::assertArrayNotHasKey('children_text', $this->sut->build($parent, 1) ?? []);
+    }
+
+    public function test_grouped_parent_keeps_its_display_children_next_to_the_children_text(): void
+    {
+        $parent = $this->createGroupedProduct([[39.9, 44.9, true], [21.5, 21.5, true]]);
+        $parent->method('isComposite')->willReturn(true);
+        $this->compositeChildrenResolver->method('getChildren')->with(10, 1)->willReturn([
+            ['name' => 'Child 0', 'sku' => 'CHILD-0', 'attributes' => []],
+            ['name' => 'Child 1', 'sku' => 'CHILD-1', 'attributes' => []],
+        ]);
+
+        $document = $this->sut->build($parent, 1);
+
+        self::assertNotNull($document);
+        self::assertSame(['CHILD-0', 'CHILD-1'], array_column($document['children'], 'sku'));
+        self::assertSame(['Child 0', 'Child 1', 'CHILD-0', 'CHILD-1'], $document['children_text']);
+        self::assertSame(21.5, $document['price']);
+    }
+
+    public function test_preload_children_resolves_the_composite_products_of_the_batch(): void
+    {
+        $simple = $this->createProductMock(id: 1);
+        $grouped = $this->createProductMock(id: 2, typeId: Grouped::TYPE_CODE);
+        $grouped->method('isComposite')->willReturn(true);
+        $configurable = $this->createProductMock(id: 3, typeId: 'configurable');
+        $configurable->method('isComposite')->willReturn(true);
+        $collection = $this->createMock(ProductCollection::class);
+        $collection->method('getItems')->willReturn([1 => $simple, 2 => $grouped, 3 => $configurable]);
+
+        $this->compositeChildrenResolver->expects(self::once())->method('preload')->with([2, 3], 4);
+
+        $this->sut->preloadChildren($collection, 4);
     }
 
     /**

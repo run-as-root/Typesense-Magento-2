@@ -43,7 +43,7 @@ final class AttributeResolverTest extends TestCase
             ['color', 'Red'],
         ]);
 
-        self::assertSame(['material' => ['Wood', 'Glass'], 'color' => 'Red'], $this->sut->getExtraAttributes($product));
+        self::assertSame(['material' => ['Wood', 'Glass'], 'color' => ['Red']], $this->sut->getExtraAttributes($product));
     }
 
     public function test_multiselect_with_single_option_is_still_an_array(): void
@@ -80,11 +80,26 @@ final class AttributeResolverTest extends TestCase
 
         $extra = (new AttributeResolver($factory, $config))->getExtraAttributes($product);
 
-        self::assertSame(['color' => 'Red'], $extra);
+        self::assertSame(['color' => ['Red']], $extra);
     }
 
-    public function test_lists_multiselect_codes(): void
+    public function test_text_attribute_values_are_a_single_string_in_a_list(): void
     {
-        self::assertSame(['material'], $this->sut->getMultiselectAttributeCodes());
+        $abv = $this->createMock(Attribute::class);
+        $abv->method('getAttributeCode')->willReturn('abv');
+        $abv->method('getFrontendInput')->willReturn('text');
+        $empty = $this->createMock(Attribute::class);
+        $empty->method('getAttributeCode')->willReturn('origin');
+        $empty->method('getFrontendInput')->willReturn('text');
+        $collection = $this->createMock(Collection::class);
+        $collection->method('getIterator')->willReturn(new \ArrayIterator([$abv, $empty]));
+        $factory = $this->createMock(CollectionFactory::class);
+        $factory->method('create')->willReturn($collection);
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn(['abv', 'origin']);
+        $product = $this->createMock(Product::class);
+        $product->method('getData')->willReturnMap([['abv', null, 40.5], ['origin', null, '']]);
+
+        self::assertSame(['abv' => ['40.5']], (new AttributeResolver($factory, $config))->getExtraAttributes($product));
     }
 }
