@@ -216,6 +216,19 @@ test('facetStats floors min and ceils max', () => {
     assert.equal(core.facetStats(mapped, 'price'), null, 'without the search list nothing is guessed');
 });
 
+test('facetStats collapses a single price to one bound, so rounding does not invent a range', () => {
+    const config = searchConfig();
+    const searches = core.buildSearches(state({ q: 'gin' }), config);
+    const single = { field_name: 'price', counts: [], stats: { min: 0.9, max: 0.9 } };
+    const results = searches.map(() => ({ facet_counts: [] }));
+    results[searches.facetSources.price] = { facet_counts: [single] };
+
+    assert.deepEqual(core.facetStats(results, 'price', searches), { min: 0, max: 0 });
+
+    results[searches.facetSources.price] = { facet_counts: [{ field_name: 'price', counts: [], stats: { min: 0.9, max: 0.95 } }] };
+    assert.deepEqual(core.facetStats(results, 'price', searches), { min: 0, max: 1 });
+});
+
 test('buildSortBy puts in_stock first and never exceeds three fields', () => {
     const config = searchConfig();
 

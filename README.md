@@ -184,7 +184,7 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | Products Per Page | 12 | Results per page on the search results page |
 | Product Tile Attributes | — | Attributes displayed on product cards (must also be indexed) |
 | Sort Options | relevance, price asc/desc, newest | Sort options available to customers (see below) |
-| Facet Filters | — | Facets shown in the filter bar: additional attributes plus Price, Availability (`in_stock`) and New (`is_new`). Category pages always get the subcategory filter |
+| Facet Filters | — | Facets shown in the filter bar: additional attributes plus Price, Availability (`in_stock`) and New (`is_new`). Category pages always get the subcategory filter. The price slider is hidden when all results have the same price |
 | Facet Types | — | Per facet: dropdown, checkbox (Yes/No fields) or slider (Price only), and "Value Search" for dropdowns. Price defaults to a slider |
 | Show Out-of-Stock Products Last | Yes | Sorts by `in_stock:desc` before the chosen sort |
 | Replace Category Pages | No | Use Typesense for category product listings (not for "Static block only" categories) |

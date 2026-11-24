@@ -120,6 +120,16 @@ test('facets are routed by type and the slider disappears when prices are hidden
     assert.equal(bar.hasPriceFilter(), false);
 });
 
+test('the price slider is hidden when every hit has the same price', () => {
+    const env = createEnvironment();
+    const bar = env.component('initTypesenseFilterBar');
+
+    bar.$event = { detail: snapshot({ priceStats: { min: 0, max: 0 } }) };
+    bar.onListingState();
+
+    assert.equal(bar.sliderFacets().length, 0);
+});
+
 test('dropdown options toggle and search with structured field/value payloads', () => {
     const env = createEnvironment();
     const bar = env.component('initTypesenseFilterBar');
