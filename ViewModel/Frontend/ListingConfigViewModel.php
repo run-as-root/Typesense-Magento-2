@@ -17,8 +17,8 @@ use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
+use RunAsRoot\TypeSense\Model\Listing\CategoryFacetResolver;
 use RunAsRoot\TypeSense\Model\Listing\FacetConfigBuilder;
-use RunAsRoot\TypeSense\Model\Listing\SubcategoryFacetResolver;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
@@ -56,7 +56,7 @@ class ListingConfigViewModel implements ArgumentInterface
         private readonly LocaleResolverInterface $localeResolver,
         private readonly ConversationModelManager $conversationModelManager,
         private readonly LoggerInterface $logger,
-        private readonly SubcategoryFacetResolver $subcategoryFacetResolver,
+        private readonly CategoryFacetResolver $categoryFacetResolver,
     ) {
     }
 
@@ -107,7 +107,7 @@ class ListingConfigViewModel implements ArgumentInterface
             'context' => $isCategory ? self::CONTEXT_CATEGORY : self::CONTEXT_SEARCH,
             'categoryId' => $category !== null ? (int) $category->getId() : null,
             'baseFilter' => $isCategory ? $this->getCategoryFilter($category, $storeId) : self::SEARCH_BASE_FILTER,
-            'facets' => $this->getFacets($category, $storeId, !$isCategory),
+            'facets' => $this->getFacets($isCategory, $category, $store),
             'maxFacetValues' => self::MAX_FACET_VALUES,
             'sortOptions' => $this->getSortOptions($category, $storeId),
             'defaultSort' => $category !== null ? $this->mapMagentoSort((string) $category->getDefaultSortBy()) : '',
@@ -172,23 +172,23 @@ class ListingConfigViewModel implements ArgumentInterface
         }
     }
 
-    /** @return list<array<string, mixed>> */
-    private function getFacets(?Category $category, int $storeId, bool $isSearchPage): array
+    /**
+     * The category facet comes first whenever it applies, like Magento's category filter; the configured facets
+     * never contain a category field (see FacetConfigBuilder).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function getFacets(bool $isCategory, ?Category $category, Store $store): array
     {
-        $facets = $this->facetConfigBuilder->build($storeId, $isSearchPage);
-        $subcategory = $category !== null ? $this->subcategoryFacetResolver->resolve($category, $storeId) : null;
-        if ($subcategory === null) {
-            return $facets;
+        $storeId = (int) $store->getId();
+        $facets = $this->facetConfigBuilder->build($storeId, !$isCategory);
+        if ($isCategory) {
+            $categoryFacet = $category !== null ? $this->categoryFacetResolver->resolve($category, $storeId) : null;
+        } else {
+            $categoryFacet = $this->categoryFacetResolver->resolveForStoreRoot((int) $store->getRootCategoryId(), $storeId);
         }
 
-        // Inside a category only its next level is useful; the other category tree facets would repeat
-        // the "Category" filter with values from the whole tree.
-        $others = array_filter(
-            $facets,
-            static fn (array $facet): bool => !str_starts_with($facet['field'], 'categories.lvl'),
-        );
-
-        return [$subcategory, ...array_values($others)];
+        return $categoryFacet !== null ? [$categoryFacet, ...$facets] : $facets;
     }
 
     /** @return list<array{label: string, value: string}> */

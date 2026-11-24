@@ -68,8 +68,8 @@ class CategoryResolver implements CategoryResolverInterface
             $names = [];
             $ancestry = $this->getAncestry($category, $storeId);
             foreach ($ancestry as $node) {
-                // An inactive ancestor's name stays in the deeper paths: SubcategoryFacetResolver builds its
-                // prefix from the same repository names.
+                // An inactive ancestor's name stays in the deeper paths, so every path is the category's full
+                // location in the tree.
                 $names[] = (string) $node->getName();
                 if (!$node->getIsActive()) {
                     continue;

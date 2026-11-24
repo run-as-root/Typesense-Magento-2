@@ -469,6 +469,22 @@ final class TypeSenseConfigTest extends TestCase
         self::assertSame([], $this->sut->getSearchableAttributes());
     }
 
+    public function test_facet_filters_are_the_configured_fields_without_a_forced_category_field(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->with('run_as_root_typesense/instant_search/facet_filters', ScopeInterface::SCOPE_STORE, 2)
+            ->willReturn(' color ,,in_stock,color');
+
+        self::assertSame(['color', 'in_stock'], $this->sut->getFacetFilters(2));
+    }
+
+    public function test_no_facet_filters_configured(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertSame([], $this->sut->getFacetFilters());
+    }
+
     public function test_facet_types_are_keyed_by_attribute_and_skip_incomplete_rows(): void
     {
         $this->scopeConfig->method('getValue')

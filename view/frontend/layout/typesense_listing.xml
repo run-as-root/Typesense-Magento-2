@@ -36,8 +36,8 @@ these blocks; `listing_context` is set by typesense_search_result.xml and typese
                                    name="typesense.listing.filters.sorting-mobile" as="sorting-mobile"
                                    template="RunAsRoot_TypeSense::listing/filters/sorting-mobile.phtml"/>
                             <block class="Magento\Framework\View\Element\Template"
-                                   name="typesense.listing.filters.subcategory" as="subcategory"
-                                   template="RunAsRoot_TypeSense::listing/filters/subcategory.phtml"/>
+                                   name="typesense.listing.filters.category" as="category"
+                                   template="RunAsRoot_TypeSense::listing/filters/category.phtml"/>
                             <block class="Magento\Framework\View\Element\Template"
                                    name="typesense.listing.filters.dropdown" as="dropdown"
                                    template="RunAsRoot_TypeSense::listing/filters/dropdown.phtml">

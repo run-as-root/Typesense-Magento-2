@@ -321,7 +321,7 @@
                 <field id="facet_filters" translate="label comment" type="multiselect" sortOrder="27" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Facet Filters</label>
                     <source_model>RunAsRoot\TypeSense\Model\Config\Source\FacetAttributeSource</source_model>
-                    <comment>Product attributes to show as filters. "Category" is always included automatically. Only attributes marked as "Additional Attributes to Index" (and the core fields) will work as facets.</comment>
+                    <comment>Product attributes to show as filters. The category filter (children of the current category, top-level categories on the search page) is always shown first. Only attributes marked as "Additional Attributes to Index" (and the core fields) will work as facets.</comment>
                     <can_be_empty>1</can_be_empty>
                 </field>
                 <field id="facet_types" translate="label comment" sortOrder="28" showInDefault="1" showInWebsite="1" showInStore="1">

@@ -184,7 +184,7 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | Products Per Page | 12 | Results per page on the search results page |
 | Product Tile Attributes | — | Attributes displayed on product cards (must also be indexed) |
 | Sort Options | relevance, price asc/desc, newest | Sort options available to customers (see below) |
-| Facet Filters | — | Facets shown in the filter bar: additional attributes plus Price, Availability (`in_stock`) and New (`is_new`). Category pages always get the subcategory filter. The search page leaves out attributes (Price included) whose "Use in Search Results Layered Navigation" is No. The price slider is hidden when all results have the same price |
+| Facet Filters | — | Facets shown in the filter bar: additional attributes plus Price, Availability (`in_stock`) and New (`is_new`). The category filter is always added first (see [Category facet](#category-facet)); `categories.lvl0`/`lvl1`/`lvl2` or `category_ids` in this list are ignored. The search page leaves out attributes (Price included) whose "Use in Search Results Layered Navigation" is No. The price slider is hidden when all results have the same price |
 | Facet Types | — | Per facet: dropdown, checkbox (Yes/No fields) or slider (Price only), and "Value Search" for dropdowns. Price defaults to a slider |
 | Show Out-of-Stock Products Last | Yes | Sorts by `in_stock:desc` before the chosen sort |
 | Replace Category Pages | No | Use Typesense for category product listings (not for "Static block only" categories) |
@@ -420,6 +420,14 @@ Other `around` plugins on `Magento\CatalogSearch\Controller\Result\Index` that a
 
 When "Replace Category Pages" is on, Typesense category pages (handle `typesense_category_search`) use the same listing, filtered by `category_ids` (anchor categories include their subtree) and visibility catalog/both. Filtering, sorting and pagination happen in the browser against Typesense; Magento's product collection is never loaded for the listing.
 
+### Category facet
+
+Both listings start with a "Category" facet that filters by `category_ids`, like Magento's layered navigation: on a category page it lists the children of the current category, on the search page the top-level categories below the store's root category. It follows Magento's category filter (`Magento\CatalogSearch\Model\Layer\Filter\Category`): only children that are active in the store, in category position order, with store-view names, nothing below an inactive category, and only children found in the current result whose count is below the result total (selecting them would narrow nothing; a selected one always stays). A category without active children gets no category facet. Several selected categories match any of them.
+
+The facet (`CategoryFacetResolver`) reaches the browser with its categories as `values` (`[{value: "<id>", label: "<name>"}]`, in position order) and `maxValues`, the number of categories: products also carry the ids of their ancestors and of categories in other trees, and Typesense returns only the `max_facet_values` most frequent values, so the facet gets its own search whose limit covers every category id. The URL holds the ids in `cat` (`?cat=12|15`, as Magento's `?cat=12`); ids that are not listed are ignored.
+
+The category path fields `categories.lvl0`, `categories.lvl1` and `categories.lvl2` are still indexed (hierarchical paths, e.g. for a project's own facets or feeds) but no longer used by the listing.
+
 ### Storefront Listing
 
 The search and category listings share the `typesense_listing` handle: one Alpine CSP component `typesenseListing` (template `listing/listing.phtml`) built from child-block slots. Override a slot by pointing its block at your own template in a theme or module layout (`<referenceBlock name="typesense.listing.tile.price" template="Vendor_Module::listing/tile/price.phtml"/>`), or copy the template into the theme under `RunAsRoot_TypeSense/templates/<path>`.
@@ -427,7 +435,7 @@ The search and category listings share the `typesense_listing` handle: one Alpin
 | Slot (alias) | Block name | Default template |
 |---|---|---|
 | `filters` | `typesense.listing.filters` (container) | `listing/filters/bar.phtml` with `skeleton`, `drawer`, `active-filters` |
-| drawer children | `typesense.listing.filters.{sorting-mobile,subcategory,dropdown,slider,checkbox}` | `listing/filters/*.phtml` (arguments `visible_values`, `group_label`) |
+| drawer children | `typesense.listing.filters.{sorting-mobile,category,dropdown,slider,checkbox}` | `listing/filters/*.phtml` (arguments `visible_values`, `group_label`) |
 | `toolbar` | `typesense.listing.toolbar` (container) | `listing/filters/sorting.phtml`, `listing/filters/page-size.phtml` |
 | `ai-answer` | `typesense.listing.ai-answer` | `listing/ai-answer.phtml` |
 | `products-count` | `typesense.listing.products-count` | `listing/products-count.phtml` |
@@ -443,7 +451,7 @@ The Alpine components of the filters and toolbar slots (`typesenseFilterBar` wit
 
 The listing block takes `eager_load_images_count` (default 4). `listing-core.js` (`window.runAsRootTypesense.listing`) holds the logic (filters, URL state, facet counts, GA4 items) and is loaded once, deferred in the head, by `typesense.listing.core` on pages whose handle sets its `is_required` argument. Child components read the listing state from the `typesense-state` window event (`typesenseListingState()` mixin) and change it by dispatching `typesense-filter-change`, `typesense-sort-change`, `typesense-limit-change` and `typesense-page-change`.
 
-URL state uses `q`, `page`, `sort` (e.g. `price:asc`), `limit`, `price` (`min-max`) and one parameter per facet field with values joined by `|`. Unknown keys are dropped, invalid values fall back to the defaults and `page` is clamped to the available pages.
+URL state uses `q`, `page`, `sort` (e.g. `price:asc`), `limit`, `price` (`min-max`) and one parameter per facet with values joined by `|`: the facet's `param` when it has one (`cat` for the category facet), else its field name. Unknown keys are dropped, invalid values fall back to the defaults, a facet with a `values` list accepts only those values, and `page` is clamped to the available pages.
 
 #### Tile API for theme overrides
 
@@ -513,7 +521,7 @@ Each listing renders its config as JSON in `<script type="application/json" data
 | `productCollection` | Store's product alias, e.g. `rar_product_de` |
 | `context`, `categoryId`, `listName` | `search` or `category`, the category id, the GA4 list name (category name or "Search Results") |
 | `baseFilter` | `filter_by` every search starts from (category ids or virtual rule, visibility) |
-| `facets` | `[{field, label, type, searchable, boolean, numeric, prefix?}]`; `type` is `dropdown`, `checkbox`, `slider` or `subcategory`, `numeric` is `int32`/`int64`/`float` or `false` |
+| `facets` | `[{field, label, type, searchable, boolean, numeric, param?, values?, maxValues?}]`; `type` is `dropdown`, `checkbox`, `slider` or `category`, `numeric` is `int32`/`int64`/`float` or `false`. `param` is the URL key (else `field`), `values` (`[{value, label}]`) the only values offered and accepted, in that order and with those labels, and `maxValues` the facet's own `max_facet_values` (it then always gets its own search) |
 | `maxFacetValues` | `max_facet_values` sent to Typesense (50) |
 | `sortOptions`, `defaultSort` | `[{label, value}]` (`value` is a Typesense `sort_by`, `''` = relevance) and the category's default |
 | `limits`, `perPage` | Page sizes from the catalog grid settings and the default |
@@ -554,7 +562,7 @@ Projects with their own item shape leave the setting off and listen to the windo
 
 #### Index requirements
 
-Grouped tiles read `children` (`object[]`), which needs a product collection created with `enable_nested_fields: true`. The flag can only be set when a collection is created, so after upgrading run a full product reindex (`bin/magento typesense:reindex --entity=product`) with Zero-Downtime Reindex on, or delete the product collections first without it. The same reindex adds the `price` facet (slider stats), sortable `in_stock`, `is_new`, the ancestor category paths in `categories.lvlN` and the anchor ancestors in `category_ids`.
+Grouped tiles read `children` (`object[]`), which needs a product collection created with `enable_nested_fields: true`. The flag can only be set when a collection is created, so after upgrading run a full product reindex (`bin/magento typesense:reindex --entity=product`) with Zero-Downtime Reindex on, or delete the product collections first without it. The same reindex adds the `price` facet (slider stats), sortable `in_stock`, `is_new`, the ancestor category paths in `categories.lvlN` and the anchor ancestors in `category_ids` (faceted for the category facet).
 
 #### Hyvä Tailwind CSS
 

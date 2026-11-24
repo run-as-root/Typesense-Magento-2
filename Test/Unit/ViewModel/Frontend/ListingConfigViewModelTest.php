@@ -21,8 +21,8 @@ use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface;
+use RunAsRoot\TypeSense\Model\Listing\CategoryFacetResolver;
 use RunAsRoot\TypeSense\Model\Listing\FacetConfigBuilder;
-use RunAsRoot\TypeSense\Model\Listing\SubcategoryFacetResolver;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
@@ -39,7 +39,7 @@ final class ListingConfigViewModelTest extends TestCase
     private EavConfig&MockObject $eavConfig;
     private ScopeConfigInterface&MockObject $scopeConfig;
     private LoggerInterface&MockObject $logger;
-    private SubcategoryFacetResolver&MockObject $subcategoryFacetResolver;
+    private CategoryFacetResolver&MockObject $categoryFacetResolver;
     /** @var list<mixed> */
     private array $constructorArguments;
     private ListingConfigViewModel $sut;
@@ -66,6 +66,7 @@ final class ListingConfigViewModelTest extends TestCase
         $store = $this->createMock(Store::class);
         $store->method('getId')->willReturn(1);
         $store->method('getCode')->willReturn('de');
+        $store->method('getRootCategoryId')->willReturn(2);
         $store->method('getCurrentCurrencyCode')->willReturn('CHF');
         $storeManager = $this->createMock(StoreManagerInterface::class);
         $storeManager->method('getStore')->willReturn($store);
@@ -93,7 +94,7 @@ final class ListingConfigViewModelTest extends TestCase
         $conversationModelManager = $this->createMock(ConversationModelManager::class);
         $conversationModelManager->method('getModelId')->willReturn('rar-product-assistant');
         $this->logger = $this->createMock(LoggerInterface::class);
-        $this->subcategoryFacetResolver = $this->createMock(SubcategoryFacetResolver::class);
+        $this->categoryFacetResolver = $this->createMock(CategoryFacetResolver::class);
 
         $this->constructorArguments = [
             $this->config,
@@ -109,7 +110,7 @@ final class ListingConfigViewModelTest extends TestCase
             $localeResolver,
             $conversationModelManager,
             $this->logger,
-            $this->subcategoryFacetResolver,
+            $this->categoryFacetResolver,
         ];
         $this->sut = new ListingConfigViewModel(...$this->constructorArguments);
     }
@@ -182,7 +183,6 @@ final class ListingConfigViewModelTest extends TestCase
         $facets = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH)['facets'];
 
         self::assertSame([
-            ['field' => 'categories.lvl0', 'label' => 'Category', 'type' => 'dropdown', 'searchable' => false, 'boolean' => false, 'numeric' => false],
             ['field' => 'color', 'label' => 'Farbe', 'type' => 'dropdown', 'searchable' => true, 'boolean' => false, 'numeric' => false],
             ['field' => 'in_stock', 'label' => 'Availability', 'type' => 'dropdown', 'searchable' => false, 'boolean' => true, 'numeric' => false],
             ['field' => 'price', 'label' => 'Price', 'type' => 'slider', 'searchable' => false, 'boolean' => false, 'numeric' => 'float'],
@@ -291,32 +291,40 @@ final class ListingConfigViewModelTest extends TestCase
         self::assertSame(['', 'name:asc'], array_column($config['sortOptions'], 'value'));
     }
 
-    public function test_category_tree_facets_are_replaced_by_the_subcategory_facet_on_category_pages(): void
+    public function test_category_pages_start_with_the_facet_of_the_category_children_instead_of_the_category_tree_fields(): void
     {
         $category = $this->givenCategory(42, 'Gin', 'position');
-        $this->config->method('getFacetFilters')->willReturn(['categories.lvl0', 'color', 'categories.lvl1']);
-        $this->schemaProvider->method('getFields')->willReturn([
-            ['name' => 'color', 'type' => 'string', 'facet' => true],
-            ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
-            ['name' => 'categories.lvl1', 'type' => 'string[]', 'facet' => true],
-        ]);
-        $this->eavConfig->method('getAttribute')->willReturn($this->createMock(Attribute::class));
-        $subcategory = [
-            'field' => 'categories.lvl1',
-            'label' => 'Category',
-            'type' => 'subcategory',
-            'searchable' => false,
-            'boolean' => false,
-            'numeric' => false,
-            'prefix' => 'Gin > ',
-        ];
-        $this->subcategoryFacetResolver->method('resolve')->with($category, 1)->willReturn($subcategory);
+        $this->givenColorAndCategoryTreeFacets();
+        $categoryFacet = $this->categoryFacet();
+        $this->categoryFacetResolver->expects(self::never())->method('resolveForStoreRoot');
+        $this->categoryFacetResolver->method('resolve')->with($category, 1)->willReturn($categoryFacet);
         $this->givenCatalogLimits('12', '12');
 
         $facets = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY)['facets'];
 
-        self::assertSame([$subcategory, 'color'], [$facets[0], $facets[1]['field']]);
+        self::assertSame([$categoryFacet, 'color'], [$facets[0], $facets[1]['field']]);
         self::assertCount(2, $facets);
+    }
+
+    public function test_category_without_children_gets_no_category_facet_at_all(): void
+    {
+        $this->givenCategory(7, 'Kräuter-Schnaps & Likör', 'position');
+        $this->givenColorAndCategoryTreeFacets();
+        $this->categoryFacetResolver->method('resolve')->willReturn(null);
+        $this->givenCatalogLimits('12', '12');
+
+        $facets = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY)['facets'];
+
+        self::assertSame(['color'], array_column($facets, 'field'));
+    }
+
+    public function test_category_page_without_a_current_category_gets_no_category_facet(): void
+    {
+        $this->categoryFacetResolver->expects(self::never())->method('resolve');
+        $this->categoryFacetResolver->expects(self::never())->method('resolveForStoreRoot');
+        $this->givenCatalogLimits('12', '12');
+
+        self::assertSame([], $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY)['facets']);
     }
 
     public function test_search_page_hides_facets_of_attributes_not_filterable_in_search_but_category_pages_keep_them(): void
@@ -345,18 +353,59 @@ final class ListingConfigViewModelTest extends TestCase
         );
     }
 
-    public function test_search_pages_get_no_subcategory_facet(): void
+    public function test_search_pages_start_with_the_facet_of_the_top_level_categories(): void
     {
-        $this->subcategoryFacetResolver->expects(self::never())->method('resolve');
-        $this->config->method('getFacetFilters')->willReturn(['categories.lvl0']);
-        $this->schemaProvider->method('getFields')->willReturn([
-            ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
-        ]);
+        $this->givenColorAndCategoryTreeFacets();
+        $categoryFacet = $this->categoryFacet();
+        $this->categoryFacetResolver->expects(self::never())->method('resolve');
+        $this->categoryFacetResolver->method('resolveForStoreRoot')->with(2, 1)->willReturn($categoryFacet);
         $this->givenCatalogLimits('12', '12');
 
         $facets = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH)['facets'];
 
-        self::assertSame(['categories.lvl0'], array_column($facets, 'field'));
+        self::assertSame([$categoryFacet, 'color'], [$facets[0], $facets[1]['field']]);
+        self::assertCount(2, $facets);
+    }
+
+    public function test_category_names_in_the_json_config_cannot_close_the_inline_script(): void
+    {
+        $categoryFacet = $this->categoryFacet();
+        $categoryFacet['values'] = [['value' => '9', 'label' => '</script><script>alert(1)</script>']];
+        $this->categoryFacetResolver->method('resolveForStoreRoot')->willReturn($categoryFacet);
+        $this->givenCatalogLimits('12', '12');
+
+        $json = $this->sut->getJsonConfig(ListingConfigViewModel::CONTEXT_SEARCH);
+
+        self::assertStringNotContainsString('</script>', $json);
+        self::assertSame($categoryFacet, json_decode($json, true)['facets'][0]);
+    }
+
+    private function givenColorAndCategoryTreeFacets(): void
+    {
+        $this->config->method('getFacetFilters')->willReturn(['categories.lvl0', 'color', 'categories.lvl1']);
+        $this->schemaProvider->method('getFields')->willReturn([
+            ['name' => 'color', 'type' => 'string', 'facet' => true],
+            ['name' => 'category_ids', 'type' => 'int32[]', 'facet' => true],
+            ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
+            ['name' => 'categories.lvl1', 'type' => 'string[]', 'facet' => true],
+        ]);
+        $this->eavConfig->method('getAttribute')->willReturn($this->createMock(Attribute::class));
+    }
+
+    /** @return array<string, mixed> */
+    private function categoryFacet(): array
+    {
+        return [
+            'field' => 'category_ids',
+            'param' => 'cat',
+            'label' => 'Category',
+            'type' => 'category',
+            'searchable' => false,
+            'boolean' => false,
+            'numeric' => 'int32',
+            'values' => [['value' => '43', 'label' => 'Dry Gin'], ['value' => '44', 'label' => 'Old Tom']],
+            'maxValues' => 350,
+        ];
     }
 
     /**

@@ -1,8 +1,8 @@
 <?php
 /**
  * Filter bar placeholders until the first result: the mobile "Filter" button and one chip per facet the page usually
- * shows. Chip widths come from the layout argument `filter_chip_widths` (category pages add one for the subcategory
- * filter). Visible from the first paint (no x-cloak).
+ * shows, the category facet first. Chip widths come from the layout argument `filter_chip_widths`. Visible from the
+ * first paint (no x-cloak).
  */
 
 declare(strict_types=1);
@@ -13,7 +13,7 @@ use Magento\Framework\View\Element\Template;
 /** @var Template $block */
 /** @var Escaper $escaper */
 
-// The default classes also make Tailwind generate the widths used in the layout files.
+// The default classes also make Tailwind generate these widths for layout files that pass them.
 $chipWidths = $block->getData('filter_chip_widths') ?: ['w-28', 'w-32', 'w-28', 'w-20', 'w-24'];
 ?>
 <div x-show="showControlsSkeleton" class="typesense-filter-skeleton flex items-center gap-3" aria-hidden="true">

@@ -408,16 +408,16 @@ class TypeSenseConfig implements TypeSenseConfigInterface
     public function getFacetFilters(?int $storeId = null): array
     {
         $value = (string) $this->getValue('instant_search/facet_filters', $storeId);
-        $configured = $value !== '' ? explode(',', $value) : [];
+        $configured = explode(',', $value);
 
-        // Always include categories.lvl0 as the first facet
-        $facets = ['categories.lvl0'];
+        $facets = [];
         foreach ($configured as $attr) {
             $attr = trim($attr);
-            if ($attr !== '' && $attr !== 'categories.lvl0') {
+            if ($attr !== '' && !in_array($attr, $facets, true)) {
                 $facets[] = $attr;
             }
         }
+
         return $facets;
     }
 

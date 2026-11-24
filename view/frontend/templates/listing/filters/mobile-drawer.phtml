@@ -3,7 +3,7 @@
  * The facet container of the filter bar. Below `md` it is a modal drawer (backdrop, scroll lock, focus trap,
  * `inert` while closed, footer with "Show N items" and Reset, mobile sorting inside); from `md` up the same
  * element is the inline chip row. Its drawer state is a mixin of `typesenseFilterBar`.
- * Children: sorting-mobile, subcategory, dropdown, slider, checkbox.
+ * Children: sorting-mobile, category, dropdown, slider, checkbox.
  */
 
 declare(strict_types=1);
@@ -48,7 +48,7 @@ $heroicons = $viewModels->require(HeroiconsOutline::class);
     </div>
     <div class="flex-1 overflow-y-auto px-4 md:flex md:flex-wrap md:items-center md:gap-3 md:overflow-visible md:px-0">
         <?= $block->getChildHtml('sorting-mobile') ?>
-        <?= $block->getChildHtml('subcategory') ?>
+        <?= $block->getChildHtml('category') ?>
         <?= $block->getChildHtml('dropdown') ?>
         <?= $block->getChildHtml('slider') ?>
         <?= $block->getChildHtml('checkbox') ?>
