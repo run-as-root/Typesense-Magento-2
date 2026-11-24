@@ -107,7 +107,7 @@ class ListingConfigViewModel implements ArgumentInterface
             'context' => $isCategory ? self::CONTEXT_CATEGORY : self::CONTEXT_SEARCH,
             'categoryId' => $category !== null ? (int) $category->getId() : null,
             'baseFilter' => $isCategory ? $this->getCategoryFilter($category, $storeId) : self::SEARCH_BASE_FILTER,
-            'facets' => $this->getFacets($category, $storeId),
+            'facets' => $this->getFacets($category, $storeId, !$isCategory),
             'maxFacetValues' => self::MAX_FACET_VALUES,
             'sortOptions' => $this->getSortOptions($category, $storeId),
             'defaultSort' => $category !== null ? $this->mapMagentoSort((string) $category->getDefaultSortBy()) : '',
@@ -173,9 +173,9 @@ class ListingConfigViewModel implements ArgumentInterface
     }
 
     /** @return list<array<string, mixed>> */
-    private function getFacets(?Category $category, int $storeId): array
+    private function getFacets(?Category $category, int $storeId, bool $isSearchPage): array
     {
-        $facets = $this->facetConfigBuilder->build($storeId);
+        $facets = $this->facetConfigBuilder->build($storeId, $isSearchPage);
         $subcategory = $category !== null ? $this->subcategoryFacetResolver->resolve($category, $storeId) : null;
         if ($subcategory === null) {
             return $facets;
