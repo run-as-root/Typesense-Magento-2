@@ -84,8 +84,8 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
             facetsOfType(type) {
                 return (this.listingConfig.facets || []).filter(facet => facet && facet.type === type);
             },
-            subcategoryFacets() {
-                return this.facetsOfType('subcategory').filter(facet => this.facetOptionsFor(facet).length > 0);
+            categoryFacets() {
+                return this.facetsOfType('category').filter(facet => this.facetOptionsFor(facet).length > 0);
             },
             // A facet whose value search matches nothing stays, so its search field does not vanish while typing.
             dropdownFacets() {
@@ -107,7 +107,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     .filter(facet => facet.field === 'price' && (stats.min < stats.max || Boolean(this.listing.state.price)));
             },
             hasFacets() {
-                return this.subcategoryFacets().length + this.dropdownFacets().length + this.checkboxFacets().length
+                return this.categoryFacets().length + this.dropdownFacets().length + this.checkboxFacets().length
                     + this.sliderFacets().length > 0;
             },
             hasSortChoice() {

@@ -114,11 +114,11 @@ final class CacheableSearchResultPluginTest extends TestCase
     public function test_listing_state_and_configured_facet_params_keep_the_page_cacheable(): void
     {
         $this->enable(true, true, true);
-        $this->config->method('getFacetFilters')->willReturn(['categories.lvl0', 'color']);
+        $this->config->method('getFacetFilters')->willReturn(['color', 'is.new']);
         $this->request->method('getParam')->with('q')->willReturn('gin');
         $this->request->method('getParams')->willReturn([
             'q' => 'gin', 'page' => '2', 'sort' => 'price_asc', 'limit' => '24', 'price' => '10-50',
-            'categories_lvl0' => 'Gin', 'color' => 'Rot|Blau',
+            'cat' => '12|34', 'color' => 'Rot|Blau', 'is_new' => 'true',
         ]);
         $this->query->method('getRedirect')->willReturn('');
         $page = $this->createMock(Page::class);
@@ -131,7 +131,7 @@ final class CacheableSearchResultPluginTest extends TestCase
     public function test_unknown_params_fall_through_to_the_uncached_core_page(array $params): void
     {
         $this->enable(true, true, true);
-        $this->config->method('getFacetFilters')->willReturn(['categories.lvl0', 'color']);
+        $this->config->method('getFacetFilters')->willReturn(['color']);
         $this->request->method('getParam')->with('q')->willReturn('gin');
         $this->request->method('getParams')->willReturn($params);
         $this->pageFactory->expects(self::never())->method('create');
@@ -145,6 +145,8 @@ final class CacheableSearchResultPluginTest extends TestCase
         return [
             'cache buster' => [['q' => 'gin', 'x' => '1']],
             'unconfigured facet' => [['q' => 'gin', 'size' => 'XL']],
+            // The category facet is read from `cat` only.
+            'old category path facet' => [['q' => 'gin', 'categories_lvl0' => 'Gin']],
             'numeric key' => [['q' => 'gin', 0 => 'junk']],
         ];
     }

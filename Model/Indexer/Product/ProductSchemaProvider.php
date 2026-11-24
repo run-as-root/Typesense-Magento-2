@@ -57,7 +57,7 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'description', 'type' => 'string', 'optional' => true],
             ['name' => 'short_description', 'type' => 'string', 'optional' => true],
             ['name' => 'categories', 'type' => 'string[]'],
-            ['name' => 'category_ids', 'type' => 'int32[]'],
+            ['name' => 'category_ids', 'type' => 'int32[]', 'facet' => true],
             ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
             ['name' => 'categories.lvl1', 'type' => 'string[]', 'facet' => true],
             ['name' => 'categories.lvl2', 'type' => 'string[]', 'facet' => true],

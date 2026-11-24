@@ -140,7 +140,7 @@ final class CategoryResolverTest extends TestCase
         self::assertSame(['Fruit'], $storeOne['categories.lvl0']);
         self::assertSame([30, 10, 20], $storeOne['category_ids']);
         // Store 2 renames Fruit and disables Stone Fruit: no lvl1 path and no anchor id of its own, but the
-        // deeper path keeps its name, as SubcategoryFacetResolver builds the prefix from the same names.
+        // deeper path keeps its name, so it stays the full location in the tree.
         self::assertSame(['Obst'], $storeTwo['categories.lvl0']);
         self::assertSame([], $storeTwo['categories.lvl1']);
         self::assertSame(['Obst > Steinobst > Plum'], $storeTwo['categories.lvl2']);

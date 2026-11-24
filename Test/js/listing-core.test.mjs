@@ -190,10 +190,11 @@ test('mergeFacetCounts reads each facet from its own disjunctive search', () => 
     const searches = core.buildSearches(current, config);
     assert.deepEqual(searches.facetSources, { color: 2, size: 3, in_stock: 3 });
 
+    // Each entry carries the total of its search, for options that would not narrow the result.
     const mapped = core.mergeFacetCounts(results.slice(0, 4), current, searches);
-    assert.deepEqual(mapped, [ownColor, size, inStock]);
+    assert.deepEqual(mapped, [{ ...ownColor, found: 8 }, { ...size, found: 3 }, { ...inStock, found: 3 }]);
     assert.deepEqual(core.mergeFacetCounts([results[0], results[1], { code: 500, error: 'down' }, results[3]], current, searches),
-        [size, inStock]);
+        [{ ...size, found: 3 }, { ...inStock, found: 3 }]);
     assert.deepEqual(core.mergeFacetCounts(results, current), [], 'without the search list nothing is guessed');
 });
 
@@ -556,35 +557,108 @@ test('facetOptions lists counted values, keeps selected values without a count a
     assert.deepEqual(core.facetOptions(color, null, [], yesNo), []);
 });
 
-test('facetOptions shows only direct children below the subcategory prefix, labelled by name', () => {
-    const facet = { field: 'categories.lvl2', type: 'subcategory', prefix: 'Spirits > Gin > ' };
-    const entry = { field_name: 'categories.lvl2', counts: [
-        { value: 'Spirits > Gin > Dry Gin', count: 5 },
-        { value: 'Spirits > Gin > Dry Gin > London', count: 2 },
-        { value: 'Spirits > Rum > White', count: 7 },
-        { value: 'Spirits > Gin > Sloe', count: 1 },
+function categoryFacet(overrides = {}) {
+    return Object.assign({
+        field: 'category_ids',
+        param: 'cat',
+        label: 'Category',
+        type: 'category',
+        searchable: false,
+        boolean: false,
+        numeric: 'int32',
+        values: [{ value: '22', label: 'Kräuterlikör' }, { value: '7', label: 'Schnaps & Likör' }, { value: '9', label: 'Punsch' }],
+        maxValues: 350,
+    }, overrides);
+}
+
+test('facetOptions of a value list keep its order and names and drop every other value', () => {
+    const facet = categoryFacet();
+    // Products also carry the ids of ancestors and other trees, ranked by count.
+    const entry = { field_name: 'category_ids', found: 12, counts: [
+        { value: '2', count: 12 },
+        { value: '7', count: 5 },
+        { value: '40', count: 4 },
+        { value: '22', count: 3 },
     ] };
 
-    assert.deepEqual(core.facetOptions(facet, entry, ['Spirits > Gin > Sloe'], yesNo), [
-        { value: 'Spirits > Gin > Dry Gin', label: 'Dry Gin', count: 5, selected: false },
-        { value: 'Spirits > Gin > Sloe', label: 'Sloe', count: 1, selected: true },
+    assert.deepEqual(core.facetOptions(facet, entry, [], yesNo), [
+        { value: '22', label: 'Kräuterlikör', count: 3, selected: false },
+        { value: '7', label: 'Schnaps & Likör', count: 5, selected: false },
     ]);
+    assert.deepEqual(core.facetOptions(facet, entry, ['9', '40'], yesNo), [
+        { value: '22', label: 'Kräuterlikör', count: 3, selected: false },
+        { value: '7', label: 'Schnaps & Likör', count: 5, selected: false },
+        { value: '9', label: 'Punsch', count: null, selected: true },
+    ]);
+    assert.deepEqual(core.facetOptions(facet, null, [], yesNo), []);
+});
+
+test('category options that would not narrow the result are hidden unless selected, as in Magento', () => {
+    const facet = categoryFacet();
+    const entry = { field_name: 'category_ids', found: 5, counts: [{ value: '7', count: 5 }, { value: '22', count: 3 }] };
+
+    assert.deepEqual(core.facetOptions(facet, entry, [], yesNo).map(option => option.value), ['22']);
+    assert.deepEqual(core.facetOptions(facet, entry, ['7'], yesNo).map(option => option.value), ['22', '7']);
+    // Without the total of its search nothing is hidden.
+    assert.deepEqual(core.facetOptions(facet, { field_name: 'category_ids', counts: entry.counts }, [], yesNo)
+        .map(option => option.value), ['22', '7']);
+});
+
+test('a facet param is the URL key of its field and accepts only listed values', () => {
+    const config = searchConfig({ facets: [categoryFacet(), { field: 'color', label: 'Color', type: 'dropdown' }] });
+
+    const parsed = core.parseUrlState('?cat=7|abc|40|22|7&category_ids=9&categories.lvl0=Gin&color=Red', config);
+    assert.deepEqual(parsed.filters, { category_ids: ['7', '22'], color: ['Red'] });
+    assert.deepEqual(core.parseUrlState('?cat=40', config).filters, {});
+
+    const query = core.serializeUrlState(state({ filters: { category_ids: ['22', '7'], color: ['Red'] } }), config);
+    assert.equal(query, '?cat=22|7&color=Red');
+    assert.deepEqual(core.parseUrlState(query, config).filters, { category_ids: ['22', '7'], color: ['Red'] });
+
+    // A param that is not a plain URL key, or that a fixed listing parameter already uses, falls back to the field.
+    const odd = searchConfig({ facets: [categoryFacet({ param: 'a b' }), { field: 'color', param: 'page', type: 'dropdown' }] });
+    assert.equal(core.serializeUrlState(state({ filters: { category_ids: ['7'], color: ['Red'] } }), odd),
+        '?category_ids=7&color=Red');
+});
+
+test('a facet with its own value limit gets its own search, with or without an active filter', () => {
+    const config = searchConfig({ facets: [categoryFacet(), { field: 'color', type: 'dropdown' }, { field: 'size', type: 'dropdown' }] });
+
+    const idle = core.buildSearches(state({ q: 'gin', page: 2 }), config);
+    assert.equal(idle.length, 3);
+    assert.equal(idle[1].facet_by, 'category_ids');
+    assert.equal(idle[1].max_facet_values, 350);
+    assert.equal(idle[1].filter_by, 'visibility:[3,4]');
+    assert.equal(idle[2].facet_by, 'color,size');
+    assert.equal(idle[2].max_facet_values, 50);
+    assert.deepEqual(idle.facetSources, { category_ids: 1, color: 2, size: 2 });
+
+    const active = core.buildSearches(state({ q: 'gin', page: 2, filters: { category_ids: ['7'], color: ['Red'] } }), config);
+    assert.equal(active[0].filter_by, 'visibility:[3,4] && category_ids:=[7] && color:=[`Red`]');
+    assert.equal(active[1].facet_by, 'category_ids');
+    assert.equal(active[1].max_facet_values, 350);
+    assert.equal(active[1].filter_by, 'visibility:[3,4] && color:=[`Red`]');
+    assert.equal(active[2].facet_by, 'color');
+    assert.equal(active[2].max_facet_values, 50);
+
+    const value = core.facetValueSearch(state(), config, 'category_ids');
+    assert.equal(value.max_facet_values, 350);
 });
 
 test('activeFilterChips are structured per value in facet order, never joined strings', () => {
     const config = searchConfig({ facets: [
-        { field: 'categories.lvl1', label: 'Category', type: 'subcategory', prefix: 'Gin > ' },
+        categoryFacet(),
         { field: 'color', label: 'Color', type: 'dropdown' },
         { field: 'in_stock', label: 'Availability', type: 'checkbox', boolean: true },
         { field: 'price', label: 'Price', type: 'slider' },
     ] });
     const chips = core.activeFilterChips(state({
-        filters: { in_stock: ['true'], color: ['Black-White', 'Red'], 'categories.lvl1': ['Gin > Dry'], unknown: ['x'] },
+        filters: { in_stock: ['true'], color: ['Black-White', 'Red'], category_ids: ['7'], unknown: ['x'] },
         price: { min: 10, max: 20 },
     }), config, yesNo);
 
     assert.deepEqual(chips.map(chip => [chip.field, chip.value, chip.facetLabel, chip.valueLabel]), [
-        ['categories.lvl1', 'Gin > Dry', 'Category', 'Dry'],
+        ['category_ids', '7', 'Category', 'Schnaps & Likör'],
         ['color', 'Black-White', 'Color', 'Black-White'],
         ['color', 'Red', 'Color', 'Red'],
         ['in_stock', 'true', 'Availability', 'Yes'],

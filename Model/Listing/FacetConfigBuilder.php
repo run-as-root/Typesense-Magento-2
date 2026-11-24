@@ -14,9 +14,10 @@ class FacetConfigBuilder
 {
     private const string NUMERIC_TYPE = '/^(int32|int64|float)(\[\])?$/';
     // Document fields the indexer computes; an EAV attribute of the same name says nothing about them.
-    private const array COMPUTED_FIELDS = [
-        'categories.lvl0', 'categories.lvl1', 'categories.lvl2', 'in_stock', 'is_new', 'type_id',
-    ];
+    private const array COMPUTED_FIELDS = ['in_stock', 'is_new', 'type_id'];
+    // The listing adds its own category facet (CategoryFacetResolver); older configs still list `categories.lvl0`,
+    // which earlier versions always prepended.
+    private const array CATEGORY_FIELDS = ['categories.lvl0', 'categories.lvl1', 'categories.lvl2', 'category_ids'];
 
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
@@ -48,7 +49,7 @@ class FacetConfigBuilder
 
         $facets = [];
         foreach ($fields as $field) {
-            if (!isset($schemaTypes[$field])) {
+            if (!isset($schemaTypes[$field]) || in_array($field, self::CATEGORY_FIELDS, true)) {
                 continue;
             }
             $attribute = $this->getAttribute($field);
@@ -110,7 +111,6 @@ class FacetConfigBuilder
     private function getLabel(string $field, ?Attribute $attribute, int $storeId): string
     {
         $coreLabel = match ($field) {
-            'categories.lvl0', 'categories.lvl1', 'categories.lvl2' => __('Category'),
             'in_stock' => __('Availability'),
             'is_new' => __('New'),
             'price' => __('Price'),

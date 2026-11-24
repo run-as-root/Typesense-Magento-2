@@ -87,14 +87,13 @@ final class FacetConfigBuilderTest extends TestCase
 
     public function test_search_page_drops_attributes_not_used_in_search_results_layered_navigation(): void
     {
-        $this->config->method('getFacetFilters')->willReturn(['color', 'taste', 'price', 'in_stock', 'categories.lvl0']);
+        $this->config->method('getFacetFilters')->willReturn(['color', 'taste', 'price', 'in_stock']);
         $this->config->method('getFacetTypes')->willReturn([]);
         $this->schemaProvider->method('getFields')->willReturn([
             ['name' => 'color', 'type' => 'string[]', 'facet' => true],
             ['name' => 'taste', 'type' => 'string[]', 'facet' => true],
             ['name' => 'price', 'type' => 'float', 'facet' => true],
             ['name' => 'in_stock', 'type' => 'bool', 'facet' => true],
-            ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
         ]);
         $attributes = [
             'color' => $this->createAttribute(93, '0'),
@@ -105,11 +104,24 @@ final class FacetConfigBuilderTest extends TestCase
             fn (string $entityType, string $code): Attribute => $attributes[$code] ?? $this->createAttribute(null, '0'),
         );
 
-        self::assertSame(['taste', 'in_stock', 'categories.lvl0'], array_column($this->sut->build(1, true), 'field'));
-        self::assertSame(
-            ['color', 'taste', 'price', 'in_stock', 'categories.lvl0'],
-            array_column($this->sut->build(1), 'field'),
-        );
+        self::assertSame(['taste', 'in_stock'], array_column($this->sut->build(1, true), 'field'));
+        self::assertSame(['color', 'taste', 'price', 'in_stock'], array_column($this->sut->build(1), 'field'));
+    }
+
+    public function test_category_fields_in_the_facet_filters_are_left_to_the_category_facet(): void
+    {
+        $this->config->method('getFacetFilters')->willReturn(['categories.lvl0', 'color', 'category_ids', 'categories.lvl2']);
+        $this->config->method('getFacetTypes')->willReturn([]);
+        $this->schemaProvider->method('getFields')->willReturn([
+            ['name' => 'color', 'type' => 'string[]', 'facet' => true],
+            ['name' => 'category_ids', 'type' => 'int32[]', 'facet' => true],
+            ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
+            ['name' => 'categories.lvl2', 'type' => 'string[]', 'facet' => true],
+        ]);
+        $this->eavConfig->method('getAttribute')->willReturn($this->createAttribute(93, '1'));
+
+        self::assertSame(['color'], array_column($this->sut->build(1), 'field'));
+        self::assertSame(['color'], array_column($this->sut->build(1, true), 'field'));
     }
 
     public function test_search_page_keeps_an_attribute_whose_flag_is_not_loaded(): void

@@ -3,6 +3,8 @@
     'use strict';
 
     const FIELD_NAME = /^[A-Za-z0-9_][A-Za-z0-9_.]*$/;
+    const PARAM_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
+    const STATE_PARAMS = ['q', 'page', 'sort', 'limit', 'price'];
     const PRICE_PARAM = /^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/;
     const PAGE_PARAM = /^[1-9]\d{0,5}$/;
     const NUMBER_VALUE = /^-?\d+(?:\.\d+)?$/;
@@ -153,6 +155,41 @@
             .filter(field => typeof field === 'string' && FIELD_NAME.test(field));
     }
 
+    function facetObjects(config) {
+        return (config.facets || []).filter(facet => facet && typeof facet === 'object');
+    }
+
+    function findFacet(config, field) {
+        return facetObjects(config).find(facet => facet.field === field) || null;
+    }
+
+    // The URL key of a facet: its `param` alias (e.g. `cat` for category_ids), else the field name.
+    function facetParam(facet) {
+        const param = facet && facet.param;
+
+        return typeof param === 'string' && PARAM_NAME.test(param) && !STATE_PARAMS.includes(param) ? param : facet.field;
+    }
+
+    // `values` is a fixed list of [{value, label}]: only those values are offered and accepted, in that order.
+    function listedValues(facet) {
+        return facet && Array.isArray(facet.values)
+            ? facet.values.filter(item => item && item.value !== undefined && item.value !== null)
+            : null;
+    }
+
+    function listedLabel(facet, value) {
+        const item = listedValues(facet).find(candidate => String(candidate.value) === value);
+
+        return item ? String(item.label) : null;
+    }
+
+    function maxFacetValues(config, field) {
+        const facet = findFacet(config, field);
+        const own = Number(facet && facet.maxValues);
+
+        return Number.isInteger(own) && own > 0 ? own : Number(config.maxFacetValues) || 50;
+    }
+
     function booleanFacetFields(config) {
         return (config.facets || [])
             .filter(facet => facet && typeof facet === 'object' && (facet.type === 'checkbox' || facet.boolean === true))
@@ -298,7 +335,7 @@
             Object.assign({}, context.common, {
                 per_page: 0,
                 facet_by: field,
-                max_facet_values: Number(config.maxFacetValues) || 50,
+                max_facet_values: maxFacetValues(config, field),
             }),
             buildFilterBy(config.baseFilter, context.filters, context.price, [field], context.booleans, context.numerics),
         );
@@ -337,7 +374,9 @@
                 ? price !== null
                 : validValues(filters[field], booleans.includes(field), numerics[field]).length > 0;
             const valueSearch = String(facetQueries[field] || '').trim() !== '';
-            (active || valueSearch ? own : rest).push(field);
+            // A facet with its own value limit must not raise the limit of the shared search.
+            const ownLimit = maxFacetValues(config, field) !== maxFacetValues(config, null);
+            (active || valueSearch || ownLimit ? own : rest).push(field);
         }
 
         const sources = {};
@@ -350,7 +389,7 @@
                 Object.assign({}, common, {
                     per_page: 0,
                     facet_by: rest.join(','),
-                    max_facet_values: Number(config.maxFacetValues) || 50,
+                    max_facet_values: maxFacetValues(config, null),
                 }),
                 mainFilter,
             )) - 1;
@@ -391,6 +430,14 @@
         return entries.find(facet => facet && facet.field_name === field) || null;
     }
 
+    // `found` is the total of the facet's search, which facetOptions compares the counts with.
+    function countsEntry(results, searches, field) {
+        const entry = sourceEntry(results, searches, field);
+        const result = (results || [])[searches.facetSources[field]];
+
+        return entry === null ? null : Object.assign({}, entry, { found: Number(result && result.found) || 0 });
+    }
+
     function hasFacetSources(searches) {
         return Boolean(searches && searches.facetSources);
     }
@@ -402,7 +449,7 @@
         }
         const fields = Object.keys(searches.facetSources);
 
-        return fields.map(field => sourceEntry(results, searches, field)).filter(facet => facet !== null);
+        return fields.map(field => countsEntry(results, searches, field)).filter(facet => facet !== null);
     }
 
     function statsOf(facet) {
@@ -453,11 +500,35 @@
         return { q: '', page: 1, sort: defaultSort(config), limit: perPage(config), filters: {}, price: null, facetQueries: {} };
     }
 
+    // URL key => facet field, for every facet but price.
+    function facetParams(config) {
+        const params = {};
+        const fields = facetFields(config).filter(field => field !== 'price');
+        for (const field of fields) {
+            const facet = findFacet(config, field);
+            params[facet ? facetParam(facet) : field] = field;
+        }
+
+        return params;
+    }
+
+    function urlValueFilter(config, field) {
+        const facet = findFacet(config, field);
+        const numeric = numericFacetFields(config)[field];
+        const listed = listedValues(facet);
+        if (booleanFacetFields(config).includes(field)) {
+            return isBooleanValue;
+        }
+        if (numeric) {
+            return value => isNumberValue(value, numeric) && (listed === null || listedLabel(facet, value) !== null);
+        }
+
+        return value => quoteValue(value) !== null && (listed === null || listedLabel(facet, value) !== null);
+    }
+
     function parseUrlState(search, config) {
         const state = emptyState(config);
-        const fields = facetFields(config).filter(field => field !== 'price');
-        const booleans = booleanFacetFields(config);
-        const numerics = numericFacetFields(config);
+        const params = facetParams(config);
         const seen = [];
         const pairs = rawPairs(search);
 
@@ -468,19 +539,14 @@
             }
             seen.push(key);
 
-            if (fields.includes(key)) {
-                let accept = value => quoteValue(value) !== null;
-                if (booleans.includes(key)) {
-                    accept = isBooleanValue;
-                } else if (numerics[key]) {
-                    accept = value => isNumberValue(value, numerics[key]);
-                }
+            if (Object.prototype.hasOwnProperty.call(params, key)) {
+                const field = params[key];
                 // Values are encoded one by one, so a literal | can only be the separator.
                 const values = valueList(rawValue.split('|').map(decode))
-                    .filter(accept)
+                    .filter(urlValueFilter(config, field))
                     .slice(0, MAX_VALUES_PER_FACET);
                 if (values.length > 0) {
-                    state.filters[key] = values;
+                    state.filters[field] = values;
                 }
                 continue;
             }
@@ -515,11 +581,11 @@
             parts.push('q=' + encodeURIComponent(q));
         }
 
-        const fields = facetFields(config).filter(field => field !== 'price');
-        for (const field of fields) {
+        const params = Object.entries(facetParams(config));
+        for (const [param, field] of params) {
             const values = valueList(filters[field]);
             if (values.length > 0) {
-                parts.push(encodeURIComponent(field) + '=' + values.map(encodeURIComponent).join('|'));
+                parts.push(encodeURIComponent(param) + '=' + values.map(encodeURIComponent).join('|'));
             }
         }
 
@@ -765,13 +831,9 @@
         return params;
     }
 
-    // Subcategory values are full category paths; only direct children of the prefix are offered, by name.
     function optionLabel(facet, value, labels) {
-        if (facet.type === 'subcategory') {
-            const prefix = String(facet.prefix || '');
-            const name = value.startsWith(prefix) ? value.slice(prefix.length) : '';
-
-            return name === '' || name.includes(' > ') ? null : name;
+        if (listedValues(facet) !== null) {
+            return listedLabel(facet, value);
         }
         if (facet.type === 'checkbox' || facet.boolean === true) {
             return isBooleanValue(value) ? String((labels || {})[value] || value) : null;
@@ -782,10 +844,44 @@
         return kind && !isNumberValue(value, kind) ? null : value;
     }
 
+    // Magento's category filter leaves out a category holding every product of the result: it narrows nothing.
+    function narrowsResult(facet, entry, count) {
+        const found = Number(entry && entry.found);
+
+        return facet.type !== 'category' || !(found > 0) || count < found;
+    }
+
+    // A value list keeps its own order: counted values first in that order, then the selected ones without a count.
+    function listedOptions(facet, entry, chosen) {
+        const counts = {};
+        const entries = entry && Array.isArray(entry.counts) ? entry.counts : [];
+        for (const item of entries) {
+            counts[String(item && item.value)] = Number(item && item.count) || 0;
+        }
+        const options = [];
+        const uncounted = [];
+        const listed = listedValues(facet);
+        for (const item of listed) {
+            const value = String(item.value);
+            const selected = chosen.includes(value);
+            const counted = Object.prototype.hasOwnProperty.call(counts, value) && counts[value] > 0;
+            if (counted && (selected || narrowsResult(facet, entry, counts[value]))) {
+                options.push({ value, label: String(item.label), count: counts[value], selected });
+            } else if (selected) {
+                uncounted.push({ value, label: String(item.label), count: null, selected });
+            }
+        }
+
+        return options.concat(uncounted);
+    }
+
     // Selected values stay listed without a count, so they can still be unchecked when a value search
     // or max_facet_values leaves them out of the counts.
     function facetOptions(facet, entry, selected, labels) {
         const chosen = valueList(selected);
+        if (listedValues(facet) !== null) {
+            return listedOptions(facet, entry, chosen);
+        }
         const counts = entry && Array.isArray(entry.counts) ? entry.counts : [];
         const options = [];
         const seen = [];

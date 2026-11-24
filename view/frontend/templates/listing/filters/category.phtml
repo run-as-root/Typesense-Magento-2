@@ -1,7 +1,7 @@
 <?php
 /**
- * Subcategories of the current category (category pages only). The facet is the category path field of the next
- * level (`categories.lvlN`, see SubcategoryFacetResolver), so names and counts come from the listing's own Typesense
+ * The category facet (type `category`, see CategoryFacetResolver): the children of the current category, or the
+ * top-level categories on the search page, by name in category order, with counts from the listing's own Typesense
  * result. Uses the `typesenseFilterDropdown` component (listing/script/filters/dropdown.phtml).
  */
 
@@ -19,11 +19,11 @@ $heroicons = $viewModels->require(HeroiconsOutline::class);
 
 $visibleValues = (int) ($block->getData('visible_values') ?? 5);
 ?>
-<template x-for="facet in subcategoryFacets" :key="facet.field">
+<template x-for="facet in categoryFacets" :key="facet.field">
     <div x-data="typesenseFilterDropdown"
          @click.outside="closeOnOutside"
          data-visible-values="<?= (int) $visibleValues ?>"
-         class="typesense-filter typesense-filter-subcategory relative border-b border-gray-200 md:border-0">
+         class="typesense-filter typesense-filter-category relative border-b border-gray-200 md:border-0">
         <button type="button"
                 @click="togglePanelOpen"
                 :aria-expanded="isOpen"
@@ -52,8 +52,8 @@ $visibleValues = (int) ($block->getData('visible_values') ?? 5);
                         <input type="checkbox"
                                :checked="isOptionSelected"
                                @change="toggleOption"
-                               class="mt-0.5 shrink-0">
-                        <span class="grow" x-text="optionLabel"></span>
+                               class="peer mt-0.5 shrink-0">
+                        <span class="grow peer-checked:font-semibold" x-text="optionLabel"></span>
                         <span x-show="hasOptionCount" x-text="optionCount" class="text-xs text-gray-500"></span>
                     </label>
                 </template>

@@ -26,7 +26,8 @@ function inlineScripts(file) {
 const config = {
     context: 'category',
     facets: [
-        { field: 'categories.lvl1', label: 'Category', type: 'subcategory', prefix: 'Gin > ' },
+        { field: 'category_ids', param: 'cat', label: 'Category', type: 'category', numeric: 'int32',
+            values: [{ value: '22', label: 'Dry Gin' }, { value: '23', label: 'Old Tom' }], maxValues: 300 },
         { field: 'color', label: 'Color', type: 'dropdown', searchable: true },
         { field: 'in_stock', label: 'Availability', type: 'checkbox', boolean: true },
         { field: 'is_new', label: 'New', type: 'checkbox', boolean: true },
@@ -44,7 +45,7 @@ function snapshot(overrides = {}) {
         context: 'category', isLoading: false, hasLoaded: true, found: 3, page: 1, totalPages: 1, error: null,
         priceStats: { min: 10, max: 200 },
         facets: [
-            { field_name: 'categories.lvl1', counts: [{ value: 'Gin > Dry', count: 2 }, { value: 'Rum > White', count: 9 }] },
+            { field_name: 'category_ids', found: 3, counts: [{ value: '5', count: 3 }, { value: '22', count: 2 }, { value: '40', count: 1 }] },
             { field_name: 'color', counts: [{ value: 'Black-White', count: 2 }, { value: 'Red', count: 1 }] },
             { field_name: 'in_stock', counts: [{ value: 'true', count: 3 }, { value: 'false', count: 1 }] },
             { field_name: 'is_new', counts: [{ value: 'false', count: 3 }] },
@@ -107,7 +108,7 @@ test('facets are routed by type and the slider disappears when prices are hidden
     const env = createEnvironment();
     const bar = env.component('initTypesenseFilterBar');
 
-    assert.deepEqual(bar.subcategoryFacets().map(facet => facet.field), ['categories.lvl1']);
+    assert.deepEqual(bar.categoryFacets().map(facet => facet.field), ['category_ids']);
     assert.deepEqual(bar.dropdownFacets().map(facet => facet.field), ['color']);
     // is_new has no `true` count, so the checkbox group only offers in_stock.
     assert.deepEqual(bar.checkboxFacets().map(facet => facet.field), ['in_stock']);
@@ -153,12 +154,25 @@ test('dropdown options toggle and search with structured field/value payloads', 
     assert.deepEqual({ ...env.lastEvent().detail }, { field: 'color', facetQuery: 'bla' });
 });
 
-test('subcategory options are the direct children of the current category, by name', () => {
+test('category options are the listed categories with a count, by name, and toggle by id', () => {
     const env = createEnvironment();
     const bar = env.component('initTypesenseFilterBar');
-    const dropdown = env.child(bar, 'initTypesenseFilterDropdown', { facet: bar.subcategoryFacets()[0] });
+    const dropdown = env.child(bar, 'initTypesenseFilterDropdown', { facet: bar.categoryFacets()[0] });
 
-    assert.deepEqual(JSON.parse(JSON.stringify(dropdown.options().map(option => [option.value, option.label]))), [['Gin > Dry', 'Dry']]);
+    assert.deepEqual(JSON.parse(JSON.stringify(dropdown.options().map(option => [option.value, option.label]))), [['22', 'Dry Gin']]);
+
+    dropdown.option = dropdown.options()[0];
+    dropdown.toggleOption();
+    assert.deepEqual({ ...env.lastEvent().detail }, { field: 'category_ids', value: '22', action: 'toggle' });
+});
+
+test('a category facet without a listed category in the result is not shown', () => {
+    const env = createEnvironment();
+    const bar = env.component('initTypesenseFilterBar');
+    bar.$event = { detail: snapshot({ facets: [{ field_name: 'category_ids', found: 3, counts: [{ value: '5', count: 3 }] }] }) };
+    bar.onListingState();
+
+    assert.deepEqual(bar.categoryFacets(), []);
 });
 
 test('a dropdown stays while its value search matches nothing', () => {

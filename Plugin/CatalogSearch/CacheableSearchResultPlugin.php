@@ -10,6 +10,7 @@ use Magento\Framework\App\RequestInterface;
 use Magento\Framework\View\Result\PageFactory;
 use Magento\Search\Model\QueryFactory;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Listing\CategoryFacetResolver;
 
 /**
  * The search page is a static shell whose results come from Typesense in the browser. Skipping the core action
@@ -19,7 +20,7 @@ use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 class CacheableSearchResultPlugin
 {
     public const string CACHEABLE_PAGE_HANDLE = 'typesense_cacheable_search_result';
-    private const array LISTING_STATE_PARAMS = ['q', 'page', 'sort', 'limit', 'price'];
+    private const array LISTING_STATE_PARAMS = ['q', 'page', 'sort', 'limit', 'price', CategoryFacetResolver::URL_PARAM];
 
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
@@ -60,7 +61,7 @@ class CacheableSearchResultPlugin
     private function hasOnlyListingStateParams(): bool
     {
         $facetFields = $this->config->getFacetFilters();
-        // PHP turns dots in query keys into underscores (categories.lvl0 -> categories_lvl0).
+        // PHP turns dots in query keys into underscores (is.new -> is_new).
         $facetParams = str_replace('.', '_', $facetFields);
         $allowed = array_merge(self::LISTING_STATE_PARAMS, $facetFields, $facetParams);
         $params = array_map('strval', array_keys($this->request->getParams()));

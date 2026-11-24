@@ -100,12 +100,13 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertSame('string[]', $field['type']);
     }
 
-    public function test_get_fields_contains_category_ids_as_int32_array(): void
+    public function test_get_fields_contains_category_ids_as_faceted_int32_array(): void
     {
         $fields = $this->sut->getFields();
 
         $field = $this->findField($fields, 'category_ids');
         self::assertSame('int32[]', $field['type']);
+        self::assertTrue($field['facet'] ?? false, 'The category facet counts category_ids');
     }
 
     public function test_get_fields_contains_hierarchical_category_facets(): void
