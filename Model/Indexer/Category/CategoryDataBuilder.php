@@ -19,6 +19,22 @@ class CategoryDataBuilder
     }
 
     /**
+     * The category's URL instance is the shared frontend URL object, which keeps the scope of the first store
+     * that used it; the previous scope is restored so later URLs in the same process are unaffected.
+     */
+    private function getUrl(Category $category, int $storeId): string
+    {
+        $url = $category->getUrlInstance();
+        $previousScope = $url->getData('scope');
+        $url->setScope($storeId);
+        try {
+            return (string) $category->getUrl();
+        } finally {
+            $url->setScope($previousScope);
+        }
+    }
+
+    /**
      * Build a Typesense document array from a category.
      *
      * @return array<string, mixed>
@@ -33,7 +49,7 @@ class CategoryDataBuilder
             'id' => (string) $categoryId,
             'category_id' => $categoryId,
             'name' => (string) $category->getName(),
-            'url' => (string) $category->getUrl(),
+            'url' => $this->getUrl($category, $storeId),
             'path' => (string) $category->getPath(),
             'level' => (int) $category->getLevel(),
             'product_count' => (int) $category->getProductCount(),

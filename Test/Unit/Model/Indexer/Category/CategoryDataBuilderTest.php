@@ -7,6 +7,7 @@ namespace RunAsRoot\TypeSense\Test\Unit\Model\Indexer\Category;
 use Magento\Catalog\Model\Category;
 use Magento\Catalog\Model\ResourceModel\Category\Collection as CategoryCollection;
 use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory as CategoryCollectionFactory;
+use Magento\Framework\Url;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -157,6 +158,34 @@ final class CategoryDataBuilderTest extends TestCase
         $this->sut->build($category, 3);
     }
 
+    public function test_build_scopes_the_shared_url_instance_to_the_store_and_restores_it(): void
+    {
+        $previousScope = $this->createMock(Store::class);
+        $url = $this->createMock(Url::class);
+        $url->method('getData')->with('scope')->willReturn($previousScope);
+        $scopes = [];
+        $url->method('setScope')->willReturnCallback(function (mixed $scope) use ($url, &$scopes): Url {
+            $scopes[] = $scope;
+
+            return $url;
+        });
+        $category = $this->createCategoryMock(url: $url);
+        $category->method('getUrl')->willReturnCallback(function () use (&$scopes): string {
+            self::assertSame([3], $scopes);
+
+            return 'https://de.example.com/rum.html';
+        });
+        $category->method('getImageUrl')->willReturn('');
+        $category->method('getData')->willReturnMap([
+            ['description', null, null],
+        ]);
+
+        $document = $this->sut->build($category, 3);
+
+        self::assertSame('https://de.example.com/rum.html', $document['url']);
+        self::assertSame([3, $previousScope], $scopes);
+    }
+
     public function test_get_category_collection_filters_active_categories(): void
     {
         $collection = $this->createCollectionMock();
@@ -268,8 +297,10 @@ final class CategoryDataBuilderTest extends TestCase
         int $level = 2,
         int $productCount = 10,
         bool $isActive = true,
+        ?Url $url = null,
     ): Category&MockObject {
         $category = $this->createMock(Category::class);
+        $category->method('getUrlInstance')->willReturn($url ?? $this->createMock(Url::class));
         $category->method('getId')->willReturn($id);
         $category->method('getName')->willReturn($name);
         $category->method('getUrlKey')->willReturn($urlKey);
