@@ -84,4 +84,51 @@ final class FacetConfigBuilderTest extends TestCase
 
         self::assertSame(['color'], array_column($this->sut->build(1), 'field'));
     }
+
+    public function test_search_page_drops_attributes_not_used_in_search_results_layered_navigation(): void
+    {
+        $this->config->method('getFacetFilters')->willReturn(['color', 'taste', 'price', 'in_stock', 'categories.lvl0']);
+        $this->config->method('getFacetTypes')->willReturn([]);
+        $this->schemaProvider->method('getFields')->willReturn([
+            ['name' => 'color', 'type' => 'string[]', 'facet' => true],
+            ['name' => 'taste', 'type' => 'string[]', 'facet' => true],
+            ['name' => 'price', 'type' => 'float', 'facet' => true],
+            ['name' => 'in_stock', 'type' => 'bool', 'facet' => true],
+            ['name' => 'categories.lvl0', 'type' => 'string[]', 'facet' => true],
+        ]);
+        $attributes = [
+            'color' => $this->createAttribute(93, '0'),
+            'taste' => $this->createAttribute(94, '1'),
+            'price' => $this->createAttribute(77, '0'),
+        ];
+        $this->eavConfig->method('getAttribute')->willReturnCallback(
+            fn (string $entityType, string $code): Attribute => $attributes[$code] ?? $this->createAttribute(null, '0'),
+        );
+
+        self::assertSame(['taste', 'in_stock', 'categories.lvl0'], array_column($this->sut->build(1, true), 'field'));
+        self::assertSame(
+            ['color', 'taste', 'price', 'in_stock', 'categories.lvl0'],
+            array_column($this->sut->build(1), 'field'),
+        );
+    }
+
+    public function test_search_page_keeps_an_attribute_whose_flag_is_not_loaded(): void
+    {
+        $this->config->method('getFacetFilters')->willReturn(['color']);
+        $this->config->method('getFacetTypes')->willReturn([]);
+        $this->schemaProvider->method('getFields')->willReturn([['name' => 'color', 'type' => 'string[]', 'facet' => true]]);
+        $this->eavConfig->method('getAttribute')->willReturn($this->createAttribute(93, null));
+
+        self::assertSame(['color'], array_column($this->sut->build(1, true), 'field'));
+    }
+
+    private function createAttribute(?int $id, ?string $filterableInSearch): Attribute&MockObject
+    {
+        $attribute = $this->createMock(Attribute::class);
+        $attribute->method('getId')->willReturn($id);
+        $attribute->method('getStoreLabel')->willReturn('Label');
+        $attribute->method('getData')->willReturnMap([['is_filterable_in_search', null, $filterableInSearch]]);
+
+        return $attribute;
+    }
 }

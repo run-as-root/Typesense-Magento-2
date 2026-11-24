@@ -408,8 +408,12 @@
     function statsOf(facet) {
         const min = Number(facet && facet.stats && facet.stats.min);
         const max = Number(facet && facet.stats && facet.stats.max);
+        if (!Number.isFinite(min) || !Number.isFinite(max)) {
+            return null;
+        }
 
-        return Number.isFinite(min) && Number.isFinite(max) ? { min: Math.floor(min), max: Math.ceil(max) } : null;
+        // A single price (0.9) would round to 0-1, a range the slider shows although there is nothing to narrow.
+        return min === max ? { min: Math.floor(min), max: Math.floor(min) } : { min: Math.floor(min), max: Math.ceil(max) };
     }
 
     // The facet's own search ignores the active price filter, so it holds the full range.

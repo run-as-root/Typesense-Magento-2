@@ -13,6 +13,10 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface;
 class FacetConfigBuilder
 {
     private const string NUMERIC_TYPE = '/^(int32|int64|float)(\[\])?$/';
+    // Document fields the indexer computes; an EAV attribute of the same name says nothing about them.
+    private const array COMPUTED_FIELDS = [
+        'categories.lvl0', 'categories.lvl1', 'categories.lvl2', 'in_stock', 'is_new', 'type_id',
+    ];
 
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
@@ -28,13 +32,15 @@ class FacetConfigBuilder
      * `numeric` is the Typesense type of a numeric field (int32, int64 or float, also for arrays), else false:
      * the listing core filters those values unquoted and accepts only numbers that fit the type, because
      * Typesense answers backtick-quoted or out-of-range values with a 400 that would fail the whole listing.
-     * A facet whose field is missing from the schema or not faceted is dropped for the same reason.
+     * A facet whose field is missing from the schema or not faceted is dropped for the same reason. On the search
+     * page, attributes with "Use in Search Results Layered Navigation" = No are dropped, as Magento and
+     * ElasticSuite do.
      *
      * @return list<array{
      *     field: string, label: string, type: string, searchable: bool, boolean: bool, numeric: string|false
      * }>
      */
-    public function build(int $storeId): array
+    public function build(int $storeId, bool $isSearchPage = false): array
     {
         $types = $this->config->getFacetTypes($storeId);
         $schemaTypes = $this->getFacetedSchemaTypes();
@@ -43,6 +49,10 @@ class FacetConfigBuilder
         $facets = [];
         foreach ($fields as $field) {
             if (!isset($schemaTypes[$field])) {
+                continue;
+            }
+            $attribute = $this->getAttribute($field);
+            if ($isSearchPage && $attribute !== null && !$this->isFilterableInSearch($attribute)) {
                 continue;
             }
             $schemaType = $schemaTypes[$field];
@@ -55,7 +65,7 @@ class FacetConfigBuilder
 
             $facets[] = [
                 'field' => $field,
-                'label' => $this->getLabel($field, $storeId),
+                'label' => $this->getLabel($field, $attribute, $storeId),
                 'type' => $type,
                 'searchable' => $type === 'dropdown' && ($types[$field]['searchable'] ?? false),
                 'boolean' => $isBoolean,
@@ -80,7 +90,24 @@ class FacetConfigBuilder
         return $types;
     }
 
-    private function getLabel(string $field, int $storeId): string
+    private function getAttribute(string $field): ?Attribute
+    {
+        if (in_array($field, self::COMPUTED_FIELDS, true)) {
+            return null;
+        }
+
+        $attribute = $this->eavConfig->getAttribute(Product::ENTITY, $field);
+
+        return $attribute instanceof Attribute && $attribute->getId() ? $attribute : null;
+    }
+
+    // Only an explicit No hides the facet; an attribute loaded without catalog_eav_attribute data keeps it.
+    private function isFilterableInSearch(Attribute $attribute): bool
+    {
+        return (string) $attribute->getData('is_filterable_in_search') !== '0';
+    }
+
+    private function getLabel(string $field, ?Attribute $attribute, int $storeId): string
     {
         $coreLabel = match ($field) {
             'categories.lvl0', 'categories.lvl1', 'categories.lvl2' => __('Category'),
@@ -94,8 +121,7 @@ class FacetConfigBuilder
             return (string) $coreLabel;
         }
 
-        $attribute = $this->eavConfig->getAttribute(Product::ENTITY, $field);
-        if ($attribute instanceof Attribute && $attribute->getId()) {
+        if ($attribute !== null) {
             return (string) $attribute->getStoreLabel($storeId);
         }
 

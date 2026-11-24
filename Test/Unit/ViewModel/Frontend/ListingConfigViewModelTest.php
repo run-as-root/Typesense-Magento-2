@@ -319,6 +319,32 @@ final class ListingConfigViewModelTest extends TestCase
         self::assertCount(2, $facets);
     }
 
+    public function test_search_page_hides_facets_of_attributes_not_filterable_in_search_but_category_pages_keep_them(): void
+    {
+        $this->givenCategory(42, 'Gin', 'position');
+        $this->config->method('getFacetFilters')->willReturn(['color', 'taste']);
+        $this->schemaProvider->method('getFields')->willReturn([
+            ['name' => 'color', 'type' => 'string[]', 'facet' => true],
+            ['name' => 'taste', 'type' => 'string[]', 'facet' => true],
+        ]);
+        $color = $this->createMock(Attribute::class);
+        $color->method('getId')->willReturn(93);
+        $color->method('getData')->willReturnMap([['is_filterable_in_search', null, '0']]);
+        $taste = $this->createMock(Attribute::class);
+        $taste->method('getId')->willReturn(94);
+        $taste->method('getData')->willReturnMap([['is_filterable_in_search', null, '1']]);
+        $this->eavConfig->method('getAttribute')->willReturnCallback(
+            static fn (string $entityType, string $code): Attribute => $code === 'color' ? $color : $taste,
+        );
+        $this->givenCatalogLimits('12', '12');
+
+        self::assertSame(['taste'], array_column($this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH)['facets'], 'field'));
+        self::assertSame(
+            ['color', 'taste'],
+            array_column($this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY)['facets'], 'field'),
+        );
+    }
+
     public function test_search_pages_get_no_subcategory_facet(): void
     {
         $this->subcategoryFacetResolver->expects(self::never())->method('resolve');

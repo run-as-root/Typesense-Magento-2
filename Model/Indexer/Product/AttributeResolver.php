@@ -27,7 +27,7 @@ class AttributeResolver implements AttributeResolverInterface
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, list<string>>
      */
     public function getExtraAttributes(Product $product): array
     {
@@ -42,42 +42,18 @@ class AttributeResolver implements AttributeResolverInterface
                 continue;
             }
 
-            $frontendInput = $attribute->getFrontendInput();
-
-            // For select/multiselect/boolean, resolve option labels instead of IDs
-            if (in_array($frontendInput, ['select', 'multiselect', 'boolean'], true)) {
-                $text = $product->getAttributeText($code);
-                if ($text === false || $text === '' || $text === null || $text === []) {
-                    continue;
-                }
-                // Multiselect values are facet-filtered one by one, so they stay an array of labels.
-                // getAttributeText returns a plain string when only one option is selected.
-                $extra[$code] = $frontendInput === 'multiselect'
-                    ? array_values(array_map('strval', (array) $text))
-                    : (string) $text;
-            } else {
-                $value = $product->getData($code);
-                if ($value === null || $value === '') {
-                    continue;
-                }
-                $extra[$code] = $value;
+            // Option attributes are indexed by label; getAttributeText returns a plain string for one option.
+            $value = in_array($attribute->getFrontendInput(), ['select', 'multiselect', 'boolean'], true)
+                ? $product->getAttributeText($code)
+                : $product->getData($code);
+            if ($value === false || $value === null || $value === '' || $value === []) {
+                continue;
             }
+
+            $extra[$code] = array_values(array_unique(array_map('strval', (array) $value)));
         }
 
         return $extra;
-    }
-
-    public function getMultiselectAttributeCodes(): array
-    {
-        $collection = $this->getAttributeCollection();
-        $codes = [];
-        foreach ($collection as $attribute) {
-            if ($attribute->getFrontendInput() === 'multiselect') {
-                $codes[] = $attribute->getAttributeCode();
-            }
-        }
-
-        return $codes;
     }
 
     private function getAttributeCollection(): AttributeCollection

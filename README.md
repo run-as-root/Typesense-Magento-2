@@ -157,7 +157,7 @@ Store-view scope. These drive the search page, autocomplete product results and 
 |---|---|---|
 | Enable Typo Tolerance | Yes | `num_typos` 2 when on, 0 when off |
 | Text Match Type | Max Weight | How the text-match score is combined across fields (`text_match_type`: `max_weight`, `max_score`, `sum_score`) |
-| Searchable Attributes | name 10, sku 9, description 1 | Rows of attribute + weight; become `query_by` / `query_by_weights` in weight order. Options are name, SKU, description, short description, categories, "Name (decompounded)" and every additional indexed attribute. Attributes that are not indexed are dropped; an empty list falls back to `name` |
+| Searchable Attributes | name 10, sku 9, description 1 | Rows of attribute + weight; become `query_by` / `query_by_weights` in weight order. Options are name, SKU, description, short description, categories, "Name (decompounded)", "Child Products" and every additional indexed attribute. Attributes that are not indexed are dropped; an empty list falls back to `name`. "Child Products" (`children_text`, the names and SKUs of a composite product's children) is always searched: without a row of its own it gets the weight of `name` |
 | Drop Tokens Threshold | 0 | Drop query words when fewer results than this are found (0 disables) |
 | Typo Tokens Threshold | 1 | Search typo-corrected matches only when exact matches return fewer results than this |
 | Minimum Word Length for 1 Typo | 5 | `min_len_1typo` (shown when typo tolerance is on) |
@@ -184,7 +184,7 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | Products Per Page | 12 | Results per page on the search results page |
 | Product Tile Attributes | — | Attributes displayed on product cards (must also be indexed) |
 | Sort Options | relevance, price asc/desc, newest | Sort options available to customers (see below) |
-| Facet Filters | — | Facets shown in the filter bar: additional attributes plus Price, Availability (`in_stock`) and New (`is_new`). Category pages always get the subcategory filter |
+| Facet Filters | — | Facets shown in the filter bar: additional attributes plus Price, Availability (`in_stock`) and New (`is_new`). Category pages always get the subcategory filter. The search page leaves out attributes (Price included) whose "Use in Search Results Layered Navigation" is No. The price slider is hidden when all results have the same price |
 | Facet Types | — | Per facet: dropdown, checkbox (Yes/No fields) or slider (Price only), and "Value Search" for dropdowns. Price defaults to a slider |
 | Show Out-of-Stock Products Last | Yes | Sorts by `in_stock:desc` before the chosen sort |
 | Replace Category Pages | No | Use Typesense for category product listings (not for "Static block only" categories) |
@@ -255,6 +255,8 @@ Select any product attributes you want included in the Typesense product documen
 Attributes are grouped by input type (select/multiselect, boolean, numeric, text) so you can quickly identify which ones make sense to index or use as facets. Each entry shows the attribute label, code, and input type — for example: `Color (color) — select`.
 
 Changes to this setting require a full product reindex to take effect.
+
+Each attribute is a `string[]` field (option attributes by label). A composite product (grouped, configurable or bundle) holds the distinct values of its own and of its children: the enabled children linked in `catalog_product_relation` that belong to the store's website, whatever their visibility, as in Magento's and ElasticSuite's indexes. A grouped "Jagertee" whose 0.02 l size has the trade name "Likör" is found by the `trade_name` filter "Likör" and counted in its facet. The children's names and SKUs go into `children_text`, which is searched with the weight of `name` (the lowest weight when `name` is not searched) unless Searchable Attributes has a "Child Products" row of its own. Prices stay the cheapest child's. Children are loaded once per indexing batch.
 
 ### Product Tile Attributes
 
