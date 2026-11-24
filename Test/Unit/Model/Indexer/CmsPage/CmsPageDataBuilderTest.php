@@ -9,19 +9,23 @@ use Magento\Cms\Model\ResourceModel\Page\Collection as PageCollection;
 use Magento\Cms\Model\ResourceModel\Page\CollectionFactory as PageCollectionFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Model\Indexer\CmsPage\CmsPageDataBuilder;
 
 final class CmsPageDataBuilderTest extends TestCase
 {
     private PageCollectionFactory&MockObject $collectionFactory;
+    private LoggerInterface&MockObject $logger;
     private CmsPageDataBuilder $sut;
 
     protected function setUp(): void
     {
         $this->collectionFactory = $this->createMock(PageCollectionFactory::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->sut = new CmsPageDataBuilder(
             $this->collectionFactory,
+            $this->logger,
         );
     }
 
@@ -54,6 +58,31 @@ final class CmsPageDataBuilderTest extends TestCase
         $document = $this->sut->build($page, 1);
 
         self::assertSame('Our mission is to serve.', $document['content']);
+    }
+
+    public function test_build_drops_script_and_style_contents(): void
+    {
+        $page = $this->createPageMock(
+            content: '<style>.a{color:red}</style><p>Visible</p><script>window.x = 1;</script> text',
+        );
+
+        $document = $this->sut->build($page, 1);
+
+        self::assertSame('Visible text', $document['content']);
+    }
+
+    public function test_build_falls_back_to_stored_content_when_rendering_fails(): void
+    {
+        $page = $this->createMock(Page::class);
+        $page->method('getId')->willReturn(7);
+        $page->method('getContent')->willThrowException(new \TypeError('Cannot access offset of type string on string'));
+        $page->method('getData')->with('content')->willReturn('<p>Stored text</p>');
+        $this->logger->expects(self::once())->method('warning')
+            ->with(self::stringContains('CMS page 7'));
+
+        $document = $this->sut->build($page, 1);
+
+        self::assertSame('Stored text', $document['content']);
     }
 
     public function test_get_page_collection_applies_store_filter(): void

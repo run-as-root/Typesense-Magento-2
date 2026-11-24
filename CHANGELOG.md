@@ -25,6 +25,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- A CMS page whose content fails to render (e.g. a broken Hyvä CMS component throwing a `TypeError` while `typesense:reindex` renders content in the frontend area) no longer aborts the whole reindex: the page is indexed with its stored content and a warning is logged. Script and style contents are no longer indexed as page text.
 - Category documents hold the URL of the store being indexed. The category's URL instance is Magento's shared frontend URL object, which kept the base URL of the first store that used it, so the autocomplete linked every store's categories to that store. Upgrade note: reindex categories (`bin/magento typesense:reindex --entity=category`).
 - The price slider no longer shows a 0-1 range when every result has the same price (e.g. all 0.90): the rounded stats of a single price now have min equal to max, so the slider is hidden as in ElasticSuite.
 - The search page no longer shows facets of attributes whose "Use in Search Results Layered Navigation" (`is_filterable_in_search`) is No, as in Magento and ElasticSuite. Category pages are unchanged. `FacetConfigBuilder::build()` takes an optional `$isSearchPage` argument.
