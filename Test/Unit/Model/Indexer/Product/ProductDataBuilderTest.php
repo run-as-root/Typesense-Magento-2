@@ -29,6 +29,7 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\NewProductResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\PriceCalculatorInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductDataBuilder;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\CompositeChildrenDataResolver;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\CrossSellResolver;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\GroupedChildrenResolver;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\SalableResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ReviewResolverInterface;
@@ -54,6 +55,7 @@ final class ProductDataBuilderTest extends TestCase
     private GroupedChildrenResolver $groupedChildrenResolver;
     private NewProductResolverInterface&MockObject $newProductResolver;
     private CompositeChildrenDataResolver&MockObject $compositeChildrenResolver;
+    private CrossSellResolver&MockObject $crossSellResolver;
     private ProductDataBuilder $sut;
 
     protected function setUp(): void
@@ -88,6 +90,7 @@ final class ProductDataBuilderTest extends TestCase
         $this->groupedChildrenResolver = new GroupedChildrenResolver($this->priceCalculator, $this->salableResolver);
         $this->newProductResolver = $this->createMock(NewProductResolverInterface::class);
         $this->compositeChildrenResolver = $this->createMock(CompositeChildrenDataResolver::class);
+        $this->crossSellResolver = $this->createMock(CrossSellResolver::class);
 
         $this->sut = $this->buildSut();
     }
@@ -317,6 +320,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->groupedChildrenResolver,
             $this->newProductResolver,
             $this->compositeChildrenResolver,
+            $this->crossSellResolver,
         );
     }
 
@@ -491,6 +495,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->groupedChildrenResolver,
             $this->newProductResolver,
             $this->compositeChildrenResolver,
+            $this->crossSellResolver,
         );
 
         $document = $sut->build($product, 1);
@@ -536,6 +541,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->groupedChildrenResolver,
             $this->newProductResolver,
             $this->compositeChildrenResolver,
+            $this->crossSellResolver,
         );
 
         $document = $sut->build($product, 2);
@@ -581,6 +587,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->groupedChildrenResolver,
             $this->newProductResolver,
             $this->compositeChildrenResolver,
+            $this->crossSellResolver,
         );
 
         $document = $sut->build($product, 2);
@@ -857,6 +864,32 @@ final class ProductDataBuilderTest extends TestCase
         $this->compositeChildrenResolver->expects(self::once())->method('preload')->with([2, 3], 4);
 
         $this->sut->preloadChildren($collection, 4);
+    }
+
+    public function test_build_holds_the_cross_sell_ids_of_the_product(): void
+    {
+        $product = $this->createProductMock(id: 7);
+        $this->stubEmptyProductData($product);
+        $this->crossSellResolver->method('getCrossSellIds')->with(7)->willReturn([12, 9]);
+
+        $document = $this->sut->build($product, 1);
+
+        self::assertNotNull($document);
+        self::assertSame([12, 9], $document['crosssell_ids']);
+    }
+
+    public function test_preload_cross_sells_resolves_every_product_of_the_batch(): void
+    {
+        $collection = $this->createMock(ProductCollection::class);
+        $collection->method('getItems')->willReturn([
+            1 => $this->createProductMock(id: 1),
+            2 => $this->createProductMock(id: 2),
+            3 => $this->createProductMock(id: 3),
+        ]);
+
+        $this->crossSellResolver->expects(self::once())->method('preload')->with([1, 2, 3]);
+
+        $this->sut->preloadCrossSells($collection);
     }
 
     /**
