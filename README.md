@@ -143,7 +143,7 @@ Typesense treats each `collections` entry as a regular expression that must matc
 | Index Products | Yes | Enable product indexing. Every flag applies per store view to full reindexes (cron, queue, CLI) and mview updates |
 | Index Categories | Yes | Enable category indexing |
 | Index CMS Pages | Yes | Enable CMS page indexing |
-| Enable Customer / Order / Store / System Configuration Indexing | No | Admin assistant collections ([Additional Indexers](#additional-indexers)). Customers and orders carry names, e-mail and postal addresses: keep them off unless the assistant needs them |
+| Enable Customer / Order / Store / System Configuration Indexing | No | `indexing/{customer,order,store,system_config}_enabled`. Admin assistant collections ([Additional Indexers](#additional-indexers)). Customers and orders carry names, e-mail and postal addresses: keep them off unless the assistant needs them |
 | Enable Search Suggestions | Yes | Suggestion collection and analytics rule per store view ([Search Suggestions](#search-suggestions)) |
 | Suggestion Limit | 1000 | How many of the most frequent queries a store's suggestion collection keeps (analytics rule `limit`); also the seed maximum |
 | Suggestion Minimum Count | 3 | Count a query needs before it is shown in suggestions and popular searches |
@@ -291,7 +291,7 @@ Choose which sort options are available to customers on search results and categ
 | Price: Low to High | Ascending price |
 | Price: High to Low | Descending price |
 | Newest | Most recently created products |
-| Name: A–Z | Alphabetical ascending |
+| Name: A–Z | Alphabetical ascending (`name` is declared sortable; collections built by 0.2.0 or earlier need a full product reindex) |
 | Name: Z–A | Alphabetical descending |
 | Best Selling | Based on sales order data |
 | Top Rated | Based on review ratings |
