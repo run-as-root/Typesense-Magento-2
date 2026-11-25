@@ -177,7 +177,17 @@
                 <item name="typesense_collection_delete" xsi:type="object">RunAsRoot\TypeSense\Console\Command\CollectionDeleteCommand</item>
                 <item name="typesense_collection_rollback" xsi:type="object">RunAsRoot\TypeSense\Console\Command\CollectionRollbackCommand</item>
                 <item name="typesense_health" xsi:type="object">RunAsRoot\TypeSense\Console\Command\HealthCheckCommand</item>
+                <item name="typesense_import_elasticsuite" xsi:type="object">RunAsRoot\TypeSense\Console\Command\ImportElasticsuiteCommand</item>
             </argument>
+        </arguments>
+    </type>
+
+    <!-- Proxies: every bin/magento run builds the command list, the importers are only needed when this one runs -->
+    <type name="RunAsRoot\TypeSense\Console\Command\ImportElasticsuiteCommand">
+        <arguments>
+            <argument name="synonymImporter" xsi:type="object">RunAsRoot\TypeSense\Model\ElasticSuite\SynonymImporter\Proxy</argument>
+            <argument name="boostRuleImporter" xsi:type="object">RunAsRoot\TypeSense\Model\ElasticSuite\BoostRuleImporter\Proxy</argument>
+            <argument name="positionImporter" xsi:type="object">RunAsRoot\TypeSense\Model\ElasticSuite\CategoryPositionImporter\Proxy</argument>
         </arguments>
     </type>
 
