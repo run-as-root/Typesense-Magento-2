@@ -17,6 +17,7 @@ use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
+use RunAsRoot\TypeSense\Model\Listing\CategoryFacetDisplay;
 use RunAsRoot\TypeSense\Model\Listing\CategoryFacetResolver;
 use RunAsRoot\TypeSense\Model\Listing\CategoryPositionSortBuilder;
 use RunAsRoot\TypeSense\Model\Listing\CollectionFieldProvider;
@@ -63,6 +64,7 @@ class ListingConfigViewModel implements ArgumentInterface
         private readonly CategoryPositionSortBuilder $positionSortBuilder,
         private readonly SortOptionProvider $sortOptionProvider,
         private readonly CollectionFieldProvider $fieldProvider,
+        private readonly CategoryFacetDisplay $facetDisplay,
     ) {
     }
 
@@ -208,11 +210,31 @@ class ListingConfigViewModel implements ArgumentInterface
         $facets = $this->facetConfigBuilder->build($storeId, !$isCategory);
         if ($isCategory) {
             $categoryFacet = $category !== null ? $this->categoryFacetResolver->resolve($category, $storeId) : null;
+            $facets = $category !== null ? $this->withoutHiddenFacets($facets, (int) $category->getId()) : $facets;
         } else {
             $categoryFacet = $this->categoryFacetResolver->resolveForStoreRoot((int) $store->getRootCategoryId(), $storeId);
         }
 
         return $categoryFacet !== null ? [$categoryFacet, ...$facets] : $facets;
+    }
+
+    /**
+     * The category facet is never hidden, as on ElasticSuite.
+     *
+     * @param list<array<string, mixed>> $facets
+     * @return list<array<string, mixed>>
+     */
+    private function withoutHiddenFacets(array $facets, int $categoryId): array
+    {
+        $hidden = $this->facetDisplay->getHiddenFields($categoryId);
+        if ($hidden === []) {
+            return $facets;
+        }
+
+        return array_values(array_filter(
+            $facets,
+            static fn (array $facet): bool => !in_array($facet['field'] ?? null, $hidden, true),
+        ));
     }
 
     /** @return list<array{label: string, value: string, code: string}> */

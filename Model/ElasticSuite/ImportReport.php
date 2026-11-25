@@ -10,6 +10,7 @@ final class ImportReport
     public const string BOOSTS = 'boosting rules';
     public const string POSITIONS = 'category positions';
     public const string HIDES = 'hidden products';
+    public const string FILTERS = 'category filters';
 
     /**
      * @var array<string, array{

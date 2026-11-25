@@ -313,7 +313,7 @@ Options appear in the order they are configured (store-view scope).
 | `bin/magento typesense:collection:delete <name> --force` | Delete a named Typesense collection |
 | `bin/magento typesense:collection:delete --entity=TYPE --force` | Delete the aliases and all collections (versioned and plain) of an entity type in every store view; refused while the type is still enabled in a store view |
 | `bin/magento typesense:health` | Check the health status of the Typesense server |
-| `bin/magento typesense:import:elasticsuite [--synonyms] [--boosts] [--positions] [--dry-run] [--store=CODE]` | Import ElasticSuite thesauri, optimizers and category positions, see [Migrating from ElasticSuite](#migrating-from-elasticsuite) |
+| `bin/magento typesense:import:elasticsuite [--synonyms] [--boosts] [--positions] [--filters] [--dry-run] [--store=CODE]` | Import ElasticSuite thesauri, optimizers, category positions and per-category filter settings, see [Migrating from ElasticSuite](#migrating-from-elasticsuite) |
 | `bin/magento typesense:suggestions:seed [--limit=N] [--store=CODE]` | Import the most popular Magento search terms into the suggestion collections; terms already present keep their count, so it can run again, see [Search Suggestions](#search-suggestions) |
 
 ### Examples
@@ -470,7 +470,7 @@ Limitations:
 
 ## Migrating from ElasticSuite
 
-`bin/magento typesense:import:elasticsuite` copies what ElasticSuite keeps in its own tables into the module and Magento, so a shop leaving ElasticSuite keeps its synonyms, boosts and category order. It reads the `smile_*` tables directly, so ElasticSuite's code does not have to be installed; a section whose tables are missing is skipped with a message.
+`bin/magento typesense:import:elasticsuite` copies what ElasticSuite keeps in its own tables into the module and Magento, so a shop leaving ElasticSuite keeps its synonyms, boosts, category order and per-category filters. It reads the `smile_*` tables directly, so ElasticSuite's code does not have to be installed; a section whose tables are missing is skipped with a message.
 
 ```bash
 # What would change, nothing written
@@ -484,6 +484,9 @@ bin/magento typesense:import:elasticsuite --synonyms --boosts --store=de
 
 # Category positions are indexed: reindex products afterwards
 bin/magento typesense:reindex --entity=product
+
+# Category filter settings are read when the page renders: clean cached pages
+bin/magento cache:clean full_page
 ```
 
 The summary lists per section what was created, updated, left unchanged and skipped (grouped by reason; `-v` lists every skipped item). Running it again updates what changed and creates no duplicates.
@@ -527,6 +530,18 @@ ElasticSuite sorts a category by its own merchandiser positions (`smile_virtualc
 Not imported (reported): positions a store view keeps for itself (category attribute `use_store_positions` set on that store view), since Magento positions are global, and rows of products the category does not list. `--store` imports only that store view's hidden products; positions are global, so run `--positions` without `--store`. Run a full product reindex afterwards.
 
 Why Magento positions rather than pins of the category merchandiser: merchandiser pins are Typesense curation, which keeps the pinned products on top for every sort order and only while no filter is selected. ElasticSuite positions are a sort order, which Magento positions plus the `category_position_<id>` sort reproduce.
+
+### Category filter settings
+
+ElasticSuite's per-category layered navigation settings (`smile_elasticsuitecatalog_category_filterable_attribute`, the category's "Layered Navigation Filters") become the category's [TypeSense Filters](#filters-per-category):
+
+| ElasticSuite display mode | TypeSense Filters |
+|---|---|
+| Always hidden (1) | Always hidden |
+| Always displayed (2) | Always shown |
+| Auto (0) | Not imported (same as no row) |
+
+A category's imported rows replace its TypeSense Filters rows; categories without ElasticSuite rows keep theirs, so a re-import adds and updates but never clears a category (a category set back to auto in ElasticSuite has no rows there). The settings are global: with `--store` the section imports nothing, run `--filters` without it. Position, facet size, sort order and minimum coverage per category are not imported. Clean the full page cache afterwards so cached category pages pick them up.
 
 ---
 
@@ -593,6 +608,10 @@ The category's "position" sort (Magento's default, or the category's "Default Pr
 - Each product document has a sortable `category_position_<id>` int32 field for every category in its `category_ids` (schema pattern field `category_position_.*`). An anchor category lists the products it only inherits from a subcategory after its own ones, at the lowest subcategory position + 10000, as Magento's category product index does. Positions are read from `catalog_category_product` once per indexing batch; changing a category's products or positions reindexes the products through the `catalog_category_product` mview subscription.
 - The sort is `category_position_<id>:asc`, then the category boosting rules (`_eval(…):desc`); with "Show Out-of-Stock Products Last" `in_stock:desc` still comes first. Merchandiser pins and hides apply on top.
 - Until the collection has the category's field (a collection built before the upgrade, a category without indexed products) the listing keeps the previous relevance sort, since Typesense fails a search sorted by an unknown field. The collection's field names are cached for five minutes, so the position sort starts at most five minutes after a reindex.
+
+### Filters per category
+
+The category edit page has a **TypeSense Filters** section that sets, for this category's page only, which filters are **Always hidden** (removed from the page) or **Always shown**. A filter without a row, or with **Auto**, shows whenever the listed products have values for it, like **Always shown** (ElasticSuite's coverage rule, which hides "auto" filters that fewer than a set share of the products have, is not implemented). The settings are global for every store view, do not apply to the search page, and never hide the Category facet. They are stored in `run_as_root_typesense_category_facet` and read when the page renders, so no reindex is needed; saving the category cleans its cached pages. `typesense:import:elasticsuite --filters` imports ElasticSuite's per-category filter settings into it.
 
 ### Category facet
 
