@@ -255,6 +255,20 @@ test('buildSortBy puts in_stock first and never exceeds three fields', () => {
     );
 });
 
+test('buildSortBy keeps in_stock first before a category position sort and its boosting rules', () => {
+    const config = searchConfig({
+        context: 'category',
+        relevanceSortBy: 'category_position_42:asc,' + EVAL + ':desc',
+    });
+
+    assert.equal(core.buildSortBy('', config), 'in_stock:desc,category_position_42:asc,' + EVAL + ':desc');
+    assert.equal(core.buildSortBy('price:asc', config), 'in_stock:desc,price:asc');
+    assert.equal(
+        core.buildSortBy('', Object.assign({}, config, { inStockFirst: false })),
+        'category_position_42:asc,' + EVAL + ':desc',
+    );
+});
+
 test('defaultSort uses the configured default when offered, else relevance on search, else the first option', () => {
     assert.equal(core.defaultSort(searchConfig({ defaultSort: 'price:desc' })), 'price:desc');
     assert.equal(core.defaultSort(searchConfig({ defaultSort: 'position:asc' })), '');

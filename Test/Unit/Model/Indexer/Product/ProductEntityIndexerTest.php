@@ -8,6 +8,7 @@ use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use RunAsRoot\TypeSense\Model\Indexer\Product\CategoryPositionResolver;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductDataBuilder;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductEntityIndexer;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface;
@@ -16,14 +17,17 @@ final class ProductEntityIndexerTest extends TestCase
 {
     private ProductDataBuilder&MockObject $dataBuilder;
     private ProductSchemaProviderInterface&MockObject $schemaProvider;
+    private CategoryPositionResolver&MockObject $positionResolver;
     private ProductEntityIndexer $sut;
 
     protected function setUp(): void
     {
         $this->dataBuilder = $this->createMock(ProductDataBuilder::class);
         $this->schemaProvider = $this->createMock(ProductSchemaProviderInterface::class);
+        $this->positionResolver = $this->createMock(CategoryPositionResolver::class);
+        $this->positionResolver->method('toFields')->willReturn([]);
 
-        $this->sut = new ProductEntityIndexer($this->dataBuilder, $this->schemaProvider);
+        $this->sut = new ProductEntityIndexer($this->dataBuilder, $this->schemaProvider, $this->positionResolver);
     }
 
     public function test_products_without_a_document_are_not_yielded(): void
@@ -32,6 +36,7 @@ final class ProductEntityIndexerTest extends TestCase
         $skipped = $this->createMock(Product::class);
         $collection = $this->createMock(ProductCollection::class);
         $collection->method('getIterator')->willReturn(new \ArrayIterator([$skipped, $indexed]));
+        $collection->method('getItems')->willReturn([]);
         $this->dataBuilder->method('getProductCollection')->with([5, 6], 2)->willReturn($collection);
         $this->dataBuilder->method('build')->willReturnMap([[$skipped, 2, null], [$indexed, 2, ['id' => '6']]]);
 
@@ -43,6 +48,7 @@ final class ProductEntityIndexerTest extends TestCase
         $product = $this->createMock(Product::class);
         $collection = $this->createMock(ProductCollection::class);
         $collection->method('getIterator')->willReturn(new \ArrayIterator([$product]));
+        $collection->method('getItems')->willReturn([]);
         $this->dataBuilder->method('getProductCollection')->willReturn($collection);
         $calls = [];
         $this->dataBuilder->expects(self::once())->method('preloadChildren')->with($collection, 2)
@@ -65,6 +71,7 @@ final class ProductEntityIndexerTest extends TestCase
         $product = $this->createMock(Product::class);
         $collection = $this->createMock(ProductCollection::class);
         $collection->method('getIterator')->willReturn(new \ArrayIterator([$product]));
+        $collection->method('getItems')->willReturn([]);
         $this->dataBuilder->method('getProductCollection')->willReturn($collection);
         $calls = [];
         $this->dataBuilder->expects(self::once())->method('preloadCrossSells')->with($collection)
@@ -87,5 +94,52 @@ final class ProductEntityIndexerTest extends TestCase
         $this->schemaProvider->method('getCollectionSettings')->willReturn(['enable_nested_fields' => true]);
 
         self::assertSame(['enable_nested_fields' => true], $this->sut->getCollectionSettings());
+    }
+
+    public function test_category_positions_of_the_batch_are_loaded_once_and_added_to_each_document(): void
+    {
+        $first = $this->createMock(Product::class);
+        $first->method('getId')->willReturn('5');
+        $second = $this->createMock(Product::class);
+        $second->method('getId')->willReturn('6');
+        $collection = $this->createMock(ProductCollection::class);
+        $collection->method('getItems')->willReturn([5 => $first, 6 => $second]);
+        $collection->method('getIterator')->willReturn(new \ArrayIterator([$first, $second]));
+        $this->dataBuilder->method('getProductCollection')->willReturn($collection);
+        $this->dataBuilder->method('build')->willReturnMap([
+            [$first, 2, ['id' => '5', 'category_ids' => [10]]],
+            [$second, 2, ['id' => '6', 'category_ids' => []]],
+        ]);
+        $positionResolver = $this->createMock(CategoryPositionResolver::class);
+        $positionResolver->expects(self::once())->method('load')->with([5, 6])->willReturn([5 => [10 => 3]]);
+        $positionResolver->method('toFields')->willReturnMap([
+            [[10 => 3], [10], ['category_position_10' => 3]],
+            [[], [], []],
+        ]);
+        $sut = new ProductEntityIndexer($this->dataBuilder, $this->schemaProvider, $positionResolver);
+
+        self::assertSame(
+            [
+                ['id' => '5', 'category_ids' => [10], 'category_position_10' => 3],
+                ['id' => '6', 'category_ids' => []],
+            ],
+            iterator_to_array($sut->buildDocuments([5, 6], 2), false),
+        );
+    }
+
+    public function test_schema_adds_the_category_position_fields(): void
+    {
+        $this->schemaProvider->method('getFields')->willReturn([['name' => 'id', 'type' => 'string']]);
+        $this->positionResolver->method('getSchemaField')->willReturn(
+            ['name' => 'category_position_.*', 'type' => 'int32', 'optional' => true, 'sort' => true],
+        );
+
+        self::assertSame(
+            [
+                ['name' => 'id', 'type' => 'string'],
+                ['name' => 'category_position_.*', 'type' => 'int32', 'optional' => true, 'sort' => true],
+            ],
+            $this->sut->getSchemaFields(),
+        );
     }
 }

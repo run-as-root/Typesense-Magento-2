@@ -16,6 +16,7 @@ final class MviewXmlTest extends TestCase
     {
         return [
             'website assignment' => ['catalog_product_website', 'product_id'],
+            'category assignment and position' => ['catalog_category_product', 'product_id'],
             'parent/child relation' => ['catalog_product_relation', 'parent_id'],
             'cross-sell and other product links' => ['catalog_product_link', 'product_id'],
         ];
