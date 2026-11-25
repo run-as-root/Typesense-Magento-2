@@ -23,6 +23,7 @@ class ElasticSuiteReader
     public const string OPTIMIZER_SEARCH_CONTAINER = 'smile_elasticsuite_optimizer_search_container';
     public const string OPTIMIZER_LIMITATION = 'smile_elasticsuite_optimizer_limitation';
     public const string CATEGORY_PRODUCT_POSITION = 'smile_virtualcategory_catalog_category_product_position';
+    public const string CATEGORY_FILTERABLE_ATTRIBUTE = 'smile_elasticsuitecatalog_category_filterable_attribute';
 
     public function __construct(
         private readonly ResourceConnection $resource,
@@ -249,6 +250,30 @@ class ElasticSuiteReader
             'thesaurus_id' => (int) $row['thesaurus_id'],
             'term_id' => (int) $row['term_id'],
             'term' => (string) $row['term'],
+        ], $rows);
+    }
+
+    /**
+     * Rows of categories that no longer exist are left out.
+     *
+     * @return list<array{category_id: int, attribute_code: string, display_mode: int}>
+     */
+    public function getCategoryFilterDisplayModes(): array
+    {
+        $select = $this->connection()->select()
+            ->from(
+                ['f' => $this->resource->getTableName(self::CATEGORY_FILTERABLE_ATTRIBUTE)],
+                ['category_id' => 'entity_id', 'display_mode' => 'facet_display_mode'],
+            )
+            ->join(['a' => $this->resource->getTableName('eav_attribute')], 'a.attribute_id = f.attribute_id', ['attribute_code'])
+            ->join(['c' => $this->resource->getTableName('catalog_category_entity')], 'c.entity_id = f.entity_id', [])
+            ->order(['f.entity_id', 'a.attribute_code']);
+        $rows = $this->connection()->fetchAll($select);
+
+        return array_map(static fn (array $row): array => [
+            'category_id' => (int) $row['category_id'],
+            'attribute_code' => (string) $row['attribute_code'],
+            'display_mode' => (int) $row['display_mode'],
         ], $rows);
     }
 

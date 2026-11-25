@@ -6,6 +6,7 @@ namespace RunAsRoot\TypeSense\Console\Command;
 
 use Magento\Framework\Exception\LocalizedException;
 use RunAsRoot\TypeSense\Model\ElasticSuite\BoostRuleImporter;
+use RunAsRoot\TypeSense\Model\ElasticSuite\CategoryFilterImporter;
 use RunAsRoot\TypeSense\Model\ElasticSuite\CategoryPositionImporter;
 use RunAsRoot\TypeSense\Model\ElasticSuite\ImportReport;
 use RunAsRoot\TypeSense\Model\ElasticSuite\StoreScope;
@@ -20,6 +21,7 @@ class ImportElasticsuiteCommand extends Command
     private const string OPTION_SYNONYMS = 'synonyms';
     private const string OPTION_BOOSTS = 'boosts';
     private const string OPTION_POSITIONS = 'positions';
+    private const string OPTION_FILTERS = 'filters';
     private const string OPTION_DRY_RUN = 'dry-run';
     private const string OPTION_STORE = 'store';
     private const int SAMPLE_SIZE = 5;
@@ -29,6 +31,7 @@ class ImportElasticsuiteCommand extends Command
         private readonly BoostRuleImporter $boostRuleImporter,
         private readonly CategoryPositionImporter $positionImporter,
         private readonly StoreScope $storeScope,
+        private readonly CategoryFilterImporter $filterImporter,
     ) {
         parent::__construct();
     }
@@ -36,7 +39,10 @@ class ImportElasticsuiteCommand extends Command
     protected function configure(): void
     {
         $this->setName('typesense:import:elasticsuite')
-            ->setDescription('Import ElasticSuite thesauri, optimizers and category positions (all without options)')
+            ->setDescription(
+                'Import ElasticSuite thesauri, optimizers, category positions and category filter settings'
+                . ' (all without options)',
+            )
             ->addOption(self::OPTION_SYNONYMS, null, InputOption::VALUE_NONE, 'Thesauri as synonyms')
             ->addOption(self::OPTION_BOOSTS, null, InputOption::VALUE_NONE, 'Optimizers as boosting rules')
             ->addOption(
@@ -44,6 +50,12 @@ class ImportElasticsuiteCommand extends Command
                 null,
                 InputOption::VALUE_NONE,
                 'Merchandiser positions as Magento category positions, blacklisted products as hidden products',
+            )
+            ->addOption(
+                self::OPTION_FILTERS,
+                null,
+                InputOption::VALUE_NONE,
+                'Per-category filter settings (always hidden / always displayed) as TypeSense category filter settings',
             )
             ->addOption(self::OPTION_DRY_RUN, null, InputOption::VALUE_NONE, 'Report what would change, write nothing')
             ->addOption(self::OPTION_STORE, null, InputOption::VALUE_REQUIRED, 'Only this store view (code)');
@@ -89,12 +101,15 @@ class ImportElasticsuiteCommand extends Command
                 . ' sort by the imported positions.',
             );
         }
+        if (isset($sections[ImportReport::FILTERS]) && !$dryRun) {
+            $output->writeln('Clean the full page cache so cached category pages pick up the imported filter settings.');
+        }
 
         return $failed ? Command::FAILURE : Command::SUCCESS;
     }
 
     /**
-     * @return array<string, SynonymImporter|BoostRuleImporter|CategoryPositionImporter>
+     * @return array<string, SynonymImporter|BoostRuleImporter|CategoryPositionImporter|CategoryFilterImporter>
      */
     private function getSections(InputInterface $input): array
     {
@@ -102,11 +117,13 @@ class ImportElasticsuiteCommand extends Command
             ImportReport::SYNONYMS => [self::OPTION_SYNONYMS, $this->synonymImporter],
             ImportReport::BOOSTS => [self::OPTION_BOOSTS, $this->boostRuleImporter],
             ImportReport::POSITIONS => [self::OPTION_POSITIONS, $this->positionImporter],
+            ImportReport::FILTERS => [self::OPTION_FILTERS, $this->filterImporter],
         ];
         $selected = array_filter($all, static fn (array $section): bool => (bool) $input->getOption($section[0]));
 
         return array_map(
-            static fn (array $section): SynonymImporter|BoostRuleImporter|CategoryPositionImporter => $section[1],
+            static fn (array $section): SynonymImporter|BoostRuleImporter|CategoryPositionImporter|CategoryFilterImporter
+                => $section[1],
             $selected === [] ? $all : $selected,
         );
     }

@@ -9,6 +9,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Console\Command\ImportElasticsuiteCommand;
 use RunAsRoot\TypeSense\Model\ElasticSuite\BoostRuleImporter;
+use RunAsRoot\TypeSense\Model\ElasticSuite\CategoryFilterImporter;
 use RunAsRoot\TypeSense\Model\ElasticSuite\CategoryPositionImporter;
 use RunAsRoot\TypeSense\Model\ElasticSuite\ImportReport;
 use RunAsRoot\TypeSense\Model\ElasticSuite\StoreScope;
@@ -22,6 +23,7 @@ final class ImportElasticsuiteCommandTest extends TestCase
     private BoostRuleImporter&MockObject $boostRuleImporter;
     private CategoryPositionImporter&MockObject $positionImporter;
     private StoreScope&MockObject $storeScope;
+    private CategoryFilterImporter&MockObject $filterImporter;
     private CommandTester $tester;
 
     protected function setUp(): void
@@ -30,12 +32,14 @@ final class ImportElasticsuiteCommandTest extends TestCase
         $this->boostRuleImporter = $this->createMock(BoostRuleImporter::class);
         $this->positionImporter = $this->createMock(CategoryPositionImporter::class);
         $this->storeScope = $this->createMock(StoreScope::class);
+        $this->filterImporter = $this->createMock(CategoryFilterImporter::class);
 
         $this->tester = new CommandTester(new ImportElasticsuiteCommand(
             $this->synonymImporter,
             $this->boostRuleImporter,
             $this->positionImporter,
             $this->storeScope,
+            $this->filterImporter,
         ));
     }
 
@@ -45,6 +49,7 @@ final class ImportElasticsuiteCommandTest extends TestCase
             ->with(self::isInstanceOf(ImportReport::class), false, null);
         $this->boostRuleImporter->expects(self::once())->method('import');
         $this->positionImporter->expects(self::once())->method('import');
+        $this->filterImporter->expects(self::once())->method('import');
 
         self::assertSame(0, $this->tester->execute([]));
     }
@@ -55,6 +60,7 @@ final class ImportElasticsuiteCommandTest extends TestCase
             ->with(self::isInstanceOf(ImportReport::class), true, 'de');
         $this->boostRuleImporter->expects(self::never())->method('import');
         $this->positionImporter->expects(self::never())->method('import');
+        $this->filterImporter->expects(self::never())->method('import');
 
         $this->tester->execute(['--synonyms' => true, '--dry-run' => true, '--store' => 'de']);
 
@@ -106,6 +112,17 @@ final class ImportElasticsuiteCommandTest extends TestCase
         $this->tester->execute(['--positions' => true]);
 
         self::assertStringContainsString('bin/magento typesense:reindex --entity=product', $this->tester->getDisplay());
+    }
+
+    public function test_filter_import_ends_with_the_cache_hint_unless_dry_run(): void
+    {
+        $this->filterImporter->expects(self::exactly(2))->method('import');
+
+        $this->tester->execute(['--filters' => true]);
+        self::assertStringContainsString('Clean the full page cache', $this->tester->getDisplay());
+
+        $this->tester->execute(['--filters' => true, '--dry-run' => true]);
+        self::assertStringNotContainsString('Clean the full page cache', $this->tester->getDisplay());
     }
 
     public function test_unknown_store_view_fails_before_importing(): void
