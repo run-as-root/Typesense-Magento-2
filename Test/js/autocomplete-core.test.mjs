@@ -284,3 +284,122 @@ test('autocomplete product searches return only the fields the rows and GA4 item
     assert.equal(fields.includes('description'), false);
     assert.equal(plan.searches[1].include_fields, plan.searches[0].include_fields);
 });
+
+test('metaLine joins the configured fields with " · " and shows values the way the shop prints them', () => {
+    const doc = {
+        'categories.lvl1': ['Spirits > Old Varieties', 'News > Summer'],
+        categories: ['Spirits', 'Old Varieties'],
+        volume_percent: ['42.0 %', '40.0 %'],
+        taste: ['', 'Pear'],
+        weight: 0.750,
+        strength: 42.50,
+        size: '10.00 cl',
+        version: '1.05',
+        empty: [],
+        nested: { a: 1 },
+    };
+
+    assert.equal(core.metaLine(doc, ['categories.lvl1', 'volume_percent', 'taste']), 'Old Varieties · 42 % · Pear');
+    assert.equal(core.metaLine(doc, ['categories', 'weight', 'strength', 'size', 'version']), 'Spirits · 0.75 · 42.5 · 10 cl · 1.05');
+    assert.equal(core.metaLine(doc, ['missing', 'empty', 'nested', 'bad field', 'taste']), 'Pear');
+    assert.equal(core.metaLine(doc, []), '');
+    assert.equal(core.metaLine(doc, undefined), '');
+    assert.equal(core.metaLine(null, ['taste']), '');
+});
+
+test('autocompleteResults gives product rows their meta line and document id and returns the top hit', () => {
+    const config = acConfig({ categoryCollection: null, pageCollection: null, suggestionCollection: null, productMetaFields: ['type', 'volume_percent'] });
+    const plan = core.buildAutocompleteSearches('gin', config);
+
+    const result = core.autocompleteResults(
+        [{ found: 2, hits: [product(1, { type: ['Gin'], volume_percent: ['41.0 %'] }), product(2)] }],
+        plan.sources, 'gin', config,
+    );
+
+    assert.deepEqual(result.sections.products.map(r => [r.id, r.meta, r.hasMeta]), [['1', 'Gin · 41 %', true], ['2', '', false]]);
+    assert.equal(result.topDocument.id, '1');
+    assert.equal(core.autocompleteResults([{ found: 0, hits: [] }], plan.sources, 'gin', config).topDocument, null);
+});
+
+test('buildCrossSellSearches asks for the top hit\'s salable cross-sells and best sellers sharing its fallback value', () => {
+    const config = acConfig({
+        productFields: ['id', 'name', 'url', 'taste', 'crosssell_ids'],
+        crossSellCount: 4, crossSellFallbackField: 'taste', crossSellFallbackSortBy: 'sales_count:desc',
+    });
+    const top = { id: '1', crosssell_ids: [7, 2, 9, 'x', -1], taste: ['Pear', 'Bad`Value', 'Quince'] };
+
+    const plan = core.buildCrossSellSearches(top, ['1', '2', '3'], config);
+
+    assert.deepEqual(plan.searches, [
+        {
+            collection: 'p', q: '*', include_fields: 'id,name,url,taste,crosssell_ids', per_page: 2,
+            filter_by: 'id:[`7`,`9`] && in_stock:=true && visibility:[2,4]',
+        },
+        {
+            collection: 'p', q: '*', include_fields: 'id,name,url,taste,crosssell_ids', per_page: 4,
+            filter_by: 'taste:=[`Pear`,`Quince`] && in_stock:=true && visibility:[2,4] && id:!=[`1`,`2`,`3`,`7`,`9`]',
+            sort_by: 'sales_count:desc',
+        },
+    ]);
+    assert.deepEqual(plan.sources, { crossSells: 0, fallback: 1, order: ['7', '9'], count: 4 });
+    assert.equal(typeof plan.key, 'string');
+});
+
+test('buildCrossSellSearches sends only what the top hit and the config allow', () => {
+    const config = acConfig({ crossSellCount: 4, crossSellFallbackField: null });
+
+    const linkedOnly = core.buildCrossSellSearches({ id: '1', crosssell_ids: [5] }, ['1'], config);
+    assert.deepEqual(linkedOnly.sources, { crossSells: 0, fallback: null, order: ['5'], count: 4 });
+    assert.equal(linkedOnly.searches[0].sort_by, undefined);
+
+    const unsorted = core.buildCrossSellSearches({ id: '1', taste: 'Pear' }, ['1'], acConfig({ crossSellCount: 2, crossSellFallbackField: 'taste' }));
+    assert.deepEqual(unsorted.sources, { crossSells: null, fallback: 0, order: [], count: 2 });
+    assert.equal('sort_by' in unsorted.searches[0], false);
+
+    assert.equal(core.buildCrossSellSearches({ id: '1' }, ['1'], config), null, 'nothing linked, no fallback');
+    assert.equal(core.buildCrossSellSearches({ id: '1', taste: [] }, ['1'], acConfig({ crossSellCount: 4, crossSellFallbackField: 'taste' })), null);
+    assert.equal(core.buildCrossSellSearches({ id: '1', crosssell_ids: [5] }, ['1'], acConfig({ crossSellCount: 0 })), null);
+    assert.equal(core.buildCrossSellSearches(null, [], config), null);
+});
+
+test('crossSellResults keeps the link order, fills up with fallback products and caps the cards', () => {
+    const config = acConfig({ crossSellMetaFields: ['type', 'taste'] });
+    const sources = { crossSells: 0, fallback: 1, order: ['9', '7'], count: 3 };
+    const results = [
+        { hits: [product(7, { type: ['Brandy'], taste: ['Pear'] }), product(9)] },
+        { hits: [product(9), product(4, { url: '' }), product(5), product(6)] },
+    ];
+
+    const cards = core.crossSellResults(results, sources, config);
+
+    assert.deepEqual(cards.map(c => [c.key, c.type, c.index, c.url]), [
+        ['crosssell-9', 'crosssell', 0, '/gin-9.html'],
+        ['crosssell-7', 'crosssell', 1, '/gin-7.html'],
+        ['crosssell-5', 'crosssell', 2, '/gin-5.html'],
+    ]);
+    assert.deepEqual(cards.map(c => [c.meta, c.hasMeta]), [['', false], ['Brandy · Pear', true], ['', false]]);
+    assert.equal(cards[1].hasImage, true);
+    assert.equal(cards[1].price, 20);
+    assert.deepEqual(cards[1].item, { item_id: 'S7', item_name: 'Gin 7', price: 20, index: 1, item_list_name: 'search_suggestions' });
+
+    const failedLinks = core.crossSellResults([{ code: 400, error: 'Bad' }, { hits: [product(5)] }], sources, config);
+    assert.deepEqual(failedLinks.map(c => c.key), ['crosssell-5']);
+    assert.deepEqual(core.crossSellResults([], { crossSells: null, fallback: null, order: [], count: 4 }, config), []);
+});
+
+test('popular searches are the store\'s suggestions by popularity, linked to the search page', () => {
+    const config = acConfig({ popularSearchCount: 6 });
+
+    assert.deepEqual(core.buildPopularSearch(config), {
+        collection: 's', q: '*', query_by: 'query', sort_by: 'popularity:desc', per_page: 6,
+    });
+    assert.equal(core.buildPopularSearch(acConfig({ popularSearchCount: 0 })), null);
+    assert.equal(core.buildPopularSearch(acConfig({ popularSearchCount: 6, suggestionCollection: null })), null);
+
+    const chips = core.popularResults({ hits: [{ document: { id: '3', query: 'Gin & Tonic' } }, { document: { id: '4', query: '' } }] }, config);
+    assert.deepEqual(chips.map(c => [c.key, c.type, c.name, c.url, c.index]), [
+        ['popular-3', 'popular', 'Gin & Tonic', 'https://shop.test/de/catalogsearch/result/?q=Gin%20%26%20Tonic', 0],
+    ]);
+    assert.deepEqual(core.popularResults({ code: 404, error: 'Not found' }, config), []);
+    assert.deepEqual(core.popularResults(undefined, config), []);
+});
