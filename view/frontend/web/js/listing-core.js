@@ -4,7 +4,7 @@
 
     const FIELD_NAME = /^[A-Za-z0-9_][A-Za-z0-9_.]*$/;
     const PARAM_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
-    const STATE_PARAMS = ['q', 'page', 'sort', 'limit', 'price'];
+    const STATE_PARAMS = ['q', 'page', 'p', 'sort', 'limit', 'price'];
     const PRICE_PARAM = /^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/;
     const PAGE_PARAM = /^[1-9]\d{0,5}$/;
     const NUMBER_VALUE = /^-?\d+(?:\.\d+)?$/;

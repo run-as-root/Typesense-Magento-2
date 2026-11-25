@@ -675,6 +675,11 @@ test('a facet param is the URL key of its field and accepts only listed values',
     const odd = searchConfig({ facets: [categoryFacet({ param: 'a b' }), { field: 'color', param: 'page', type: 'dropdown' }] });
     assert.equal(core.serializeUrlState(state({ filters: { category_ids: ['7'], color: ['Red'] } }), odd),
         '?category_ids=7&color=Red');
+
+    // Magento's p page parameter cannot be taken over by a facet either.
+    const pagedFacet = searchConfig({ facets: [{ field: 'color', param: 'p', type: 'dropdown' }] });
+    assert.equal(core.parseUrlState('?p=3', pagedFacet).page, 3);
+    assert.deepEqual(core.parseUrlState('?p=3', pagedFacet).filters, {});
 });
 
 test('a facet with its own value limit gets its own search, with or without an active filter', () => {
