@@ -369,7 +369,7 @@ When zero-downtime reindexing is enabled:
 
 1. `ZeroDowntimeService::startReindex()` creates a new versioned collection (e.g., `rar_product_v2` while `rar_product` alias points at `rar_product_v1`)
 2. All documents are indexed into the new versioned collection
-3. `ZeroDowntimeService::finishReindex()` atomically swaps the alias to point at the new collection, keeps the previously live collection as a rollback target, and deletes older versions
+3. `ZeroDowntimeService::finishReindex()` re-creates the synonyms and merchandising overrides on the new collection, atomically swaps the alias to point at it, keeps the previously live collection as a rollback target, and deletes older versions. If the synonyms or overrides cannot be re-created, the alias is not swapped: the new collection is deleted and the reindex fails (non-zero exit code, cron error log), so the live search keeps its synonyms. Only the first build of a collection, with nothing live yet, goes live anyway
 
 This means the live alias (`rar_product`) always points at a fully populated collection. If a new version turns out bad, `bin/magento typesense:collection:rollback --entity=<type> --store=<code>` points the alias back to the previous version.
 

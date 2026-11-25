@@ -13,6 +13,7 @@ use RunAsRoot\TypeSense\Api\CollectionSettingsProviderInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 use RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface;
 use RunAsRoot\TypeSense\Api\SelfMaintainedEntityInterface;
+use RunAsRoot\TypeSense\Model\Collection\ApplierFailedException;
 use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
 use RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
@@ -125,7 +126,13 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         }
 
         if ($zeroDowntime) {
-            $this->zeroDowntimeService->finishReindex($entityType, $storeCode, $collectionName, $storeId);
+            try {
+                $this->zeroDowntimeService->finishReindex($entityType, $storeCode, $collectionName, $storeId);
+            } catch (ApplierFailedException $e) {
+                // Only this failure is raised before the swap; after it the new collection is live.
+                $this->discardFailedBuild($collectionName);
+                throw $e;
+            }
         }
 
         $this->logComplete($entityType, $storeCode, $stats);

@@ -16,6 +16,7 @@ use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionSettingsProviderInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 use RunAsRoot\TypeSense\Api\SelfMaintainedEntityInterface;
+use RunAsRoot\TypeSense\Model\Collection\ApplierFailedException;
 use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
 use RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
@@ -225,6 +226,35 @@ final class IndexerOrchestratorTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('import failed');
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_failed_appliers_delete_the_new_collection_and_rethrow(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_product_de_v2');
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $this->zeroDowntimeService->method('finishReindex')
+            ->willThrowException(new ApplierFailedException('synonyms: typesense down'));
+
+        $this->collectionManager->expects(self::once())->method('deleteCollection')->with('rar_product_de_v2');
+
+        $this->expectException(ApplierFailedException::class);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_failure_after_the_swap_keeps_the_new_collection(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_product_de_v2');
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $this->zeroDowntimeService->method('finishReindex')->willThrowException(new \RuntimeException('cleanup failed'));
+
+        $this->collectionManager->expects(self::never())->method('deleteCollection');
+
+        $this->expectException(\RuntimeException::class);
 
         $this->sut->reindex('product');
     }

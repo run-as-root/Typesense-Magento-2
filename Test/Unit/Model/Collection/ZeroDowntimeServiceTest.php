@@ -11,6 +11,7 @@ use RunAsRoot\TypeSense\Api\AliasManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Api\PostSwapApplierInterface;
+use RunAsRoot\TypeSense\Model\Collection\ApplierFailedException;
 use RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService;
 use Typesense\Exceptions\ObjectNotFound;
 
@@ -235,7 +236,7 @@ final class ZeroDowntimeServiceTest extends TestCase
         self::assertSame(['apply', 'upsertAlias'], $calls);
     }
 
-    public function test_failing_applier_does_not_block_swap(): void
+    public function test_failing_applier_does_not_block_the_first_swap(): void
     {
         $second = $this->createMock(PostSwapApplierInterface::class);
         $sut = new ZeroDowntimeService(
@@ -366,5 +367,32 @@ final class ZeroDowntimeServiceTest extends TestCase
         $this->aliasManager->expects(self::once())->method('upsertAlias')->with('rar_p', 'rar_p_v8');
 
         self::assertSame('rar_p_v8', $this->sut->rollback('p', 'de'));
+    }
+
+    public function test_failing_applier_keeps_the_live_alias_and_throws(): void
+    {
+        $second = $this->createMock(PostSwapApplierInterface::class);
+        $sut = new ZeroDowntimeService(
+            $this->collectionManager,
+            $this->aliasManager,
+            $this->nameResolver,
+            $this->logger,
+            ['synonyms' => $this->applier, 'category_merchandising' => $second],
+        );
+        $this->nameResolver->method('resolve')->willReturn('rar_product_de');
+        $this->aliasManager->method('getAlias')->willReturn(['collection_name' => 'rar_product_de_v1']);
+        $this->collectionManager->method('listCollections')->willReturn([
+            ['name' => 'rar_product_de_v1'], ['name' => 'rar_product_de_v2'],
+        ]);
+
+        $this->applier->method('apply')->willThrowException(new \RuntimeException('typesense down'));
+        $second->expects(self::once())->method('apply');
+        $this->aliasManager->expects(self::never())->method('upsertAlias');
+        $this->collectionManager->expects(self::never())->method('deleteCollection');
+
+        $this->expectException(ApplierFailedException::class);
+        $this->expectExceptionMessage('synonyms: typesense down');
+
+        $sut->finishReindex('product', 'de', 'rar_product_de_v2', 3);
     }
 }

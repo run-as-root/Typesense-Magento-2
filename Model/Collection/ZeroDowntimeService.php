@@ -39,12 +39,20 @@ class ZeroDowntimeService
         return $collectionName;
     }
 
+    /**
+     * @throws ApplierFailedException when the collection state could not be re-created on a collection that
+     *     would replace a live one; the alias keeps pointing at the live collection
+     */
     public function finishReindex(string $entityType, string $storeCode, string $collectionName, ?int $storeId = null): void
     {
         $aliasName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
 
+        // Read before the swap: the version that was live is the only safe rollback target. The
+        // highest lower number may be a half-built orphan or the version rolled away from.
+        $previouslyLive = $this->getAliasTarget($aliasName);
+
         // Synonyms and overrides live on the collection, so the new one must carry them before it goes live.
-        $this->runAppliers($entityType, $storeCode, $collectionName, $storeId);
+        $this->runAppliers($entityType, $storeCode, $collectionName, $storeId, $previouslyLive !== null);
 
         // A plain collection squatting on the alias name blocks alias creation (pre-versioning installs).
         if ($this->collectionManager->collectionExists($aliasName) && !$this->aliasManager->aliasExists($aliasName)) {
@@ -52,18 +60,19 @@ class ZeroDowntimeService
             $this->logger->info("One-time migration: deleted plain collection {$aliasName} to make way for the alias");
         }
 
-        // Read before the swap: the version that was live is the only safe rollback target. The
-        // highest lower number may be a half-built orphan or the version rolled away from.
-        $previouslyLive = $this->getAliasTarget($aliasName);
-
         $this->aliasManager->upsertAlias($aliasName, $collectionName);
         $this->logger->info("Swapped alias {$aliasName} → {$collectionName}");
 
         $this->cleanupOldVersions($aliasName, $collectionName, $previouslyLive);
     }
 
-    private function runAppliers(string $entityType, string $storeCode, string $collectionName, ?int $storeId): void
-    {
+    private function runAppliers(
+        string $entityType,
+        string $storeCode,
+        string $collectionName,
+        ?int $storeId,
+        bool $replacesLiveCollection,
+    ): void {
         if ($storeId === null) {
             $this->logger->info(
                 "No store id for {$entityType}/{$storeCode}: skipping post-swap appliers on {$collectionName}",
@@ -71,6 +80,8 @@ class ZeroDowntimeService
             return;
         }
 
+        $failures = [];
+        $firstFailure = null;
         foreach ($this->appliers as $code => $applier) {
             try {
                 $applier->apply($entityType, $storeId, $storeCode, $collectionName);
@@ -79,8 +90,25 @@ class ZeroDowntimeService
                     "Post-swap applier {$code} failed on {$collectionName}: {$e->getMessage()}",
                     ['exception' => $e],
                 );
+                $failures[] = "{$code}: {$e->getMessage()}";
+                $firstFailure ??= $e;
             }
         }
+
+        // A first build has nothing live to protect: serving it without synonyms beats serving no search at all.
+        if ($failures === [] || !$replacesLiveCollection) {
+            return;
+        }
+
+        throw new ApplierFailedException(
+            sprintf(
+                'Could not re-create the collection state on %s (%s); the previous collection stays live',
+                $collectionName,
+                implode('; ', $failures),
+            ),
+            0,
+            $firstFailure,
+        );
     }
 
     public function rollback(string $entityType, string $storeCode, ?int $storeId = null): string
