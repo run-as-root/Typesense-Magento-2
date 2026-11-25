@@ -18,6 +18,7 @@ use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
 use RunAsRoot\TypeSense\Model\Listing\CategoryFacetResolver;
+use RunAsRoot\TypeSense\Model\Listing\CategoryPositionSortBuilder;
 use RunAsRoot\TypeSense\Model\Listing\FacetConfigBuilder;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
@@ -57,6 +58,7 @@ class ListingConfigViewModel implements ArgumentInterface
         private readonly ConversationModelManager $conversationModelManager,
         private readonly LoggerInterface $logger,
         private readonly CategoryFacetResolver $categoryFacetResolver,
+        private readonly CategoryPositionSortBuilder $positionSortBuilder,
     ) {
     }
 
@@ -94,6 +96,7 @@ class ListingConfigViewModel implements ArgumentInterface
             : SearchRequestParamsBuilder::CONTEXT_SEARCH;
         $category = $isCategory ? $this->getCurrentCategory() : null;
         $limits = $this->getCatalogLimits($storeId);
+        $productCollection = $this->collectionNameResolver->resolve('product', $store->getCode(), $storeId);
 
         return [
             // Only the search-only key may reach the browser.
@@ -103,7 +106,7 @@ class ListingConfigViewModel implements ArgumentInterface
                 'protocol' => $this->config->getSearchProtocol(),
                 'apiKey' => $this->config->getSearchOnlyApiKey(),
             ],
-            'productCollection' => $this->collectionNameResolver->resolve('product', $store->getCode(), $storeId),
+            'productCollection' => $productCollection,
             'context' => $isCategory ? self::CONTEXT_CATEGORY : self::CONTEXT_SEARCH,
             'categoryId' => $category !== null ? (int) $category->getId() : null,
             'baseFilter' => $isCategory ? $this->getCategoryFilter($category, $storeId) : self::SEARCH_BASE_FILTER,
@@ -116,7 +119,7 @@ class ListingConfigViewModel implements ArgumentInterface
             'inStockFirst' => $this->config->isInStockFirst($storeId),
             'requestParams' => $this->requestParamsBuilder->build($paramsContext, $storeId),
             'cacheParams' => $this->searchParametersProvider->getCacheParameters($storeId),
-            'relevanceSortBy' => $this->requestParamsBuilder->getRelevanceSortBy($paramsContext, $storeId),
+            'relevanceSortBy' => $this->getRelevanceSortBy($paramsContext, $category, $storeId, $productCollection),
             'directMatchesFirst' => !$isCategory && $this->config->isDirectMatchesFirstEnabled($storeId),
             'conversationalSearch' => [
                 'enabled' => !$isCategory && $this->config->isConversationalSearchEnabled($storeId),
@@ -144,6 +147,22 @@ class ListingConfigViewModel implements ArgumentInterface
             $this->getConfig($context),
             JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
         );
+    }
+
+    /**
+     * On a category listing the relevance option ('') is Magento's "position" sort (see MAGENTO_SORT_MAP).
+     */
+    private function getRelevanceSortBy(
+        string $paramsContext,
+        ?Category $category,
+        int $storeId,
+        string $productCollection,
+    ): ?string {
+        $positionSortBy = $category !== null
+            ? $this->positionSortBuilder->build((int) $category->getId(), $storeId, $productCollection)
+            : null;
+
+        return $positionSortBy ?? $this->requestParamsBuilder->getRelevanceSortBy($paramsContext, $storeId);
     }
 
     private function getCurrentCategory(): ?Category

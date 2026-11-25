@@ -22,6 +22,7 @@ use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface;
 use RunAsRoot\TypeSense\Model\Listing\CategoryFacetResolver;
+use RunAsRoot\TypeSense\Model\Listing\CategoryPositionSortBuilder;
 use RunAsRoot\TypeSense\Model\Listing\FacetConfigBuilder;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
@@ -40,6 +41,7 @@ final class ListingConfigViewModelTest extends TestCase
     private ScopeConfigInterface&MockObject $scopeConfig;
     private LoggerInterface&MockObject $logger;
     private CategoryFacetResolver&MockObject $categoryFacetResolver;
+    private CategoryPositionSortBuilder&MockObject $positionSortBuilder;
     /** @var list<mixed> */
     private array $constructorArguments;
     private ListingConfigViewModel $sut;
@@ -95,6 +97,7 @@ final class ListingConfigViewModelTest extends TestCase
         $conversationModelManager->method('getModelId')->willReturn('rar-product-assistant');
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->categoryFacetResolver = $this->createMock(CategoryFacetResolver::class);
+        $this->positionSortBuilder = $this->createMock(CategoryPositionSortBuilder::class);
 
         $this->constructorArguments = [
             $this->config,
@@ -111,6 +114,7 @@ final class ListingConfigViewModelTest extends TestCase
             $conversationModelManager,
             $this->logger,
             $this->categoryFacetResolver,
+            $this->positionSortBuilder,
         ];
         $this->sut = new ListingConfigViewModel(...$this->constructorArguments);
     }
@@ -145,6 +149,29 @@ final class ListingConfigViewModelTest extends TestCase
         self::assertSame('https://shop.test/checkout/cart/add/', $config['addToCartUrl']);
         self::assertSame('https://shop.test/wishlist/index/add/', $config['wishlistAddUrl']);
         self::assertTrue($config['showPrices']);
+    }
+
+    public function test_category_listing_in_position_order_sorts_by_the_category_position(): void
+    {
+        $this->givenCategory(42, 'Gin', 'position');
+        $this->givenCatalogLimits('12', '12');
+        $this->positionSortBuilder->method('build')->with(42, 1, 'rar_product_de')
+            ->willReturn('category_position_42:asc');
+        $this->requestParamsBuilder->expects(self::never())->method('getRelevanceSortBy');
+
+        $config = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY);
+
+        self::assertSame('', $config['defaultSort']);
+        self::assertSame('category_position_42:asc', $config['relevanceSortBy']);
+    }
+
+    public function test_search_listing_never_sorts_by_category_position(): void
+    {
+        $this->givenCatalogLimits('12', '12');
+        $this->positionSortBuilder->expects(self::never())->method('build');
+        $this->requestParamsBuilder->method('getRelevanceSortBy')->willReturn(null);
+
+        self::assertNull($this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH)['relevanceSortBy']);
     }
 
     public function test_listing_config_for_search_filters_search_visibility_and_merges_direct_matches(): void

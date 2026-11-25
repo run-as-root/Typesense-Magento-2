@@ -13,6 +13,7 @@ class ProductEntityIndexer implements EntityIndexerInterface, CollectionSettings
     public function __construct(
         private readonly ProductDataBuilder $dataBuilder,
         private readonly ProductSchemaProviderInterface $schemaProvider,
+        private readonly CategoryPositionResolver $positionResolver,
     ) {
     }
 
@@ -28,7 +29,7 @@ class ProductEntityIndexer implements EntityIndexerInterface, CollectionSettings
 
     public function getSchemaFields(): array
     {
-        return $this->schemaProvider->getFields();
+        return [...$this->schemaProvider->getFields(), $this->positionResolver->getSchemaField()];
     }
 
     public function getCollectionSettings(): array
@@ -41,13 +42,18 @@ class ProductEntityIndexer implements EntityIndexerInterface, CollectionSettings
         $collection = $this->dataBuilder->getProductCollection($entityIds, $storeId);
         $this->dataBuilder->preloadChildren($collection, $storeId);
         $this->dataBuilder->preloadCrossSells($collection);
+        $productIds = array_map('intval', array_keys($collection->getItems()));
+        $positions = $this->positionResolver->load($productIds);
 
         /** @var Product $product */
         foreach ($collection as $product) {
             // Not yielding a product makes a partial reindex delete its stale document.
             $document = $this->dataBuilder->build($product, $storeId);
             if ($document !== null) {
-                yield $document;
+                yield $document + $this->positionResolver->toFields(
+                    $positions[(int) $product->getId()] ?? [],
+                    $document['category_ids'] ?? [],
+                );
             }
         }
     }
