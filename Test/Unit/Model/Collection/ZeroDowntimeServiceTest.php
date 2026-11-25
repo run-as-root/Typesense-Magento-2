@@ -395,4 +395,70 @@ final class ZeroDowntimeServiceTest extends TestCase
 
         $sut->finishReindex('product', 'de', 'rar_product_de_v2', 3);
     }
+
+    public function test_finish_reindex_reports_a_changed_schema(): void
+    {
+        $this->useLiveCollectionWithFields(
+            [['name' => 'name', 'type' => 'string', 'sort' => false]],
+            [['name' => 'name', 'type' => 'string', 'sort' => true]],
+        );
+
+        self::assertTrue($this->sut->finishReindex('product', 'de', 'rar_product_de_v2', 3));
+    }
+
+    public function test_finish_reindex_reports_an_added_field(): void
+    {
+        $this->useLiveCollectionWithFields(
+            [['name' => 'name', 'type' => 'string']],
+            [['name' => 'name', 'type' => 'string'], ['name' => 'volume_percent_sort', 'type' => 'float']],
+        );
+
+        self::assertTrue($this->sut->finishReindex('product', 'de', 'rar_product_de_v2', 3));
+    }
+
+    public function test_finish_reindex_reports_an_unchanged_schema_regardless_of_field_order(): void
+    {
+        $this->useLiveCollectionWithFields(
+            [['name' => 'name', 'type' => 'string', 'sort' => true], ['name' => 'sku', 'type' => 'string']],
+            [['name' => 'sku', 'type' => 'string'], ['sort' => true, 'type' => 'string', 'name' => 'name']],
+        );
+
+        self::assertFalse($this->sut->finishReindex('product', 'de', 'rar_product_de_v2', 3));
+    }
+
+    public function test_first_build_counts_as_a_changed_schema(): void
+    {
+        $this->nameResolver->method('resolve')->willReturn('rar_product_de');
+        $this->aliasManager->method('getAlias')->willThrowException(new ObjectNotFound());
+        $this->collectionManager->method('listCollections')->willReturn([]);
+
+        self::assertTrue($this->sut->finishReindex('product', 'de', 'rar_product_de_v1', 3));
+    }
+
+    public function test_unreadable_schema_counts_as_changed(): void
+    {
+        $this->nameResolver->method('resolve')->willReturn('rar_product_de');
+        $this->aliasManager->method('getAlias')->willReturn(['collection_name' => 'rar_product_de_v1']);
+        $this->collectionManager->method('listCollections')->willReturn([]);
+        $this->collectionManager->method('getCollection')->willThrowException(new \RuntimeException('timeout'));
+
+        self::assertTrue($this->sut->finishReindex('product', 'de', 'rar_product_de_v2', 3));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $liveFields
+     * @param list<array<string, mixed>> $newFields
+     */
+    private function useLiveCollectionWithFields(array $liveFields, array $newFields): void
+    {
+        $this->nameResolver->method('resolve')->willReturn('rar_product_de');
+        $this->aliasManager->method('getAlias')->willReturn(['collection_name' => 'rar_product_de_v1']);
+        $this->collectionManager->method('listCollections')->willReturn([
+            ['name' => 'rar_product_de_v1'], ['name' => 'rar_product_de_v2'],
+        ]);
+        $this->collectionManager->method('getCollection')->willReturnMap([
+            ['rar_product_de_v1', ['name' => 'rar_product_de_v1', 'fields' => $liveFields]],
+            ['rar_product_de_v2', ['name' => 'rar_product_de_v2', 'fields' => $newFields]],
+        ]);
+    }
 }

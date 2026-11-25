@@ -35,6 +35,12 @@ class CollectionFieldProvider
         return in_array($field, $this->fieldNames[$collection], true);
     }
 
+    public function invalidate(string $collection): void
+    {
+        unset($this->fieldNames[$collection]);
+        $this->cache->remove(self::CACHE_KEY_PREFIX . $collection);
+    }
+
     /**
      * @return list<string>
      */

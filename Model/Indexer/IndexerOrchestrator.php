@@ -32,6 +32,7 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         private readonly DocumentDeleter $documentDeleter,
         private readonly LoggerInterface $logger,
         private readonly Emulation $emulation,
+        private readonly SchemaChangeHandler $schemaChangeHandler,
     ) {
     }
 
@@ -44,9 +45,21 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
     {
         $indexer = $this->indexerPool->getIndexer($entityType);
 
+        $changedSchemas = [];
         $stores = $this->storeResolver->getStores($entityType);
-        foreach ($stores as $store) {
-            $this->reindexStore($indexer, $entityType, $store->getCode(), (int) $store->getId(), $entityIds);
+        try {
+            foreach ($stores as $store) {
+                $storeId = (int) $store->getId();
+                $schemaChanged = $this->reindexStore($indexer, $entityType, $store->getCode(), $storeId, $entityIds);
+                if ($schemaChanged) {
+                    $changedSchemas[] = $this->nameResolver->resolve($entityType, $store->getCode(), $storeId);
+                }
+            }
+        } finally {
+            // The stores reindexed before a failing one are live with their new schema.
+            if ($entityIds === []) {
+                $this->schemaChangeHandler->handle($changedSchemas);
+            }
         }
     }
 
@@ -68,7 +81,7 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         string $storeCode,
         int $storeId,
         array $entityIds,
-    ): void {
+    ): bool {
         $this->logger->info("Reindexing {$entityType} for store {$storeCode} (ID: {$storeId})");
 
         // Its documents are written by Typesense itself: a versioned rebuild would discard them.
@@ -76,18 +89,19 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
             if ($entityIds === []) {
                 $indexer->provision($storeId, $storeCode);
             }
-            return;
+            return false;
         }
 
         // Documents are generated lazily, so building, importing and deleting must all happen inside emulation.
         $this->emulation->startEnvironmentEmulation($storeId, Area::AREA_FRONTEND, true);
         try {
             if ($entityIds === []) {
-                $this->reindexStoreFull($indexer, $entityType, $storeCode, $storeId);
-                return;
+                return $this->reindexStoreFull($indexer, $entityType, $storeCode, $storeId);
             }
 
             $this->reindexStorePartial($indexer, $entityType, $storeCode, $storeId, $entityIds);
+
+            return false;
         } finally {
             $this->emulation->stopEnvironmentEmulation();
         }
@@ -98,20 +112,23 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         string $entityType,
         string $storeCode,
         int $storeId,
-    ): void {
+    ): bool {
         $schema = ['fields' => $indexer->getSchemaFields()];
         if ($indexer instanceof CollectionSettingsProviderInterface) {
             $schema += $indexer->getCollectionSettings();
         }
         $zeroDowntime = $this->config->isZeroDowntimeEnabled($storeId);
+        $schemaChanged = false;
 
         if ($zeroDowntime) {
             $collectionName = $this->zeroDowntimeService->startReindex($entityType, $storeCode, $schema, $storeId);
         } else {
             $collectionName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
 
+            // An existing collection is reused as it is, so only a new one can bring a new schema.
             if (!$this->collectionManager->collectionExists($collectionName)) {
                 $this->collectionManager->createCollection($collectionName, ['name' => $collectionName] + $schema);
+                $schemaChanged = true;
             }
         }
 
@@ -127,7 +144,12 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
 
         if ($zeroDowntime) {
             try {
-                $this->zeroDowntimeService->finishReindex($entityType, $storeCode, $collectionName, $storeId);
+                $schemaChanged = $this->zeroDowntimeService->finishReindex(
+                    $entityType,
+                    $storeCode,
+                    $collectionName,
+                    $storeId,
+                );
             } catch (ApplierFailedException $e) {
                 // Only this failure is raised before the swap; after it the new collection is live.
                 $this->discardFailedBuild($collectionName);
@@ -136,6 +158,8 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         }
 
         $this->logComplete($entityType, $storeCode, $stats);
+
+        return $schemaChanged;
     }
 
     private function discardFailedBuild(string $collectionName): void

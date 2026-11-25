@@ -40,10 +40,11 @@ class ZeroDowntimeService
     }
 
     /**
+     * @return bool whether the new collection's schema differs from the one that was live (true for a first build)
      * @throws ApplierFailedException when the collection state could not be re-created on a collection that
      *     would replace a live one; the alias keeps pointing at the live collection
      */
-    public function finishReindex(string $entityType, string $storeCode, string $collectionName, ?int $storeId = null): void
+    public function finishReindex(string $entityType, string $storeCode, string $collectionName, ?int $storeId = null): bool
     {
         $aliasName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
 
@@ -60,10 +61,49 @@ class ZeroDowntimeService
             $this->logger->info("One-time migration: deleted plain collection {$aliasName} to make way for the alias");
         }
 
+        $schemaChanged = $previouslyLive === null || $this->schemaDiffers($previouslyLive, $collectionName);
+
         $this->aliasManager->upsertAlias($aliasName, $collectionName);
         $this->logger->info("Swapped alias {$aliasName} → {$collectionName}");
 
         $this->cleanupOldVersions($aliasName, $collectionName, $previouslyLive);
+
+        return $schemaChanged;
+    }
+
+    // Compares the retrieved schemas, so fields that a pattern field (category_position_.*) created count too.
+    private function schemaDiffers(string $previousCollection, string $newCollection): bool
+    {
+        try {
+            $previous = $this->collectionManager->getCollection($previousCollection);
+            $new = $this->collectionManager->getCollection($newCollection);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                "Could not compare the schemas of {$previousCollection} and {$newCollection}: {$e->getMessage()}",
+                ['exception' => $e],
+            );
+
+            return true;
+        }
+
+        return $this->fieldSignature($previous) !== $this->fieldSignature($new);
+    }
+
+    /**
+     * @param array<string, mixed> $collection
+     * @return array<string, array<string, mixed>> field name => normalized definition
+     */
+    private function fieldSignature(array $collection): array
+    {
+        $signature = [];
+        $fields = is_array($collection['fields'] ?? null) ? $collection['fields'] : [];
+        foreach ($fields as $field) {
+            ksort($field);
+            $signature[(string) ($field['name'] ?? '')] = $field;
+        }
+        ksort($signature);
+
+        return $signature;
     }
 
     private function runAppliers(

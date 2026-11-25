@@ -158,7 +158,7 @@ Typesense treats each `collections` entry as a regular expression that must matc
 
 ### Search Settings
 
-Store-view scope. These drive the search page, autocomplete product results and (with "Replace Category Pages") category listings. Settings marked "Reindex" change the collection schema: run `bin/magento typesense:reindex --entity=product` after changing them. Searches can fail until that reindex has finished. Schema changes (infix, stemming, decompounding) only take effect with Zero-Downtime Reindex enabled, which builds a new collection; without it the existing collection is reused, so delete it first (`typesense:collection:delete`). Flush the full page cache after the reindex, because cached pages still send the old search parameters.
+Store-view scope. These drive the search page, autocomplete product results and (with "Replace Category Pages") category listings. Settings marked "Reindex" change the collection schema: run `bin/magento typesense:reindex --entity=product` after changing them. Searches can fail until that reindex has finished. Schema changes (infix, stemming, decompounding) only take effect with Zero-Downtime Reindex enabled, which builds a new collection; without it the existing collection is reused, so delete it first (`typesense:collection:delete`). A full reindex whose schema differs from the previously live collection cleans the full page cache by itself, because cached pages still send the old search parameters; flush it manually after changing settings that need no reindex.
 
 | Setting | Default | Description |
 |---|---|---|
@@ -370,6 +370,8 @@ When zero-downtime reindexing is enabled:
 1. `ZeroDowntimeService::startReindex()` creates a new versioned collection (e.g., `rar_product_v2` while `rar_product` alias points at `rar_product_v1`)
 2. All documents are indexed into the new versioned collection
 3. `ZeroDowntimeService::finishReindex()` re-creates the synonyms and merchandising overrides on the new collection, atomically swaps the alias to point at it, keeps the previously live collection as a rollback target, and deletes older versions. If the synonyms or overrides cannot be re-created, the alias is not swapped: the new collection is deleted and the reindex fails (non-zero exit code, cron error log), so the live search keeps its synonyms. Only the first build of a collection, with nothing live yet, goes live anyway
+
+When the new collection's schema differs from the one that was live (new or changed fields, including category position fields), the reindex cleans the full page cache and the cached field list of that collection once all store views are done.
 
 This means the live alias (`rar_product`) always points at a fully populated collection. If a new version turns out bad, `bin/magento typesense:collection:rollback --entity=<type> --store=<code>` points the alias back to the previous version.
 

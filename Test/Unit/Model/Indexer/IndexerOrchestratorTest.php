@@ -25,6 +25,7 @@ use RunAsRoot\TypeSense\Model\Indexer\DocumentDeleter;
 use RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool;
 use RunAsRoot\TypeSense\Model\Indexer\IndexableStoreResolver;
 use RunAsRoot\TypeSense\Model\Indexer\IndexerOrchestrator;
+use RunAsRoot\TypeSense\Model\Indexer\SchemaChangeHandler;
 
 final class IndexerOrchestratorTest extends TestCase
 {
@@ -39,6 +40,7 @@ final class IndexerOrchestratorTest extends TestCase
     private DocumentDeleter&MockObject $documentDeleter;
     private LoggerInterface&MockObject $logger;
     private Emulation&MockObject $emulation;
+    private SchemaChangeHandler&MockObject $schemaChangeHandler;
     private IndexerOrchestrator $sut;
 
     protected function setUp(): void
@@ -66,6 +68,7 @@ final class IndexerOrchestratorTest extends TestCase
         $this->documentDeleter = $this->createMock(DocumentDeleter::class);
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->emulation = $this->createMock(Emulation::class);
+        $this->schemaChangeHandler = $this->createMock(SchemaChangeHandler::class);
 
         $this->sut = new IndexerOrchestrator(
             new EntityIndexerPool(['product' => $this->indexer]),
@@ -79,6 +82,7 @@ final class IndexerOrchestratorTest extends TestCase
             $this->documentDeleter,
             $this->logger,
             $this->emulation,
+            $this->schemaChangeHandler,
         );
     }
 
@@ -391,6 +395,7 @@ final class IndexerOrchestratorTest extends TestCase
             $this->documentDeleter,
             $this->logger,
             $this->emulation,
+            $this->schemaChangeHandler,
         );
 
         $this->indexer->expects(self::once())->method('buildDocuments');
@@ -521,6 +526,7 @@ final class IndexerOrchestratorTest extends TestCase
             $this->documentDeleter,
             $this->logger,
             $this->emulation,
+            $this->schemaChangeHandler,
         );
     }
 
@@ -570,6 +576,7 @@ final class IndexerOrchestratorTest extends TestCase
             $this->documentDeleter,
             $this->logger,
             $this->emulation,
+            $this->schemaChangeHandler,
         );
 
         $this->indexer->expects(self::once())->method('buildDocuments');
@@ -586,6 +593,86 @@ final class IndexerOrchestratorTest extends TestCase
         $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
         $this->config->method('isEntityIndexingEnabled')->with('product', 3)->willReturn(false);
         $this->aliasManager->method('aliasExists')->willReturn(true);
+        $this->sut = $this->buildSut();
+    }
+
+    public function test_schema_change_of_a_zero_downtime_build_is_handled_once_after_all_stores(): void
+    {
+        $this->useTwoStores();
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_product_v2');
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $this->zeroDowntimeService->method('finishReindex')->willReturnCallback(
+            static fn (string $entityType, string $storeCode): bool => $storeCode === 'at',
+        );
+
+        $this->schemaChangeHandler->expects(self::once())->method('handle')->with(['rar_product_at']);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_unchanged_schema_is_not_handled(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_product_de_v2');
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $this->zeroDowntimeService->method('finishReindex')->willReturn(false);
+
+        $this->schemaChangeHandler->expects(self::once())->method('handle')->with([]);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_collection_created_without_zero_downtime_counts_as_a_schema_change(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
+        $this->collectionManager->method('collectionExists')->willReturn(false);
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+
+        $this->schemaChangeHandler->expects(self::once())->method('handle')->with(['rar_product_de']);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_schema_change_of_an_earlier_store_is_handled_when_a_later_store_fails(): void
+    {
+        $this->useTwoStores();
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_product_v2');
+        $this->batchImportService->method('import')->willReturnOnConsecutiveCalls(
+            ['success' => 1, 'failed' => 0, 'total' => 1],
+            self::throwException(new \RuntimeException('import failed')),
+        );
+        $this->zeroDowntimeService->method('finishReindex')->willReturn(true);
+
+        $this->schemaChangeHandler->expects(self::once())->method('handle')->with(['rar_product_de']);
+        $this->expectException(\RuntimeException::class);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_partial_reindex_never_handles_a_schema_change(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->aliasManager->method('aliasExists')->willReturn(true);
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+
+        $this->schemaChangeHandler->expects(self::never())->method('handle');
+
+        $this->sut->reindex('product', [5]);
+    }
+
+    private function useTwoStores(): void
+    {
+        $this->storeRepository = $this->createMock(StoreRepositoryInterface::class);
+        $this->storeRepository->method('getList')->willReturn([
+            $this->createStore(3, 'de', true),
+            $this->createStore(4, 'at', true),
+        ]);
+        $this->nameResolver = $this->createMock(CollectionNameResolver::class);
+        $this->nameResolver->method('resolve')->willReturnCallback(
+            static fn (string $entityType, string $storeCode): string => "rar_{$entityType}_{$storeCode}",
+        );
         $this->sut = $this->buildSut();
     }
 }
