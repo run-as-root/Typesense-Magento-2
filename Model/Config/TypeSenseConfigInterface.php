@@ -189,8 +189,19 @@ interface TypeSenseConfigInterface
     /** @return string[] */
     public function getFacetFilters(?int $storeId = null): array;
 
-    /** @return array<int, array{label: string, value: string}> */
+    /**
+     * @deprecated Only the fixed options; use \RunAsRoot\TypeSense\Model\Listing\SortOptionProvider::getOptions(),
+     *     which also returns the attribute sort options.
+     * @return array<int, array{label: string, value: string}>
+     */
     public function getEnabledSortOptions(?int $storeId = null): array;
+
+    /**
+     * Configured sort option keys in order: fixed ones (`price_asc`) and attribute ones (`attr:<code>:<direction>`).
+     *
+     * @return list<string>
+     */
+    public function getSortOptionKeys(?int $storeId = null): array;
 
     public function isConversationalSearchEnabled(?int $storeId = null): bool;
 

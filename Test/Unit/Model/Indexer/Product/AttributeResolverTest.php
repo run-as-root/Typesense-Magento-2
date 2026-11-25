@@ -11,6 +11,7 @@ use Magento\Catalog\Model\ResourceModel\Product\Attribute\CollectionFactory;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\AttributeResolver;
+use RunAsRoot\TypeSense\Model\Indexer\Product\SortableAttributeProvider;
 
 final class AttributeResolverTest extends TestCase
 {
@@ -32,7 +33,7 @@ final class AttributeResolverTest extends TestCase
         $config = $this->createMock(TypeSenseConfigInterface::class);
         $config->method('getAdditionalAttributes')->willReturn(['material', 'color']);
 
-        $this->sut = new AttributeResolver($factory, $config);
+        $this->sut = new AttributeResolver($factory, $config, $this->createMock(SortableAttributeProvider::class));
     }
 
     public function test_multiselect_attribute_is_indexed_as_label_array(): void
@@ -78,7 +79,7 @@ final class AttributeResolverTest extends TestCase
         $product->method('getAttributeText')->willReturnMap([['is_new', 'Yes'], ['color', 'Red']]);
         $product->method('getData')->willReturn('5');
 
-        $extra = (new AttributeResolver($factory, $config))->getExtraAttributes($product);
+        $extra = (new AttributeResolver($factory, $config, $this->createMock(SortableAttributeProvider::class)))->getExtraAttributes($product);
 
         self::assertSame(['color' => ['Red']], $extra);
     }
@@ -100,6 +101,40 @@ final class AttributeResolverTest extends TestCase
         $product = $this->createMock(Product::class);
         $product->method('getData')->willReturnMap([['abv', null, 40.5], ['origin', null, '']]);
 
-        self::assertSame(['abv' => ['40.5']], (new AttributeResolver($factory, $config))->getExtraAttributes($product));
+        self::assertSame(['abv' => ['40.5']], (new AttributeResolver($factory, $config, $this->createMock(SortableAttributeProvider::class)))->getExtraAttributes($product));
+    }
+
+    public function test_sortable_attributes_are_loaded_next_to_the_additional_attributes(): void
+    {
+        $collection = $this->createMock(Collection::class);
+        $collection->method('getIterator')->willReturn(new \ArrayIterator([]));
+        $collection->expects(self::once())
+            ->method('addFieldToFilter')
+            ->with('attribute_code', ['in' => ['color', 'volume_percent']]);
+        $factory = $this->createMock(CollectionFactory::class);
+        $factory->method('create')->willReturn($collection);
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn(['color', 'volume_percent']);
+        $sortableAttributes = $this->createMock(SortableAttributeProvider::class);
+        $sortableAttributes->method('getSortableAttributes')->willReturn(['volume_percent' => 'float']);
+
+        (new AttributeResolver($factory, $config, $sortableAttributes))->getExtraAttributes($this->createMock(Product::class));
+    }
+
+    public function test_sortable_attribute_that_is_no_additional_attribute_is_loaded_too(): void
+    {
+        $collection = $this->createMock(Collection::class);
+        $collection->method('getIterator')->willReturn(new \ArrayIterator([]));
+        $collection->expects(self::once())
+            ->method('addFieldToFilter')
+            ->with('attribute_code', ['in' => ['volume_percent']]);
+        $factory = $this->createMock(CollectionFactory::class);
+        $factory->method('create')->willReturn($collection);
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn([]);
+        $sortableAttributes = $this->createMock(SortableAttributeProvider::class);
+        $sortableAttributes->method('getSortableAttributes')->willReturn(['volume_percent' => 'float']);
+
+        (new AttributeResolver($factory, $config, $sortableAttributes))->getExtraAttributes($this->createMock(Product::class));
     }
 }

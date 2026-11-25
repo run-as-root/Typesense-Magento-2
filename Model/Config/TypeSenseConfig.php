@@ -9,6 +9,7 @@ use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Store\Model\ScopeInterface;
 use RunAsRoot\TypeSense\Model\Config\Source\ImageType;
+use RunAsRoot\TypeSense\Model\Listing\SortOptionProvider;
 
 class TypeSenseConfig implements TypeSenseConfigInterface
 {
@@ -503,35 +504,21 @@ class TypeSenseConfig implements TypeSenseConfigInterface
 
     public function getEnabledSortOptions(?int $storeId = null): array
     {
-        $value = (string) $this->getValue('instant_search/sort_options', $storeId);
-
-        if ($value === '') {
-            return [];
-        }
-
-        $sortOptionMap = [
-            'relevance'     => ['label' => 'Relevance', 'value' => ''],
-            'price_asc'     => ['label' => 'Price: Low to High', 'value' => 'price:asc'],
-            'price_desc'    => ['label' => 'Price: High to Low', 'value' => 'price:desc'],
-            'newest'        => ['label' => 'Newest', 'value' => 'created_at:desc'],
-            'name_asc'      => ['label' => 'Name: A–Z', 'value' => 'name:asc'],
-            'name_desc'     => ['label' => 'Name: Z–A', 'value' => 'name:desc'],
-            'best_selling'  => ['label' => 'Best Selling', 'value' => 'sales_count:desc'],
-            'top_rated'     => ['label' => 'Top Rated', 'value' => 'rating_summary:desc'],
-            'most_reviewed' => ['label' => 'Most Reviewed', 'value' => 'review_count:desc'],
-        ];
-
         $options = [];
-
-        foreach (explode(',', $value) as $key) {
-            $key = trim($key);
-
-            if (isset($sortOptionMap[$key])) {
-                $options[] = $sortOptionMap[$key];
+        $keys = $this->getSortOptionKeys($storeId);
+        foreach ($keys as $key) {
+            if (isset(SortOptionProvider::STATIC_OPTIONS[$key])) {
+                $option = SortOptionProvider::STATIC_OPTIONS[$key];
+                $options[] = ['label' => $option['label'], 'value' => $option['value']];
             }
         }
 
         return $options;
+    }
+
+    public function getSortOptionKeys(?int $storeId = null): array
+    {
+        return $this->getFieldList('instant_search/sort_options', $storeId);
     }
 
     // Conversational Search

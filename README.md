@@ -191,7 +191,7 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | Enable Instant Search | Yes | Replace the Magento search results page |
 | Products Per Page | 12 | Results per page on the search results page |
 | Product Tile Attributes | — | Attributes displayed on product cards (must also be indexed) |
-| Sort Options | relevance, price asc/desc, newest | Sort options available to customers (see below) |
+| Sort Options | relevance, price asc/desc, newest | Sort options available to customers, including attribute options such as "Alcohol Vol.-%" (see below) |
 | Facet Filters | — | Facets shown in the filter bar: additional attributes plus Price, Availability (`in_stock`) and New (`is_new`). The category filter is always added first (see [Category facet](#category-facet)); `categories.lvl0`/`lvl1`/`lvl2` or `category_ids` in this list are ignored. The search page leaves out attributes (Price included) whose "Use in Search Results Layered Navigation" is No. The price slider is hidden when all results have the same price |
 | Facet Types | — | Per facet: dropdown, checkbox (Yes/No fields) or slider (Price only), and "Value Search" for dropdowns. Price defaults to a slider |
 | Show Out-of-Stock Products Last | Yes | Sorts by `in_stock:desc` before the chosen sort |
@@ -296,6 +296,11 @@ Choose which sort options are available to customers on search results and categ
 | Best Selling | Based on sales order data |
 | Top Rated | Based on review ratings |
 | Most Reviewed | Based on review count |
+| *Attribute* (ascending / descending) | One pair per product attribute with "Used for Sorting in Product Listing" = Yes (e.g. "Alcohol Vol.-% (ascending)", key `attr:volume_percent:asc`) |
+
+Options appear in the order they are configured (store-view scope).
+
+**Attribute sort options.** Typesense cannot sort on the `string[]` attribute fields, so every attribute with a configured sort option also gets a single-valued, sortable field `<code>_sort` (and is indexed like an additional attribute even when it is not listed there). Its type follows the attribute: `float` for select/multiselect attributes whose option labels are all numbers, optionally with a unit ("40.0 %", "0,7 l"), and for other `decimal`/`int` attributes; `string` otherwise. The value is the product's own value; a composite product without one takes the lowest value of its children (a multiselect also its lowest). Products without a value sort last in both directions. The storefront label is the attribute's store label, with ": Low to High" / ": High to Low" when both directions are enabled. On category pages the attribute options follow the category's "Available Product Listing Sort By" (the attribute code, e.g. `volume_percent`), and a category whose "Default Product Listing Sort By" is the attribute opens with its ascending option. Adding an attribute sort option needs a full product reindex (`bin/magento typesense:reindex --entity=product`); the reindex cleans the full page cache.
 
 ---
 

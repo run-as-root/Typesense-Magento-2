@@ -23,6 +23,7 @@ class AttributeResolver implements AttributeResolverInterface
     public function __construct(
         private readonly AttributeCollectionFactory $attributeCollectionFactory,
         private readonly TypeSenseConfigInterface $config,
+        private readonly SortableAttributeProvider $sortableAttributes,
     ) {
     }
 
@@ -59,7 +60,8 @@ class AttributeResolver implements AttributeResolverInterface
     private function getAttributeCollection(): AttributeCollection
     {
         if ($this->cachedCollection === null) {
-            $additionalAttributes = $this->config->getAdditionalAttributes();
+            $sortableCodes = array_keys($this->sortableAttributes->getSortableAttributes());
+            $additionalAttributes = array_values(array_unique([...$this->config->getAdditionalAttributes(), ...$sortableCodes]));
             $collection = $this->attributeCollectionFactory->create();
 
             if ($additionalAttributes !== []) {

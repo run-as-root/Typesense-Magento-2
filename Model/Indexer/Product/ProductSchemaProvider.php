@@ -28,6 +28,7 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
 
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
+        private readonly SortableAttributeProvider $sortableAttributes,
     ) {
     }
 
@@ -81,12 +82,24 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             ['name' => 'crosssell_ids', 'type' => 'int32[]', 'optional' => true],
         ];
 
+        $sortableAttributes = $this->sortableAttributes->getSortableAttributes();
+
         // Config imported from files bypasses the admin source that hides core attributes, and Typesense
-        // rejects a schema with duplicate field names.
-        $additionalAttributes = array_diff($this->config->getAdditionalAttributes(), self::RESERVED_FIELDS);
+        // rejects a schema with duplicate field names. Sort attributes are indexed like additional ones.
+        $indexedAttributes = array_unique([...$this->config->getAdditionalAttributes(), ...array_keys($sortableAttributes)]);
+        $additionalAttributes = array_diff($indexedAttributes, self::RESERVED_FIELDS);
         foreach ($additionalAttributes as $attrCode) {
             // An array even for a single select: a composite parent holds the values of all its children.
             $fields[] = ['name' => $attrCode, 'type' => 'string[]', 'optional' => true, 'facet' => true];
+        }
+
+        foreach ($sortableAttributes as $attrCode => $type) {
+            $fields[] = [
+                'name' => SortableAttributeProvider::getFieldName($attrCode),
+                'type' => $type,
+                'optional' => true,
+                'sort' => true,
+            ];
         }
 
         // Text representation of categories for embedding

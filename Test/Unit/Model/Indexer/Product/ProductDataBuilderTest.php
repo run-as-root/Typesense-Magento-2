@@ -34,6 +34,7 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\GroupedChildrenResolver;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\SalableResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ReviewResolverInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\SalesCountResolverInterface;
+use RunAsRoot\TypeSense\Model\Indexer\Product\SortableAttributeProvider;
 use RunAsRoot\TypeSense\Model\Indexer\Product\UrlResolverInterface;
 
 final class ProductDataBuilderTest extends TestCase
@@ -56,6 +57,7 @@ final class ProductDataBuilderTest extends TestCase
     private NewProductResolverInterface&MockObject $newProductResolver;
     private CompositeChildrenDataResolver&MockObject $compositeChildrenResolver;
     private CrossSellResolver&MockObject $crossSellResolver;
+    private SortableAttributeProvider&MockObject $sortableAttributes;
     private ProductDataBuilder $sut;
 
     protected function setUp(): void
@@ -91,6 +93,7 @@ final class ProductDataBuilderTest extends TestCase
         $this->newProductResolver = $this->createMock(NewProductResolverInterface::class);
         $this->compositeChildrenResolver = $this->createMock(CompositeChildrenDataResolver::class);
         $this->crossSellResolver = $this->createMock(CrossSellResolver::class);
+        $this->sortableAttributes = $this->createMock(SortableAttributeProvider::class);
 
         $this->sut = $this->buildSut();
     }
@@ -321,6 +324,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->newProductResolver,
             $this->compositeChildrenResolver,
             $this->crossSellResolver,
+            $this->sortableAttributes,
         );
     }
 
@@ -496,6 +500,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->newProductResolver,
             $this->compositeChildrenResolver,
             $this->crossSellResolver,
+            $this->sortableAttributes,
         );
 
         $document = $sut->build($product, 1);
@@ -542,6 +547,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->newProductResolver,
             $this->compositeChildrenResolver,
             $this->crossSellResolver,
+            $this->sortableAttributes,
         );
 
         $document = $sut->build($product, 2);
@@ -588,6 +594,7 @@ final class ProductDataBuilderTest extends TestCase
             $this->newProductResolver,
             $this->compositeChildrenResolver,
             $this->crossSellResolver,
+            $this->sortableAttributes,
         );
 
         $document = $sut->build($product, 2);
@@ -795,6 +802,26 @@ final class ProductDataBuilderTest extends TestCase
         self::assertSame(['40'], $document['volume_percent']);
         self::assertSame(['Jagertee 0,02l', 'Jagertee 0,5l', 'JT-002', 'JT-05'], $document['children_text']);
         self::assertSame(9.9, $document['price']);
+    }
+
+    public function test_sort_fields_are_built_from_the_own_and_the_merged_attribute_values(): void
+    {
+        $parent = $this->createProductMock(id: 10, sku: 'JT', name: 'Jagertee', typeId: 'configurable');
+        $parent->method('isComposite')->willReturn(true);
+        $this->attributeResolver->method('getExtraAttributes')->willReturn(['trade_name' => ['Jagertee']]);
+        $this->stubEmptyProductData($parent);
+        $this->compositeChildrenResolver->method('getChildren')->willReturn([
+            ['name' => 'Jagertee 0,02l', 'sku' => 'JT-002', 'attributes' => ['volume_percent' => ['40.0 %']]],
+        ]);
+        $this->sortableAttributes->expects(self::once())
+            ->method('buildSortFields')
+            ->with(['trade_name' => ['Jagertee']], ['trade_name' => ['Jagertee'], 'volume_percent' => ['40.0 %']], 1)
+            ->willReturn(['volume_percent_sort' => 40.0]);
+
+        $document = $this->sut->build($parent, 1);
+
+        self::assertNotNull($document);
+        self::assertSame(40.0, $document['volume_percent_sort']);
     }
 
     public function test_child_values_never_overwrite_core_document_fields(): void

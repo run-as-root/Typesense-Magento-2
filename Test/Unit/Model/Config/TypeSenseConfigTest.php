@@ -643,4 +643,13 @@ final class TypeSenseConfigTest extends TestCase
 
         self::assertTrue($this->sut->isExhaustiveSearchEnabled(2));
     }
+
+    public function test_sort_option_keys_are_trimmed_and_empty_ones_dropped(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->with('run_as_root_typesense/instant_search/sort_options', ScopeInterface::SCOPE_STORE, 2)
+            ->willReturn('relevance, attr:volume_percent:asc,,price_asc');
+
+        self::assertSame(['relevance', 'attr:volume_percent:asc', 'price_asc'], $this->sut->getSortOptionKeys(2));
+    }
 }

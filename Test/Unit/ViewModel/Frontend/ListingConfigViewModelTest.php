@@ -24,6 +24,7 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface;
 use RunAsRoot\TypeSense\Model\Listing\CategoryFacetResolver;
 use RunAsRoot\TypeSense\Model\Listing\CategoryPositionSortBuilder;
 use RunAsRoot\TypeSense\Model\Listing\FacetConfigBuilder;
+use RunAsRoot\TypeSense\Model\Listing\SortOptionProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
@@ -42,6 +43,13 @@ final class ListingConfigViewModelTest extends TestCase
     private LoggerInterface&MockObject $logger;
     private CategoryFacetResolver&MockObject $categoryFacetResolver;
     private CategoryPositionSortBuilder&MockObject $positionSortBuilder;
+    private SortOptionProvider&MockObject $sortOptionProvider;
+    /** @var list<array{label: string, value: string, code: string}> */
+    private array $sortOptions = [
+        ['label' => 'Relevance', 'value' => '', 'code' => 'position'],
+        ['label' => 'Price: Low to High', 'value' => 'price:asc', 'code' => 'price'],
+        ['label' => 'Name: A–Z', 'value' => 'name:asc', 'code' => 'name'],
+    ];
     /** @var list<mixed> */
     private array $constructorArguments;
     private ListingConfigViewModel $sut;
@@ -53,11 +61,8 @@ final class ListingConfigViewModelTest extends TestCase
         $this->config->method('getSearchPort')->willReturn(443);
         $this->config->method('getSearchProtocol')->willReturn('https');
         $this->config->method('getSearchOnlyApiKey')->willReturn('search-only-key');
-        $this->config->method('getEnabledSortOptions')->willReturn([
-            ['label' => 'Relevance', 'value' => ''],
-            ['label' => 'Price: Low to High', 'value' => 'price:asc'],
-            ['label' => 'Name: A–Z', 'value' => 'name:asc'],
-        ]);
+        $this->sortOptionProvider = $this->createMock(SortOptionProvider::class);
+        $this->sortOptionProvider->method('getOptions')->with(1)->willReturnCallback(fn (): array => $this->sortOptions);
         $this->config->method('getProductsPerPage')->willReturn(12);
         $this->config->method('isInStockFirst')->willReturn(true);
         $this->config->method('isDirectMatchesFirstEnabled')->willReturn(true);
@@ -115,6 +120,7 @@ final class ListingConfigViewModelTest extends TestCase
             $this->logger,
             $this->categoryFacetResolver,
             $this->positionSortBuilder,
+            $this->sortOptionProvider,
         ];
         $this->sut = new ListingConfigViewModel(...$this->constructorArguments);
     }
@@ -301,6 +307,23 @@ final class ListingConfigViewModelTest extends TestCase
             ['label' => 'Price: Low to High', 'value' => 'price:asc'],
             ['label' => 'Name: A–Z', 'value' => 'name:asc'],
         ], $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY)['sortOptions']);
+    }
+
+    public function test_attribute_sort_option_follows_the_category_available_sort_by_and_default_sort(): void
+    {
+        $this->sortOptions = [
+            ['label' => 'Relevance', 'value' => '', 'code' => 'position'],
+            ['label' => 'Alkohol Vol.-%: High to Low', 'value' => 'volume_percent_sort:desc', 'code' => 'volume_percent'],
+            ['label' => 'Alkohol Vol.-%: Low to High', 'value' => 'volume_percent_sort:asc', 'code' => 'volume_percent'],
+            ['label' => 'Name: A–Z', 'value' => 'name:asc', 'code' => 'name'],
+        ];
+        $this->givenCategory(42, 'Gin', 'volume_percent', ['position', 'volume_percent']);
+        $this->givenCatalogLimits('12', '12');
+
+        $config = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY);
+
+        self::assertSame(['', 'volume_percent_sort:desc', 'volume_percent_sort:asc'], array_column($config['sortOptions'], 'value'));
+        self::assertSame('volume_percent_sort:asc', $config['defaultSort']);
     }
 
     public function test_hidden_prices_remove_the_price_sorts(): void

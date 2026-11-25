@@ -105,3 +105,7 @@
 "Like Product Meta Line Fields, for the cross-sell cards. Leave empty for no meta line.","Wie Produkt-Metazeile: Felder, für die Cross-Selling-Karten. Leer lassen für keine Metazeile."
 "Popular Searches Count","Anzahl beliebter Suchen"
 "The store's most popular search terms (from the suggestion index), also shown when the search opens with an empty input. 0 disables them.","Die beliebtesten Suchbegriffe des Store Views (aus dem Vorschlagsindex), auch bei leerem Suchfeld angezeigt. 0 deaktiviert sie."
+"%1: Low to High","%1: aufsteigend"
+"%1: High to Low","%1: absteigend"
+"%1 (ascending)","%1 (aufsteigend)"
+"%1 (descending)","%1 (absteigend)"
