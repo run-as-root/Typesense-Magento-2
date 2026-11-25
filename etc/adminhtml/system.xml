@@ -413,6 +413,55 @@
                     <label>Group Products By</label>
                     <comment>Faceted product field (e.g. an Additional Attribute shared by the variants of one product); the header search then shows one product per value. Ignored when the field is not in the product schema or not faceted. Leave empty to disable.</comment>
                 </field>
+                <field id="product_meta_fields" translate="label comment" type="text"
+                       sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Product Meta Line Fields</label>
+                    <comment>Comma-separated product document fields shown below a product's name, joined with " · " (e.g. categories.lvl1,volume_percent,color). Lists show their first value, category paths their last name, whole decimals without ".0". Leave empty for no meta line.</comment>
+                </field>
+                <field id="crosssell_enabled" translate="label comment" type="select"
+                       sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Show Cross-Sells of the Top Hit</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Shows the Magento cross-sell products of the first product hit, in stock and visible in the catalog. Needs a full product reindex after upgrading (crosssell_ids field).</comment>
+                </field>
+                <field id="crosssell_count" translate="label" type="text"
+                       sortOrder="90" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Cross-Sell Count</label>
+                    <validate>validate-digits</validate>
+                    <depends>
+                        <field id="crosssell_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="crosssell_fallback_attribute" translate="label comment" type="text"
+                       sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Cross-Sell Fallback Attribute</label>
+                    <comment>Product field (e.g. an Additional Attribute such as color); when the top hit has fewer cross-sells than the count, the rest is filled with products sharing one of its values. Ignored when the field is not in the product schema. Leave empty for no fallback.</comment>
+                    <depends>
+                        <field id="crosssell_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="crosssell_fallback_sort" translate="label comment" type="text"
+                       sortOrder="110" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Cross-Sell Fallback Sort</label>
+                    <comment>Typesense sort_by of the fallback products, e.g. sales_count:desc (best sellers first).</comment>
+                    <depends>
+                        <field id="crosssell_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="crosssell_meta_fields" translate="label comment" type="text"
+                       sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Cross-Sell Meta Line Fields</label>
+                    <comment>Like Product Meta Line Fields, for the cross-sell cards. Leave empty for no meta line.</comment>
+                    <depends>
+                        <field id="crosssell_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="popular_search_count" translate="label comment" type="text"
+                       sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Popular Searches Count</label>
+                    <validate>validate-digits</validate>
+                    <comment>The store's most popular search terms (from the suggestion index), also shown when the search opens with an empty input. 0 disables them.</comment>
+                </field>
             </group>
 
             <!-- Merchandising -->

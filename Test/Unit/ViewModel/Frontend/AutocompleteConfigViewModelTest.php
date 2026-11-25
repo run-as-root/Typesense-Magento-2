@@ -280,4 +280,70 @@ final class AutocompleteConfigViewModelTest extends TestCase
         }
         self::assertSame($sortBy, json_decode($json, true)['relevanceSortBy']);
     }
+
+    public function test_cross_sells_meta_lines_and_popular_searches_are_configured_per_store(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $this->schemaProvider->method('getFields')->willReturn([
+            ['name' => 'taste', 'type' => 'string[]', 'facet' => true],
+        ]);
+        $this->config->method('isSuggestionIndexingEnabled')->willReturn(true);
+        $this->config->method('getAutocompleteSuggestionCount')->willReturn(4);
+        $this->config->method('getAutocompletePopularSearchCount')->with(1)->willReturn(6);
+        $this->config->method('getAutocompleteProductMetaFields')->with(1)
+            ->willReturn(['categories.lvl1', 'volume_percent', 'taste', 'bad field']);
+        $this->config->method('isAutocompleteCrossSellEnabled')->with(1)->willReturn(true);
+        $this->config->method('getAutocompleteCrossSellCount')->with(1)->willReturn(4);
+        $this->config->method('getAutocompleteCrossSellFallbackAttribute')->with(1)->willReturn('taste');
+        $this->config->method('getAutocompleteCrossSellFallbackSort')->with(1)->willReturn('sales_count:desc');
+        $this->config->method('getAutocompleteCrossSellMetaFields')->with(1)->willReturn(['trade_name', 'taste']);
+
+        $result = $this->sut->getConfig();
+
+        self::assertSame(['categories.lvl1', 'volume_percent', 'taste'], $result['productMetaFields']);
+        self::assertSame(4, $result['crossSellCount']);
+        self::assertSame('taste', $result['crossSellFallbackField']);
+        self::assertSame('sales_count:desc', $result['crossSellFallbackSortBy']);
+        self::assertSame(['trade_name', 'taste'], $result['crossSellMetaFields']);
+        self::assertSame(6, $result['popularSearchCount']);
+        self::assertSame(
+            ['id', 'name', 'sku', 'url', 'image_url', 'final_price', 'price', 'categories.lvl1', 'volume_percent',
+                'taste', 'crosssell_ids', 'trade_name'],
+            $result['productFields'],
+        );
+    }
+
+    public function test_disabled_cross_sells_and_a_missing_suggestion_index_send_no_extra_searches(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $this->config->method('isSuggestionIndexingEnabled')->willReturn(false);
+        $this->config->method('getAutocompletePopularSearchCount')->willReturn(6);
+        $this->config->method('isAutocompleteCrossSellEnabled')->willReturn(false);
+        $this->config->method('getAutocompleteCrossSellCount')->willReturn(4);
+        $this->config->method('getAutocompleteCrossSellFallbackAttribute')->willReturn('taste');
+
+        $result = $this->sut->getConfig();
+
+        self::assertSame(0, $result['crossSellCount']);
+        self::assertSame(0, $result['popularSearchCount']);
+        self::assertSame([], $result['productMetaFields']);
+        self::assertSame(['id', 'name', 'sku', 'url', 'image_url', 'final_price', 'price'], $result['productFields']);
+    }
+
+    public function test_cross_sell_fallback_needs_a_schema_field_and_a_sort(): void
+    {
+        $this->collectionNameResolver->method('resolve')->willReturn('collection');
+        $this->schemaProvider->method('getFields')->willReturn([['name' => 'color', 'type' => 'string[]']]);
+        $this->config->method('isAutocompleteCrossSellEnabled')->willReturn(true);
+        $this->config->method('getAutocompleteCrossSellCount')->willReturn(4);
+        $this->config->method('getAutocompleteCrossSellFallbackAttribute')->willReturn('missing_field');
+        $this->config->method('getAutocompleteCrossSellFallbackSort')->willReturn('');
+
+        $result = $this->sut->getConfig();
+
+        self::assertSame(4, $result['crossSellCount']);
+        self::assertNull($result['crossSellFallbackField']);
+        self::assertNull($result['crossSellFallbackSortBy']);
+        self::assertContains('crosssell_ids', $result['productFields']);
+    }
 }

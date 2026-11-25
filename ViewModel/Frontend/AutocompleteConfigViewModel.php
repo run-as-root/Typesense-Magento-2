@@ -20,6 +20,9 @@ use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
  */
 class AutocompleteConfigViewModel implements ArgumentInterface
 {
+    private const string FIELD_NAME = '/^[A-Za-z0-9_][A-Za-z0-9_.]*$/';
+    private const string CROSS_SELL_FIELD = 'crosssell_ids';
+
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
         private readonly StoreManagerInterface $storeManager,
@@ -95,6 +98,12 @@ class AutocompleteConfigViewModel implements ArgumentInterface
         $categoryCount = $this->config->getAutocompleteCategoryCount($storeId);
         $pageCount = $this->config->getAutocompleteCmsPageCount($storeId);
         $suggestionCount = $this->config->getAutocompleteSuggestionCount($storeId);
+        $suggestionsIndexed = $this->config->isSuggestionIndexingEnabled($storeId);
+        $productMetaFields = $this->getFieldNames($this->config->getAutocompleteProductMetaFields($storeId));
+        $crossSell = $this->getCrossSellConfig($storeId);
+        $crossSellFields = $crossSell['crossSellCount'] > 0
+            ? [self::CROSS_SELL_FIELD, $crossSell['crossSellFallbackField'], ...$crossSell['crossSellMetaFields']]
+            : [];
 
         return [
             'minQueryLength'       => $this->getMinQueryLength(),
@@ -107,7 +116,7 @@ class AutocompleteConfigViewModel implements ArgumentInterface
             'pageCollection'       => $this->config->isCmsPageIndexingEnabled($storeId) && $pageCount > 0
                 ? $this->collectionNameResolver->resolve('cms_page', $storeCode, $storeId)
                 : null,
-            'suggestionCollection' => $this->config->isSuggestionIndexingEnabled($storeId) && $suggestionCount > 0
+            'suggestionCollection' => $suggestionsIndexed && $suggestionCount > 0
                 ? $this->collectionNameResolver->resolve('suggestion', $storeCode, $storeId)
                 : null,
             'productCount'         => $this->config->getAutocompleteProductCount($storeId),
@@ -117,7 +126,17 @@ class AutocompleteConfigViewModel implements ArgumentInterface
             'groupBy'              => $this->getGroupByField($storeId),
             'highlight'            => $this->config->isHighlightEnabled($storeId),
             'showPrices'           => $this->canShowPrices(),
-            'productFields'        => array_values($this->getProductFields()),
+            'productFields'        => array_values(array_unique(array_filter([
+                ...$this->getProductFields(),
+                ...$productMetaFields,
+                ...$crossSellFields,
+            ]))),
+            'productMetaFields'    => $productMetaFields,
+            ...$crossSell,
+            // Popular searches are read from the suggestion collection, which may be off for the store.
+            'popularSearchCount'   => $suggestionsIndexed
+                ? $this->config->getAutocompletePopularSearchCount($storeId)
+                : 0,
             'requestParams'        => $this->requestParamsBuilder->build(SearchRequestParamsBuilder::CONTEXT_AUTOCOMPLETE, $storeId),
             'directMatchesFirst'   => $this->config->isDirectMatchesFirstEnabled($storeId),
             'cacheParams'          => $this->searchParametersProvider->getCacheParameters($storeId),
@@ -131,6 +150,64 @@ class AutocompleteConfigViewModel implements ArgumentInterface
             $this->getConfig(),
             JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
         );
+    }
+
+    /**
+     * @param string[] $fields
+     * @return list<string>
+     */
+    private function getFieldNames(array $fields): array
+    {
+        return array_values(array_filter(
+            $fields,
+            static fn (string $field): bool => preg_match(self::FIELD_NAME, $field) === 1,
+        ));
+    }
+
+    /**
+     * @return array{
+     *     crossSellCount: int,
+     *     crossSellFallbackField: string|null,
+     *     crossSellFallbackSortBy: string|null,
+     *     crossSellMetaFields: list<string>,
+     * }
+     */
+    private function getCrossSellConfig(int $storeId): array
+    {
+        $count = $this->config->isAutocompleteCrossSellEnabled($storeId)
+            ? $this->config->getAutocompleteCrossSellCount($storeId)
+            : 0;
+        if ($count === 0) {
+            return [
+                'crossSellCount' => 0,
+                'crossSellFallbackField' => null,
+                'crossSellFallbackSortBy' => null,
+                'crossSellMetaFields' => [],
+            ];
+        }
+
+        $fallbackField = $this->getCrossSellFallbackField($storeId);
+        $fallbackSortBy = $this->config->getAutocompleteCrossSellFallbackSort($storeId);
+
+        return [
+            'crossSellCount' => $count,
+            'crossSellFallbackField' => $fallbackField,
+            'crossSellFallbackSortBy' => $fallbackField !== null && $fallbackSortBy !== '' ? $fallbackSortBy : null,
+            'crossSellMetaFields' => $this->getFieldNames($this->config->getAutocompleteCrossSellMetaFields($storeId)),
+        ];
+    }
+
+    // Typesense rejects a filter on a field that is not in the schema, which would fail the fallback search.
+    private function getCrossSellFallbackField(int $storeId): ?string
+    {
+        $field = $this->config->getAutocompleteCrossSellFallbackAttribute($storeId);
+        if ($field === '') {
+            return null;
+        }
+
+        $schemaFields = array_column($this->schemaProvider->getFields(), 'name');
+
+        return in_array($field, $schemaFields, true) ? $field : null;
     }
 
     // Typesense rejects group_by on a field that is missing or not faceted, which would fail the whole dropdown.

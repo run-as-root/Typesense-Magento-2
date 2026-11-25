@@ -130,6 +130,27 @@ interface TypeSenseConfigInterface
     /** Product field the header search groups hits by (one hit per value); empty disables grouping. */
     public function getAutocompleteGroupBy(?int $storeId = null): string;
 
+    /**
+     * Product document fields shown as the meta line of a header search product row, in order.
+     *
+     * @return string[]
+     */
+    public function getAutocompleteProductMetaFields(?int $storeId = null): array;
+
+    public function isAutocompleteCrossSellEnabled(?int $storeId = null): bool;
+
+    public function getAutocompleteCrossSellCount(?int $storeId = null): int;
+
+    /** Product field whose values the cross-sell fallback shares with the top hit; empty disables the fallback. */
+    public function getAutocompleteCrossSellFallbackAttribute(?int $storeId = null): string;
+
+    public function getAutocompleteCrossSellFallbackSort(?int $storeId = null): string;
+
+    /** @return string[] */
+    public function getAutocompleteCrossSellMetaFields(?int $storeId = null): array;
+
+    public function getAutocompletePopularSearchCount(?int $storeId = null): int;
+
     public function isCategoryMerchandiserEnabled(?int $storeId = null): bool;
 
     public function isQueryMerchandiserEnabled(?int $storeId = null): bool;

@@ -72,6 +72,13 @@
                 <cms_page_count>2</cms_page_count>
                 <suggestion_count>4</suggestion_count>
                 <group_by/>
+                <product_meta_fields/>
+                <crosssell_enabled>0</crosssell_enabled>
+                <crosssell_count>4</crosssell_count>
+                <crosssell_fallback_attribute/>
+                <crosssell_fallback_sort>sales_count:desc</crosssell_fallback_sort>
+                <crosssell_meta_fields/>
+                <popular_search_count>0</popular_search_count>
             </autocomplete>
             <merchandising>
                 <category_merchandiser_enabled>0</category_merchandiser_enabled>

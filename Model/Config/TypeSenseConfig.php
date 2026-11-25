@@ -352,6 +352,41 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return trim((string) $this->getValue('autocomplete/group_by', $storeId));
     }
 
+    public function getAutocompleteProductMetaFields(?int $storeId = null): array
+    {
+        return $this->getFieldList('autocomplete/product_meta_fields', $storeId);
+    }
+
+    public function isAutocompleteCrossSellEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('autocomplete/crosssell_enabled', $storeId);
+    }
+
+    public function getAutocompleteCrossSellCount(?int $storeId = null): int
+    {
+        return max(0, (int) $this->getValue('autocomplete/crosssell_count', $storeId));
+    }
+
+    public function getAutocompleteCrossSellFallbackAttribute(?int $storeId = null): string
+    {
+        return trim((string) $this->getValue('autocomplete/crosssell_fallback_attribute', $storeId));
+    }
+
+    public function getAutocompleteCrossSellFallbackSort(?int $storeId = null): string
+    {
+        return trim((string) $this->getValue('autocomplete/crosssell_fallback_sort', $storeId));
+    }
+
+    public function getAutocompleteCrossSellMetaFields(?int $storeId = null): array
+    {
+        return $this->getFieldList('autocomplete/crosssell_meta_fields', $storeId);
+    }
+
+    public function getAutocompletePopularSearchCount(?int $storeId = null): int
+    {
+        return max(0, (int) $this->getValue('autocomplete/popular_search_count', $storeId));
+    }
+
     // Merchandising
     public function isCategoryMerchandiserEnabled(?int $storeId = null): bool
     {
@@ -543,6 +578,14 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         $value = $this->getValue($path, $storeId);
 
         return $value === null || $value === '' ? $default : (int) $value;
+    }
+
+    /** @return string[] */
+    private function getFieldList(string $path, ?int $storeId): array
+    {
+        $fields = array_map('trim', explode(',', (string) $this->getValue($path, $storeId)));
+
+        return array_values(array_filter($fields, static fn (string $field): bool => $field !== ''));
     }
 
     private function getFlag(string $path, ?int $storeId = null): bool
