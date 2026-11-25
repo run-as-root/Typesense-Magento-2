@@ -6,6 +6,11 @@ namespace RunAsRoot\TypeSense\Test\Unit\Model\Indexer\Product;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Serialize\Serializer\Json;
+use RunAsRoot\TypeSense\Model\Config\Source\SortOptionSource;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfig;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProvider;
 
@@ -156,6 +161,33 @@ final class ProductSchemaProviderTest extends TestCase
         $field = $this->findField($this->sut->getFields(), 'in_stock');
 
         self::assertTrue($field['sort'] ?? false);
+    }
+
+    public function test_name_is_sortable_for_the_name_sort_options(): void
+    {
+        $field = $this->findField($this->sut->getFields(), 'name');
+
+        self::assertTrue($field['sort'] ?? false);
+    }
+
+    public function test_every_offered_sort_option_sorts_by_a_sortable_field(): void
+    {
+        $keys = array_column((new SortOptionSource())->toOptionArray(), 'value');
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('getValue')->willReturn(implode(',', $keys));
+        $config = new TypeSenseConfig($scopeConfig, $this->createMock(EncryptorInterface::class), new Json());
+        $fields = $this->sut->getFields();
+
+        $options = $config->getEnabledSortOptions();
+        self::assertCount(count($keys), $options);
+        foreach ($options as $option) {
+            $clauses = $option['value'] === '' ? [] : explode(',', $option['value']);
+            foreach ($clauses as $clause) {
+                $field = $this->findField($fields, explode(':', $clause)[0]);
+                $numeric = in_array($field['type'], ['int32', 'int64', 'float', 'bool'], true);
+                self::assertTrue($numeric || ($field['sort'] ?? false), "{$field['name']} is not sortable");
+            }
+        }
     }
 
     public function test_get_fields_contains_type_id_as_string_facet(): void

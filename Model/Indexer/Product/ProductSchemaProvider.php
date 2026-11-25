@@ -47,7 +47,8 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
         $fields = [
             ['name' => 'id', 'type' => 'string'],
             ['name' => 'product_id', 'type' => 'int32'],
-            ['name' => 'name', 'type' => 'string'],
+            // String fields can only be sorted on when declared sortable (the "Name" sort options).
+            ['name' => 'name', 'type' => 'string', 'sort' => true],
             ['name' => 'sku', 'type' => 'string'],
             ['name' => 'url', 'type' => 'string'],
             ['name' => 'image_url', 'type' => 'string'],
