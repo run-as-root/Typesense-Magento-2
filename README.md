@@ -65,7 +65,7 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 | PHP | 8.3+ |
 | Magento 2 / Mage-OS | 2.4.7+ |
 | Magento Inventory (MSI) modules | enabled (product stock comes from `IsProductSalableInterface`) |
-| Typesense | 27+ |
+| Typesense | 27+; search suggestions need 29.x with search analytics enabled ([Search Suggestions](#search-suggestions)) |
 | Hyva Theme | 1.3+ |
 | typesense/typesense-php | ^6.0 |
 | run-as-root/german-compound-splitter | ^1.0 |
@@ -143,7 +143,8 @@ Typesense treats each `collections` entry as a regular expression that must matc
 | Index Products | Yes | Enable product indexing |
 | Index Categories | Yes | Enable category indexing |
 | Index CMS Pages | Yes | Enable CMS page indexing |
-| Index Suggestions | Yes | Enable search suggestion indexing |
+| Enable Search Suggestions | Yes | Suggestion collection and analytics rule per store view ([Search Suggestions](#search-suggestions)) |
+| Suggestion Limit | 1000 | How many of the most frequent queries a store's suggestion collection keeps (analytics rule `limit`); also the seed maximum |
 | Additional Attributes to Index | — | Extra product attributes to include in the Typesense index (see below) |
 | Zero-Downtime Reindex | Yes | Use alias swap strategy for live reindexing |
 | Enable Cron Reindex | No | Schedule automatic reindexing |
@@ -301,6 +302,7 @@ Choose which sort options are available to customers on search results and categ
 | `bin/magento typesense:collection:delete <name>` | Delete a named Typesense collection |
 | `bin/magento typesense:health` | Check the health status of the Typesense server |
 | `bin/magento typesense:import:elasticsuite [--synonyms] [--boosts] [--positions] [--dry-run] [--store=CODE]` | Import ElasticSuite thesauri, optimizers and category positions, see [Migrating from ElasticSuite](#migrating-from-elasticsuite) |
+| `bin/magento typesense:suggestions:seed [--limit=N] [--store=CODE]` | Import the most popular Magento search terms into the suggestion collections; terms already present keep their count, so it can run again, see [Search Suggestions](#search-suggestions) |
 
 ### Examples
 
@@ -316,6 +318,10 @@ bin/magento typesense:collection:list
 
 # Check server connectivity before indexing
 bin/magento typesense:health
+
+# Create the suggestion collections and analytics rules, then import the top 500 Magento search terms of one store view
+bin/magento typesense:reindex --entity=suggestion
+bin/magento typesense:suggestions:seed --store=de --limit=500
 ```
 
 ---
@@ -337,7 +343,7 @@ The indexer pipeline is split into three layers:
 | Products | `<prefix>_product_v<n>` | `typesense_product` |
 | Categories | `<prefix>_category_v<n>` | `typesense_category` |
 | CMS Pages | `<prefix>_cms_page_v<n>` | `typesense_cms_page` |
-| Suggestions | `<prefix>_suggestion_v<n>` | `typesense_suggestion` |
+| Suggestions | `<prefix>_suggestion_<store code>` (not versioned, written by Typesense) | `typesense_suggestion` |
 | Orders | `<prefix>_order_v<n>` | `typesense_order` |
 | Customers | `<prefix>_customer_v<n>` | `typesense_customer` |
 | Store | `<prefix>_store_v<n>` | `typesense_store` |
@@ -345,7 +351,7 @@ The indexer pipeline is split into three layers:
 
 Collections are suffixed with a version number (e.g., `rar_product_v2`) so that the live collection pointed to by the alias is never written to during a reindex.
 
-Every store view gets its own collections, behind the alias `<prefix>_<entity>_<store code>`. A store view's category collection holds only the active categories below that store's root category, with the names, URLs and status of that store view; its CMS page collection holds the pages assigned to the store view or to all store views, and its suggestion collection the store view's own search terms.
+Every store view gets its own collections, behind the alias `<prefix>_<entity>_<store code>`. A store view's category collection holds only the active categories below that store's root category, with the names, URLs and status of that store view; its CMS page collection holds the pages assigned to the store view or to all store views, and its suggestion collection the queries searched on the store view's product collection.
 
 ### Zero-Downtime Reindexing
 
@@ -360,6 +366,28 @@ This means the live alias (`rar_product`) always points at a fully populated col
 ### Magento Indexer Integration
 
 The module registers standard Magento indexers and supports incremental updates via MView (MySQL change log). After configuration changes or new product saves, the relevant indexer is flagged and can be reindexed via the standard `bin/magento indexer:reindex` command.
+
+### Search Suggestions
+
+The header search's suggestions and popular searches come from Typesense's own [search analytics](https://typesense.org/docs/29.0/api/analytics-query-suggestions.html), not from Magento: Typesense counts the queries searched on each store view's product collection and keeps the most frequent ones in its suggestion collection. Magento's `search_query` table is not exported (shops collect tens of thousands of one-off terms there, and terms first searched on the Typesense search page never get a result count in it).
+
+Per store view, a full reindex of `typesense_suggestion` (`bin/magento typesense:reindex --entity=suggestion`, or with every other type) only provisions, it never rebuilds:
+
+- the collection `<prefix>_suggestion_<store code>` with the fields `q` (string) and `count` (int32), created when missing. An existing one keeps its documents (and counts); it is not versioned and not swapped. A collection without these fields (the former search term export, also when versioned behind an alias) is replaced.
+- the analytics rule `<prefix>_suggestion_<store code>_popular`: `popular_queries` from the product alias `<prefix>_product_<store code>` into that collection, `expand_query: true`, `limit` = Suggestion Limit. It is only written when missing or different, since a rule update drops the counts not yet flushed. Typesense matches the collection name a search is sent to, and storefront searches always name the alias, so product zero-downtime swaps need no rule update.
+- a newly created collection is seeded with the store view's most popular Magento search terms.
+
+The documents are written by Typesense on every analytics flush: `{"id": "<wyhash of q>", "q": "williams birne", "count": 12}`, where `q` is the query trimmed and lowercased (ASCII only) and, with `expand_query`, the expanded form of a typed prefix ("bir" → "birne"). Typesense adds to the `count` of an existing document and deletes everything beyond the limit after each flush. Only queries with results are counted; queries without hits never become suggestions (Typesense counts those only for a separate `nohits_queries` rule, which the module does not create).
+
+**Server requirements.** Typesense 29.x started with `--enable-search-analytics=true` and `--analytics-dir=<dir>` (environment `TYPESENSE_ENABLE_SEARCH_ANALYTICS=true`, `TYPESENSE_ANALYTICS_DIR=…`); counts are written every `--analytics-flush-interval` seconds (default 3600, minimum 60). Without the flag the rule is accepted but nothing is counted. Typesense Cloud enables analytics by default. Typesense 30 changed the analytics rule structure (`/analytics/rules` with `collection`/`event_type`); the module uses the Typesense 29 format (typesense-php `analyticsV1`).
+
+**Seed.** `bin/magento typesense:suggestions:seed [--limit=N] [--store=CODE]` carries existing search history over: per store view it reads the top N rows of `search_query` (`num_results > 0`, `is_active = 1`, by popularity, one `LIMIT` query; N defaults to and is capped at Suggestion Limit) and creates `{id, q, count: popularity}` documents under the id Typesense analytics use themselves (wyhash v5 of the normalized query as an unsigned decimal, as in Typesense's `QueryAnalytics::serialize_as_docs`). Later analytics counts therefore add to the seeded document instead of duplicating it. Documents are created with `action=create`: terms already present keep their count, so the seed is idempotent. Seeded counts are Magento's lifetime popularity, so they outrank new terms until those catch up.
+
+**What is counted.** Only the query a shopper typed: the header search's product search and the search page's main search on page load. Every other search sends `enable_analytics: false`, including `q=*` listings, facet and direct-match copies of a search, paging/sorting/filtering (which re-send the counted term), cross-sells, no-results products, recommendations, the suggestion and popular-search lookups and the admin and AI assistant searches. Typesense finalizes a visitor's query after a 4-second pause, so "b", "bi", "bir", "birne" count once as "birne". `expand_query` then replaces a prefix the visitor stopped at by the token the top hit matched in the first `query_by` field ("bir" → "birne"); when the matched tokens don't map onto every typed token it keeps the query as typed (e.g. with SKU as the first Searchable Attribute, prefixes stayed as typed in testing). A matched token that doesn't start with the typed one (stemming, typo correction) can leave an empty `q`; the storefront skips such documents.
+
+**Visitor id.** Typesense aggregates those keystrokes per user, identified by the client IP unless a user id is sent, and behind a reverse proxy every visitor would share one IP. The storefront sends a random id (`crypto.randomUUID()`, kept in `localStorage` under `typesense-visitor-id`, no personal data; one id per page view when storage is blocked) as the multi_search URL parameter `x-typesense-user-id`. Typesense reads the user id only from that URL parameter or the `X-TYPESENSE-USER-ID` header, never from inside a search; the URL parameter needs no change to a proxy's CORS `Access-Control-Allow-Headers` and is no part of Typesense's cache key.
+
+**Search cache.** With Enable Server-Side Search Cache on (the default), Typesense answers a repeated identical request from its cache without counting it (the visitor id is no part of the cache key): a term is counted at most once per Search Cache TTL per identical request, and a keystroke answered from the cache is missing from that visitor's sequence. Counts are then a lower bound that still ranks frequent terms first; turn the cache off for exact counts, at the cost of more search load.
 
 ---
 
@@ -519,7 +547,7 @@ With "Show Cross-Sells of the Top Hit" on, the dropdown shows "Goes well with" c
 
 #### Popular searches
 
-Popular Searches Count > 0 shows the store's most popular search terms (suggestion collection, `sort_by: popularity:desc`) as links to the search page. They are requested once per page, on the first focus, and shown with the results and alone while the query is shorter than the minimum length (e.g. when the search opens with an empty input). They need the suggestion index of the store.
+Popular Searches Count > 0 shows the store's most popular search terms (suggestion collection, `sort_by: count:desc`, see [Search Suggestions](#search-suggestions)) as links to the search page. They are requested once per page, on the first focus, and shown with the results and alone while the query is shorter than the minimum length (e.g. when the search opens with an empty input). They need the suggestion index of the store.
 
 ### Instant Search Page
 
