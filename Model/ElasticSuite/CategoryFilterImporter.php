@@ -8,9 +8,8 @@ use RunAsRoot\TypeSense\Model\Listing\CategoryFacetDisplay;
 
 /**
  * Copies ElasticSuite's per-category filter settings ("always hidden" / "always displayed"), whose mode values
- * CategoryFacetDisplay shares. A category's settings replace the module's for that category; settings are global
- * in both, so a store view option does not narrow them. ElasticSuite's coverage rule for "auto" filters is not
- * carried over.
+ * CategoryFacetDisplay shares. A category's settings replace the module's for that category; categories without
+ * ElasticSuite settings keep theirs. ElasticSuite's coverage rule for "auto" filters is not carried over.
  */
 class CategoryFilterImporter
 {
@@ -29,14 +28,18 @@ class CategoryFilterImporter
 
             return;
         }
+        // Like Magento positions, the settings are global: a store view run must not change other store views.
         if ($storeCode !== null) {
-            $report->note(ImportReport::FILTERS, 'Category filter settings are global: imported for every store view');
+            $report->note(ImportReport::FILTERS, 'Category filter settings are global: run --filters without --store');
+
+            return;
         }
 
         $byCategory = $this->groupByCategory($this->reader->getCategoryFilterDisplayModes(), $report);
         foreach ($byCategory as $categoryId => $modes) {
             ksort($modes);
             $current = $this->facetDisplay->getModes($categoryId);
+            ksort($current);
             if ($current === $modes) {
                 $report->unchanged(ImportReport::FILTERS);
                 continue;

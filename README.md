@@ -541,7 +541,7 @@ ElasticSuite's per-category layered navigation settings (`smile_elasticsuitecata
 | Always displayed (2) | Always shown |
 | Auto (0) | Not imported (same as no row) |
 
-A category's imported rows replace its TypeSense Filters rows; categories without ElasticSuite rows keep theirs. The settings are global, so `--store` does not narrow them. Position, facet size, sort order and minimum coverage per category are not imported. Clean the full page cache afterwards so cached category pages pick them up.
+A category's imported rows replace its TypeSense Filters rows; categories without ElasticSuite rows keep theirs, so a re-import adds and updates but never clears a category (a category set back to auto in ElasticSuite has no rows there). The settings are global: with `--store` the section imports nothing, run `--filters` without it. Position, facet size, sort order and minimum coverage per category are not imported. Clean the full page cache afterwards so cached category pages pick them up.
 
 ---
 

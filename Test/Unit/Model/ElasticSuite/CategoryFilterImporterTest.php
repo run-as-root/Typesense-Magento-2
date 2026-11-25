@@ -85,7 +85,7 @@ final class CategoryFilterImporterTest extends TestCase
         self::assertSame(1, $report->getSections()[ImportReport::FILTERS]['created']);
     }
 
-    public function test_unknown_modes_are_skipped_and_a_store_option_is_noted(): void
+    public function test_unknown_modes_are_skipped(): void
     {
         $this->reader->method('getCategoryFilterDisplayModes')->willReturn([
             ['category_id' => 139, 'attribute_code' => 'taste', 'display_mode' => 7],
@@ -93,11 +93,36 @@ final class CategoryFilterImporterTest extends TestCase
         $this->facetDisplay->expects(self::never())->method('replace');
         $report = new ImportReport();
 
-        $this->sut->import($report, false, 'de');
+        $this->sut->import($report, false, null);
 
         $section = $report->getSections()[ImportReport::FILTERS];
         self::assertSame(['category 139 taste (7)'], $section['skipped']['unknown ElasticSuite display mode']);
-        self::assertStringContainsString('global', $section['notes'][0]);
+    }
+
+    public function test_a_store_view_run_writes_nothing_as_the_settings_are_global(): void
+    {
+        $this->reader->expects(self::never())->method('getCategoryFilterDisplayModes');
+        $this->facetDisplay->expects(self::never())->method('replace');
+        $report = new ImportReport();
+
+        $this->sut->import($report, false, 'de');
+
+        self::assertStringContainsString('without --store', $report->getSections()[ImportReport::FILTERS]['notes'][0]);
+    }
+
+    public function test_settings_stored_in_another_order_count_as_unchanged(): void
+    {
+        $this->reader->method('getCategoryFilterDisplayModes')->willReturn([
+            ['category_id' => 7, 'attribute_code' => 'alc_vol', 'display_mode' => 1],
+            ['category_id' => 7, 'attribute_code' => 'alcohol', 'display_mode' => 2],
+        ]);
+        $this->facetDisplay->method('getModes')->willReturn(['alcohol' => 2, 'alc_vol' => 1]);
+        $this->facetDisplay->expects(self::never())->method('replace');
+        $report = new ImportReport();
+
+        $this->sut->import($report, false, null);
+
+        self::assertSame(1, $report->getSections()[ImportReport::FILTERS]['unchanged']);
     }
 
     public function test_missing_elasticsuite_table_is_noted(): void
