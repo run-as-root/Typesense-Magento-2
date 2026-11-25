@@ -40,6 +40,9 @@ interface TypeSenseConfigInterface
 
     public function isSuggestionIndexingEnabled(?int $storeId = null): bool;
 
+    /** Reads `indexing/<entity type>_enabled`; an entity type without such a flag is always indexed. */
+    public function isEntityIndexingEnabled(string $entityType, ?int $storeId = null): bool;
+
     /** How many popular queries the store's suggestion collection keeps (Typesense analytics rule `limit`). */
     public function getSuggestionLimit(?int $storeId = null): int;
 

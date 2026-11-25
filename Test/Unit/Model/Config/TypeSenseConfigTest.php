@@ -616,4 +616,22 @@ final class TypeSenseConfigTest extends TestCase
         self::assertSame([], $this->sut->getAutocompleteProductMetaFields());
         self::assertSame(0, $this->sut->getAutocompletePopularSearchCount());
     }
+
+    public function test_entity_indexing_reads_the_entity_type_flag(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturnMap([
+            ['run_as_root_typesense/indexing/customer_enabled', ScopeInterface::SCOPE_STORE, 3, '0'],
+            ['run_as_root_typesense/indexing/order_enabled', ScopeInterface::SCOPE_STORE, 3, '1'],
+        ]);
+
+        self::assertFalse($this->sut->isEntityIndexingEnabled('customer', 3));
+        self::assertTrue($this->sut->isEntityIndexingEnabled('order', 3));
+    }
+
+    public function test_entity_type_without_a_flag_stays_indexed(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertTrue($this->sut->isEntityIndexingEnabled('third_party_entity', 3));
+    }
 }

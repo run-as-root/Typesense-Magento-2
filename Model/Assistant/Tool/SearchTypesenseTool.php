@@ -7,6 +7,8 @@ namespace RunAsRoot\TypeSense\Model\Assistant\Tool;
 use Magento\Store\Model\StoreManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Api\TypeSenseClientFactoryInterface;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use Typesense\Exceptions\ObjectNotFound;
 
 class SearchTypesenseTool implements ToolInterface
 {
@@ -24,6 +26,7 @@ class SearchTypesenseTool implements ToolInterface
         private readonly TypeSenseClientFactoryInterface $clientFactory,
         private readonly CollectionNameResolverInterface $collectionNameResolver,
         private readonly StoreManagerInterface $storeManager,
+        private readonly TypeSenseConfigInterface $config,
     ) {
     }
 
@@ -84,6 +87,12 @@ class SearchTypesenseTool implements ToolInterface
         $storeId = (int) $store->getId();
         $storeCode = $store->getCode();
 
+        // Customers, orders, stores and configuration are only indexed when enabled; answering from a stale or
+        // missing collection must not fail the whole assistant turn.
+        if (!$this->config->isEntityIndexingEnabled($collectionType, $storeId)) {
+            return $this->notIndexed($collectionType);
+        }
+
         $collectionName = $this->collectionNameResolver->resolve($collectionType, $storeCode, $storeId);
         $queryBy = self::COLLECTION_QUERY_BY[$collectionType];
 
@@ -104,8 +113,12 @@ class SearchTypesenseTool implements ToolInterface
             $searchParams['sort_by'] = $sortBy;
         }
 
-        $client = $this->clientFactory->create($storeId);
-        $result = $client->collections[$collectionName]->documents->search($searchParams);
+        try {
+            $client = $this->clientFactory->create($storeId);
+            $result = $client->collections[$collectionName]->documents->search($searchParams);
+        } catch (ObjectNotFound) {
+            return $this->notIndexed($collectionType);
+        }
 
         $documents = [];
         foreach ($result['hits'] ?? [] as $hit) {
@@ -115,6 +128,16 @@ class SearchTypesenseTool implements ToolInterface
         return json_encode([
             'found' => $result['found'] ?? 0,
             'documents' => $documents,
+        ]);
+    }
+
+    private function notIndexed(string $collectionType): string
+    {
+        return (string) json_encode([
+            'error' => sprintf(
+                'The %s collection is not indexed (Stores > Configuration > TypeSense > Indexing). Use execute_sql instead.',
+                $collectionType,
+            ),
         ]);
     }
 }

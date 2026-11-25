@@ -11,12 +11,15 @@ use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Api\TypeSenseClientFactoryInterface;
 use RunAsRoot\TypeSense\Model\Assistant\Tool\SearchTypesenseTool;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use Typesense\Exceptions\ObjectNotFound;
 
 final class SearchTypesenseToolTest extends TestCase
 {
     private TypeSenseClientFactoryInterface&MockObject $clientFactory;
     private CollectionNameResolverInterface&MockObject $collectionNameResolver;
     private StoreManagerInterface&MockObject $storeManager;
+    private TypeSenseConfigInterface&MockObject $config;
     private SearchTypesenseTool $sut;
 
     protected function setUp(): void
@@ -24,11 +27,13 @@ final class SearchTypesenseToolTest extends TestCase
         $this->clientFactory = $this->createMock(TypeSenseClientFactoryInterface::class);
         $this->collectionNameResolver = $this->createMock(CollectionNameResolverInterface::class);
         $this->storeManager = $this->createMock(StoreManagerInterface::class);
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
 
         $this->sut = new SearchTypesenseTool(
             $this->clientFactory,
             $this->collectionNameResolver,
             $this->storeManager,
+            $this->config,
         );
     }
 
@@ -87,5 +92,36 @@ final class SearchTypesenseToolTest extends TestCase
 
         self::assertArrayHasKey('error', $result);
         self::assertStringContainsString('invalid', $result['error']);
+    }
+
+    public function test_execute_reports_a_collection_whose_indexing_is_disabled_without_querying_it(): void
+    {
+        $this->useDefaultStoreView();
+        $this->config->method('isEntityIndexingEnabled')->with('customer', 1)->willReturn(false);
+
+        $this->clientFactory->expects(self::never())->method('create');
+
+        $result = json_decode($this->sut->execute(['collection' => 'customer', 'query' => 'mueller']), true);
+
+        self::assertStringContainsString('not indexed', $result['error']);
+    }
+
+    public function test_execute_reports_a_missing_collection_instead_of_failing(): void
+    {
+        $this->useDefaultStoreView();
+        $this->config->method('isEntityIndexingEnabled')->willReturn(true);
+        $this->clientFactory->method('create')->willThrowException(new ObjectNotFound('Not Found'));
+
+        $result = json_decode($this->sut->execute(['collection' => 'order', 'query' => '1000001']), true);
+
+        self::assertStringContainsString('not indexed', $result['error']);
+    }
+
+    private function useDefaultStoreView(): void
+    {
+        $store = $this->createMock(StoreInterface::class);
+        $store->method('getId')->willReturn('1');
+        $store->method('getCode')->willReturn('default');
+        $this->storeManager->method('getDefaultStoreView')->willReturn($store);
     }
 }

@@ -113,6 +113,14 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return $this->getFlag('indexing/suggestion_enabled', $storeId);
     }
 
+    public function isEntityIndexingEnabled(string $entityType, ?int $storeId = null): bool
+    {
+        // Entity types registered by other modules have no flag of their own.
+        $value = $this->getValue('indexing/' . $entityType . '_enabled', $storeId);
+
+        return $value === null || (bool) $value;
+    }
+
     public function getSuggestionLimit(?int $storeId = null): int
     {
         $limit = (int) $this->getValue('indexing/suggestion_limit', $storeId);

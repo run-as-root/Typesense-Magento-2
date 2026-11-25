@@ -19,6 +19,10 @@
                 <category_enabled>1</category_enabled>
                 <cms_page_enabled>1</cms_page_enabled>
                 <suggestion_enabled>1</suggestion_enabled>
+                <customer_enabled>0</customer_enabled>
+                <order_enabled>0</order_enabled>
+                <store_enabled>0</store_enabled>
+                <system_config_enabled>0</system_config_enabled>
                 <suggestion_limit>1000</suggestion_limit>
                 <suggestion_min_count>3</suggestion_min_count>
                 <suggestion_max_length>60</suggestion_max_length>

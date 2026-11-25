@@ -10,6 +10,9 @@ use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface;
 use RunAsRoot\TypeSense\Console\Command\ReindexCommand;
 use RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool;
+use RunAsRoot\TypeSense\Model\Indexer\IndexableStoreResolver;
+use Magento\Store\Api\Data\StoreInterface;
+use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 use Symfony\Component\Console\Tester\CommandTester;
 
 final class ReindexCommandTest extends TestCase
@@ -17,6 +20,7 @@ final class ReindexCommandTest extends TestCase
     private IndexerOrchestratorInterface&MockObject $orchestrator;
     private EntityIndexerPool&MockObject $indexerPool;
     private State&MockObject $appState;
+    private IndexableStoreResolver&MockObject $storeResolver;
     private ReindexCommand $command;
 
     protected function setUp(): void
@@ -24,7 +28,11 @@ final class ReindexCommandTest extends TestCase
         $this->orchestrator = $this->createMock(IndexerOrchestratorInterface::class);
         $this->indexerPool = $this->createMock(EntityIndexerPool::class);
         $this->appState = $this->createMock(State::class);
-        $this->command = new ReindexCommand($this->orchestrator, $this->indexerPool, $this->appState);
+        $this->storeResolver = $this->createMock(IndexableStoreResolver::class);
+        $this->storeResolver->method('getStores')->willReturnCallback(
+            fn (string $entityType): array => $entityType === 'customer' ? [] : [$this->createMock(StoreInterface::class)],
+        );
+        $this->command = new ReindexCommand($this->orchestrator, $this->indexerPool, $this->appState, $this->storeResolver);
     }
 
     public function test_reindex_all_is_called_when_no_entity_option(): void
@@ -88,5 +96,36 @@ final class ReindexCommandTest extends TestCase
 
         self::assertSame(1, $exitCode);
         self::assertStringContainsString('Connection failed', $tester->getDisplay());
+    }
+
+    public function test_disabled_entity_type_is_skipped_with_a_message(): void
+    {
+        $this->indexerPool->method('hasIndexer')->with('customer')->willReturn(true);
+
+        $this->orchestrator->expects(self::never())->method('reindex');
+        $this->orchestrator->expects(self::never())->method('reindexAll');
+
+        $tester = new CommandTester($this->command);
+        $exitCode = $tester->execute(['--entity' => 'customer']);
+
+        self::assertSame(0, $exitCode);
+        self::assertStringContainsString('Skipping customer', $tester->getDisplay());
+        self::assertStringContainsString('run_as_root_typesense/indexing/customer_enabled', $tester->getDisplay());
+    }
+
+    public function test_reindex_all_reports_the_disabled_entity_types(): void
+    {
+        $this->indexerPool->method('getAll')->willReturn([
+            'product' => $this->createMock(EntityIndexerInterface::class),
+            'customer' => $this->createMock(EntityIndexerInterface::class),
+        ]);
+
+        $this->orchestrator->expects(self::once())->method('reindexAll');
+
+        $tester = new CommandTester($this->command);
+        $tester->execute([]);
+
+        self::assertStringContainsString('Skipping customer', $tester->getDisplay());
+        self::assertStringNotContainsString('Skipping product', $tester->getDisplay());
     }
 }

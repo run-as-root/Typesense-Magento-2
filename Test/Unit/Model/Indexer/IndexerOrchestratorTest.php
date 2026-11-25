@@ -22,6 +22,7 @@ use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Indexer\BatchImportService;
 use RunAsRoot\TypeSense\Model\Indexer\DocumentDeleter;
 use RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool;
+use RunAsRoot\TypeSense\Model\Indexer\IndexableStoreResolver;
 use RunAsRoot\TypeSense\Model\Indexer\IndexerOrchestrator;
 
 final class IndexerOrchestratorTest extends TestCase
@@ -53,6 +54,7 @@ final class IndexerOrchestratorTest extends TestCase
 
         $this->config = $this->createMock(TypeSenseConfigInterface::class);
         $this->config->method('isEnabled')->willReturn(true);
+        $this->config->method('isEntityIndexingEnabled')->willReturn(true);
 
         $store = $this->createStore(3, 'de', true);
         $this->storeRepository = $this->createMock(StoreRepositoryInterface::class);
@@ -70,7 +72,7 @@ final class IndexerOrchestratorTest extends TestCase
             $this->batchImportService,
             $this->nameResolver,
             $this->config,
-            $this->storeRepository,
+            new IndexableStoreResolver($this->storeRepository, $this->config, $this->logger),
             $this->aliasManager,
             $this->collectionManager,
             $this->documentDeleter,
@@ -308,6 +310,7 @@ final class IndexerOrchestratorTest extends TestCase
         $this->config->method('isEnabled')->willReturnCallback(
             static fn (?int $storeId = null): bool => $storeId !== 5,
         );
+        $this->config->method('isEntityIndexingEnabled')->willReturn(true);
         $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
         $this->sut = $this->buildSut();
 
@@ -326,6 +329,7 @@ final class IndexerOrchestratorTest extends TestCase
         $this->config->method('isEnabled')->willReturnCallback(
             static fn (?int $storeId = null): bool => $storeId === 3,
         );
+        $this->config->method('isEntityIndexingEnabled')->willReturn(true);
         $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
         $this->sut = $this->buildSut();
 
@@ -351,7 +355,7 @@ final class IndexerOrchestratorTest extends TestCase
             $this->batchImportService,
             $this->nameResolver,
             $this->config,
-            $this->storeRepository,
+            new IndexableStoreResolver($this->storeRepository, $this->config, $this->logger),
             $this->aliasManager,
             $this->collectionManager,
             $this->documentDeleter,
@@ -481,12 +485,77 @@ final class IndexerOrchestratorTest extends TestCase
             $this->batchImportService,
             $this->nameResolver,
             $this->config,
-            $this->storeRepository,
+            new IndexableStoreResolver($this->storeRepository, $this->config, $this->logger),
             $this->aliasManager,
             $this->collectionManager,
             $this->documentDeleter,
             $this->logger,
             $this->emulation,
         );
+    }
+
+    public function test_full_reindex_skips_entity_type_disabled_for_the_store(): void
+    {
+        $this->useConfigWithEntityIndexingDisabled();
+
+        $this->indexer->expects(self::never())->method('buildDocuments');
+        $this->zeroDowntimeService->expects(self::never())->method('startReindex');
+        $this->collectionManager->expects(self::never())->method('createCollection');
+        $this->batchImportService->expects(self::never())->method('import');
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_partial_reindex_skips_entity_type_disabled_for_the_store(): void
+    {
+        $this->useConfigWithEntityIndexingDisabled();
+
+        $this->indexer->expects(self::never())->method('buildDocuments');
+        $this->batchImportService->expects(self::never())->method('import');
+        $this->documentDeleter->expects(self::never())->method('deleteByIds');
+
+        $this->sut->reindex('product', [5]);
+    }
+
+    public function test_reindex_all_skips_disabled_entity_types(): void
+    {
+        $customer = $this->createMock(EntityIndexerInterface::class);
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->config->method('isEnabled')->willReturn(true);
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
+        $this->config->method('isEntityIndexingEnabled')->willReturnCallback(
+            static fn (string $entityType, ?int $storeId = null): bool => $entityType !== 'customer',
+        );
+        $this->collectionManager->method('collectionExists')->willReturn(true);
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $sut = new IndexerOrchestrator(
+            new EntityIndexerPool(['product' => $this->indexer, 'customer' => $customer]),
+            $this->zeroDowntimeService,
+            $this->batchImportService,
+            $this->nameResolver,
+            $this->config,
+            new IndexableStoreResolver($this->storeRepository, $this->config, $this->logger),
+            $this->aliasManager,
+            $this->collectionManager,
+            $this->documentDeleter,
+            $this->logger,
+            $this->emulation,
+        );
+
+        $this->indexer->expects(self::once())->method('buildDocuments');
+        $customer->expects(self::never())->method('buildDocuments');
+        $customer->expects(self::never())->method('getSchemaFields');
+
+        $sut->reindexAll();
+    }
+
+    private function useConfigWithEntityIndexingDisabled(): void
+    {
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->config->method('isEnabled')->willReturn(true);
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->config->method('isEntityIndexingEnabled')->with('product', 3)->willReturn(false);
+        $this->aliasManager->method('aliasExists')->willReturn(true);
+        $this->sut = $this->buildSut();
     }
 }

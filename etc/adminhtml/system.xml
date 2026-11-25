@@ -103,6 +103,30 @@
                     <label>Enable CMS Page Indexing</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
+                <field id="customer_enabled" translate="label comment" type="select"
+                       sortOrder="41" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Customer Indexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Copies customer names, e-mail addresses and addresses into Typesense for the admin AI assistant. Keep disabled unless the assistant needs them: every customer save is reindexed. Remove existing collections with bin/magento typesense:collection:delete --entity=customer --force.</comment>
+                </field>
+                <field id="order_enabled" translate="label comment" type="select"
+                       sortOrder="42" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Order Indexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Copies orders with customer names and e-mail addresses into Typesense for the admin AI assistant. Keep disabled unless the assistant needs them: every order save is reindexed. Remove existing collections with bin/magento typesense:collection:delete --entity=order --force.</comment>
+                </field>
+                <field id="store_enabled" translate="label comment" type="select"
+                       sortOrder="43" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Store Indexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Indexes the store views for the admin AI assistant.</comment>
+                </field>
+                <field id="system_config_enabled" translate="label comment" type="select"
+                       sortOrder="44" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable System Configuration Indexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Indexes the system configuration for the admin AI assistant.</comment>
+                </field>
                 <field id="suggestion_enabled" translate="label comment" type="select"
                        sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Enable Search Suggestions</label>
