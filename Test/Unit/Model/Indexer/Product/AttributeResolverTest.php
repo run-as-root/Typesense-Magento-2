@@ -137,4 +137,35 @@ final class AttributeResolverTest extends TestCase
 
         (new AttributeResolver($factory, $config, $sortableAttributes))->getExtraAttributes($this->createMock(Product::class));
     }
+
+    public function test_each_store_gets_the_attributes_of_its_own_sort_options(): void
+    {
+        $filters = [];
+        $factory = $this->createMock(CollectionFactory::class);
+        $factory->expects(self::exactly(2))->method('create')->willReturnCallback(function () use (&$filters): Collection {
+            $collection = $this->createMock(Collection::class);
+            $collection->method('getIterator')->willReturn(new \ArrayIterator([]));
+            $collection->method('addFieldToFilter')->willReturnCallback(
+                function (string $field, array $condition) use (&$filters, $collection): Collection {
+                    $filters[] = $condition['in'];
+
+                    return $collection;
+                },
+            );
+
+            return $collection;
+        });
+        $config = $this->createMock(TypeSenseConfigInterface::class);
+        $config->method('getAdditionalAttributes')->willReturn([]);
+        $sortableAttributes = $this->createMock(SortableAttributeProvider::class);
+        $sortableAttributes->method('getSortableAttributes')
+            ->willReturnOnConsecutiveCalls(['volume_percent' => 'float'], ['volume_percent' => 'float'], ['vintage' => 'float']);
+        $sut = new AttributeResolver($factory, $config, $sortableAttributes);
+
+        $sut->getExtraAttributes($this->createMock(Product::class));
+        $sut->getExtraAttributes($this->createMock(Product::class));
+        $sut->getExtraAttributes($this->createMock(Product::class));
+
+        self::assertSame([['volume_percent'], ['vintage']], $filters);
+    }
 }

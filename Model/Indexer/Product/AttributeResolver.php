@@ -18,7 +18,8 @@ class AttributeResolver implements AttributeResolverInterface
         'image', 'small_image', 'thumbnail',
     ];
 
-    private ?AttributeCollection $cachedCollection = null;
+    /** @var array<string, AttributeCollection> attribute code list => collection */
+    private array $collections = [];
 
     public function __construct(
         private readonly AttributeCollectionFactory $attributeCollectionFactory,
@@ -57,22 +58,19 @@ class AttributeResolver implements AttributeResolverInterface
         return $extra;
     }
 
+    // Additional and sort attributes are store-scoped, and one process indexes every store in turn.
     private function getAttributeCollection(): AttributeCollection
     {
-        if ($this->cachedCollection === null) {
-            $sortableCodes = array_keys($this->sortableAttributes->getSortableAttributes());
-            $additionalAttributes = array_values(array_unique([...$this->config->getAdditionalAttributes(), ...$sortableCodes]));
-            $collection = $this->attributeCollectionFactory->create();
-
-            if ($additionalAttributes !== []) {
-                $collection->addFieldToFilter('attribute_code', ['in' => $additionalAttributes]);
-            } else {
-                $collection->addFieldToFilter('attribute_code', ['in' => ['__none__']]);
-            }
-
-            $this->cachedCollection = $collection;
+        $sortableCodes = array_keys($this->sortableAttributes->getSortableAttributes());
+        $additionalAttributes = array_values(array_unique([...$this->config->getAdditionalAttributes(), ...$sortableCodes]));
+        $key = implode(',', $additionalAttributes);
+        if (isset($this->collections[$key])) {
+            return $this->collections[$key];
         }
 
-        return $this->cachedCollection;
+        $collection = $this->attributeCollectionFactory->create();
+        $collection->addFieldToFilter('attribute_code', ['in' => $additionalAttributes !== [] ? $additionalAttributes : ['__none__']]);
+
+        return $this->collections[$key] = $collection;
     }
 }
