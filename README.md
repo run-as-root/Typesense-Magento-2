@@ -47,7 +47,8 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 - Boosting rules that raise or lower products matching admin-built conditions in the relevance order
 - Relevance tuning: weighted searchable attributes, typo/prefix/split-join parameters, infix search, stemming, German decompounding and direct matches ranked above synonym matches
 - Admin synonym manager and collection browser
-- CLI commands for reindexing, collection management, and health checks
+- Category listings in the merchandised order (Magento category positions)
+- CLI commands for reindexing, collection management, health checks and the ElasticSuite migration
 - Cron-based and message-queue-based background reindexing
 - Conversational search (RAG) with AI-generated answers powered by OpenAI + Typesense embeddings
 - Product recommendations on the product detail page using vector similarity search
@@ -299,6 +300,7 @@ Choose which sort options are available to customers on search results and categ
 | `bin/magento typesense:collection:list` | List all Typesense collections with document count and alias mappings |
 | `bin/magento typesense:collection:delete <name>` | Delete a named Typesense collection |
 | `bin/magento typesense:health` | Check the health status of the Typesense server |
+| `bin/magento typesense:import:elasticsuite [--synonyms] [--boosts] [--positions] [--dry-run] [--store=CODE]` | Import ElasticSuite thesauri, optimizers and category positions, see [Migrating from ElasticSuite](#migrating-from-elasticsuite) |
 
 ### Examples
 
@@ -385,7 +387,7 @@ Rules resolve at query time: the condition tree compiles into a Typesense `filte
 
 ### Query Merchandiser
 
-Navigate to **Content > TypeSense > Query Merchandiser**.
+Navigate to **Stores > TypeSense > Query Merchandiser**.
 
 Promote or bury products for specific search queries. Each rule targets a keyword and specifies pinned (top positions) or hidden product IDs.
 
@@ -406,6 +408,68 @@ Limitations:
 
 - Typesense's `_eval` parser cannot read parentheses inside condition values (e.g. SKU is `Birne (alt)`): such a rule would break every search, so it is skipped and logged as a warning, and saving it shows a warning. Rules without conditions, or whose conditions do not compile, are skipped the same way.
 - Saving or deleting a rule cleans the full page cache, since the sort is rendered into the page. A date window starting or ending later only takes effect once cached pages expire.
+
+---
+
+## Migrating from ElasticSuite
+
+`bin/magento typesense:import:elasticsuite` copies what ElasticSuite keeps in its own tables into the module and Magento, so a shop leaving ElasticSuite keeps its synonyms, boosts and category order. It reads the `smile_*` tables directly, so ElasticSuite's code does not have to be installed; a section whose tables are missing is skipped with a message.
+
+```bash
+# What would change, nothing written
+bin/magento typesense:import:elasticsuite --dry-run
+
+# Everything (no section option = all sections)
+bin/magento typesense:import:elasticsuite
+
+# Only some sections, or only one store view
+bin/magento typesense:import:elasticsuite --synonyms --boosts --store=de
+
+# Category positions are indexed: reindex products afterwards
+bin/magento typesense:reindex --entity=product
+```
+
+The summary lists per section what was created, updated, left unchanged and skipped (grouped by reason; `-v` lists every skipped item). Running it again updates what changed and creates no duplicates.
+
+### Synonyms (thesauri)
+
+| ElasticSuite | Typesense synonym |
+|---|---|
+| Thesaurus of type "synonym": every row (term_id group) of terms | Multi-way synonym of the group's terms |
+| Thesaurus of type "expansion": every reference term and its expanded terms (`smile_elasticsuite_thesaurus_reference_terms`, same term_id) | One-way synonym: root = reference term, synonyms = expanded terms. Like in ElasticSuite, a search for the reference term also finds the expanded terms, not the other way round |
+| Store view assignment (0 = all store views) | The product collection and, where categories are indexed, the category collection of every assigned store view (ElasticSuite applies its thesaurus to product search and the category autocomplete) |
+| Typesense id | `es-thesaurus-<thesaurus_id>-<term_id>`, keyed by the collection alias like admin synonyms, so it survives zero-downtime swaps |
+
+Skipped: inactive thesauri, and synonym groups with a single term (each admin row of a synonym thesaurus is its own group, so a thesaurus with one term per row had no effect in ElasticSuite either; add such terms as one synonym in Stores > TypeSense > Synonyms if they were meant as one group). A synonym that is saved but cannot be pushed (no collection yet) is applied with the next reindex.
+
+### Boosting rules (optimizers)
+
+| ElasticSuite optimizer | Boosting rule |
+|---|---|
+| Name | `ES optimizer #<optimizer_id>: <name>`; the prefix finds the rule again on the next run (a renamed rule is imported anew) |
+| Store view, active, from/to date | Same values |
+| Model `constant_score`, `constant_score_value` | Weight = the rounded value. ElasticSuite multiplies the score by 1 + value/100, boosting rules rank by weight inside a text-match bucket: the order between rules is kept (monotonic), the exact effect differs |
+| Search containers | `quick_search_container` and `catalog_product_autocomplete`: Apply to Search Results; `catalog_view_container`: Apply to Category Listings |
+| Condition tree (all/any, product conditions) | The same tree with the module's condition classes; operators `==`, `!=`, `>=`, `<=`, `>`, `<`, `()`, `!()` unchanged. SKU "contains" / "does not contain" become "is one of" / "is not one of" the SKUs containing the value as whole words today (`10029-group` also matches `10029-group-023`); the summary lists every such expansion |
+
+Optimizers limited to certain search queries or categories (`apply_to` with entries in `smile_elasticsuite_optimizer_limitation`) are imported **inactive**: a boosting rule applies to every query, so activating it widens the optimizer. The summary names the limitation; review the rule and activate it in Stores > TypeSense > Boosting Rules. A re-run never changes a rule's active state.
+
+Skipped with the reason: inactive optimizers, other models (`attribute_value`: rules only have constant weights), a constant score of 0, conditions on attributes boosting rules cannot filter on (anything but name, sku, price, category_ids and the store's Additional Attributes, e.g. `stock.is_in_stock`), option attributes (ElasticSuite stores option IDs, Typesense indexes labels), "is FALSE" condition groups, "contains" on other attributes, condition values with parentheses, and optimizers of a store view outside `--store`.
+
+### Category positions (merchandiser)
+
+ElasticSuite sorts a category by its own merchandiser positions (`smile_virtualcategory_catalog_category_product_position`, Magento's positions are ignored): positioned products first, in position order, then the others by relevance. The import copies them into Magento, so indexing only reads Magento's data and the order stays editable in the category's "Products in Category" grid:
+
+| ElasticSuite | Magento / module |
+|---|---|
+| Position of a product assigned to the category ("All Store Views" rows) | `catalog_category_product.position` |
+| Position of a product an anchor category only inherits from a subcategory | The product is assigned to the category with that position (Magento can only position assigned products; for an anchor category the listing does not change) |
+| Assigned products without a position (or with position 0) | Moved behind the highest imported position, in their Magento order, so the positioned ones come first as in ElasticSuite |
+| Blacklisted product (`is_blacklisted`) | "Hide" row of the category merchandiser for every store view the row applies to, synced to Typesense |
+
+Not imported (reported): positions a store view keeps for itself (category attribute `use_store_positions` set on that store view), since Magento positions are global, and rows of products the category does not list. `--store` imports only that store view's hidden products; positions are global, so run `--positions` without `--store`. Run a full product reindex afterwards.
+
+Why Magento positions rather than pins of the category merchandiser: merchandiser pins are Typesense curation, which keeps the pinned products on top for every sort order and only while no filter is selected. ElasticSuite positions are a sort order, which Magento positions plus the `category_position_<id>` sort reproduce.
 
 ---
 
@@ -466,6 +530,12 @@ Other `around` plugins on `Magento\CatalogSearch\Controller\Result\Index` that a
 ### Category Page
 
 When "Replace Category Pages" is on, Typesense category pages (handle `typesense_category_search`) use the same listing, filtered by `category_ids` (anchor categories include their subtree) and visibility catalog/both. Filtering, sorting and pagination happen in the browser against Typesense; Magento's product collection is never loaded for the listing.
+
+The category's "position" sort (Magento's default, or the category's "Default Product Listing Sort By"; the listing's relevance option on category pages) follows the Magento category positions, like Magento's own listing:
+
+- Each product document has a sortable `category_position_<id>` int32 field for every category in its `category_ids` (schema pattern field `category_position_.*`). An anchor category lists the products it only inherits from a subcategory after its own ones, at the lowest subcategory position + 10000, as Magento's category product index does. Positions are read from `catalog_category_product` once per indexing batch; changing a category's products or positions reindexes the products through the `catalog_category_product` mview subscription.
+- The sort is `category_position_<id>:asc`, then the category boosting rules (`_eval(…):desc`); with "Show Out-of-Stock Products Last" `in_stock:desc` still comes first. Merchandiser pins and hides apply on top.
+- Until the collection has the category's field (a collection built before the upgrade, a category without indexed products) the listing keeps the previous relevance sort, since Typesense fails a search sorted by an unknown field. The collection's field names are cached for five minutes, so the position sort starts at most five minutes after a reindex.
 
 ### Category facet
 
