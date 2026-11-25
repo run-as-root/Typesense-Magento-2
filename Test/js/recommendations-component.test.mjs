@@ -72,6 +72,7 @@ test('registers both components and searches similar in-stock products through t
     assert.equal(env.requests[0].params.vector_query, 'embedding:([], id:42)');
     assert.equal(env.requests[0].params.filter_by, 'id:!=42 && in_stock:true');
     assert.equal(env.requests[0].params.per_page, 4);
+    assert.equal(env.requests[0].params.enable_analytics, false, 'a q=* search must not count as a popular query');
     assert.equal(component.loading, false);
     assert.equal(component.visible(), true);
     assert.equal(component.recommendations.length, 1);

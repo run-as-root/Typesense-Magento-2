@@ -170,6 +170,48 @@ test('buildSearches adds disjunctive facet searches with facet_query and search 
     assert.equal(core.buildSearches(state({ q: 'gin' }), searchConfig({ directMatchesFirst: false })).length, 2);
 });
 
+test('only the main search of a newly searched term counts for the popular-queries analytics', () => {
+    const config = searchConfig();
+    const current = state({ q: 'gin', filters: { color: ['Red'] } });
+
+    const recorded = core.buildSearches(current, config, true);
+    assert.equal('enable_analytics' in recorded[0], false);
+    assert.deepEqual(recorded.slice(1).map(search => search.enable_analytics), [false, false, false]);
+
+    // Paging, sorting and filtering re-send the same term, which must not count again.
+    assert.equal(core.buildSearches(current, config).every(search => search.enable_analytics === false), true);
+    // Listing pages search for `*`, which Typesense would otherwise count as a query.
+    const category = core.buildSearches(state(), searchConfig({ context: 'category' }), true);
+    assert.equal(category.every(search => search.enable_analytics === false), true);
+    assert.equal(core.facetValueSearch(current, config, 'color').enable_analytics, false);
+});
+
+test('visitorId keeps one random id per browser and falls back to one per page view', () => {
+    const values = {};
+    const storage = { getItem: key => values[key] ?? null, setItem: (key, value) => { values[key] = String(value); } };
+
+    const id = core.visitorId(storage);
+    assert.match(id, /^[A-Za-z0-9-]{16,}$/);
+    assert.equal(core.visitorId(storage), id);
+    assert.deepEqual(Object.values(values), [id]);
+
+    const blocked = { getItem: () => { throw new Error('SecurityError'); }, setItem: () => {} };
+    const fallback = core.visitorId(blocked);
+    assert.match(fallback, /^[A-Za-z0-9-]{16,}$/);
+    assert.notEqual(fallback, id);
+    assert.equal(core.visitorId(blocked), fallback);
+    assert.equal(core.visitorId(null), fallback);
+});
+
+test('searchParams sends the cache settings and the visitor id as multi_search URL parameters', () => {
+    const storage = { getItem: () => 'visitor-1234567890abcdef', setItem: () => {} };
+
+    assert.deepEqual(core.searchParams(searchConfig(), storage), {
+        use_cache: true, cache_ttl: 60, 'x-typesense-user-id': 'visitor-1234567890abcdef',
+    });
+    assert.deepEqual(core.searchParams({}, storage), { 'x-typesense-user-id': 'visitor-1234567890abcdef' });
+});
+
 test('mergeFacetCounts reads each facet from its own disjunctive search', () => {
     const filteredColor = { field_name: 'color', counts: [{ value: 'Red', count: 3 }] };
     const ownColor = { field_name: 'color', counts: [{ value: 'Red', count: 3 }, { value: 'Blue', count: 5 }] };

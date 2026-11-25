@@ -15,6 +15,7 @@ use RunAsRoot\TypeSense\Api\AliasManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionSettingsProviderInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
+use RunAsRoot\TypeSense\Api\SelfMaintainedEntityInterface;
 use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
 use RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
@@ -407,6 +408,46 @@ final class IndexerOrchestratorTest extends TestCase
             ->with('rar_product_nl', ['9'], 8);
 
         $this->sut->reindex('product', [9]);
+    }
+
+    public function test_full_reindex_of_self_maintained_entity_only_provisions_it(): void
+    {
+        $indexer = $this->useSelfMaintainedIndexer();
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+
+        $indexer->expects(self::once())->method('provision')->with(3, 'de');
+        $indexer->expects(self::never())->method('buildDocuments');
+        $this->zeroDowntimeService->expects(self::never())->method('startReindex');
+        $this->zeroDowntimeService->expects(self::never())->method('finishReindex');
+        $this->collectionManager->expects(self::never())->method('createCollection');
+        $this->collectionManager->expects(self::never())->method('deleteCollection');
+        $this->batchImportService->expects(self::never())->method('import');
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_partial_reindex_of_self_maintained_entity_does_nothing(): void
+    {
+        $indexer = $this->useSelfMaintainedIndexer();
+
+        $indexer->expects(self::never())->method('provision');
+        $indexer->expects(self::never())->method('buildDocuments');
+        $this->batchImportService->expects(self::never())->method('import');
+        $this->documentDeleter->expects(self::never())->method('deleteByIds');
+
+        $this->sut->reindex('product', [5]);
+    }
+
+    private function useSelfMaintainedIndexer(): EntityIndexerInterface&SelfMaintainedEntityInterface&MockObject
+    {
+        $indexer = $this->createMockForIntersectionOfInterfaces([
+            EntityIndexerInterface::class,
+            SelfMaintainedEntityInterface::class,
+        ]);
+        $this->indexer = $indexer;
+        $this->sut = $this->buildSut();
+
+        return $indexer;
     }
 
     private function useIndexerWithCollectionSettings(): void

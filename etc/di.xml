@@ -178,6 +178,7 @@
                 <item name="typesense_collection_rollback" xsi:type="object">RunAsRoot\TypeSense\Console\Command\CollectionRollbackCommand</item>
                 <item name="typesense_health" xsi:type="object">RunAsRoot\TypeSense\Console\Command\HealthCheckCommand</item>
                 <item name="typesense_import_elasticsuite" xsi:type="object">RunAsRoot\TypeSense\Console\Command\ImportElasticsuiteCommand</item>
+                <item name="typesense_suggestions_seed" xsi:type="object">RunAsRoot\TypeSense\Console\Command\SuggestionSeedCommand</item>
             </argument>
         </arguments>
     </type>
@@ -188,6 +189,13 @@
             <argument name="synonymImporter" xsi:type="object">RunAsRoot\TypeSense\Model\ElasticSuite\SynonymImporter\Proxy</argument>
             <argument name="boostRuleImporter" xsi:type="object">RunAsRoot\TypeSense\Model\ElasticSuite\BoostRuleImporter\Proxy</argument>
             <argument name="positionImporter" xsi:type="object">RunAsRoot\TypeSense\Model\ElasticSuite\CategoryPositionImporter\Proxy</argument>
+        </arguments>
+    </type>
+
+    <type name="RunAsRoot\TypeSense\Console\Command\SuggestionSeedCommand">
+        <arguments>
+            <argument name="provisioner" xsi:type="object">RunAsRoot\TypeSense\Model\Suggestion\SuggestionCollectionProvisioner\Proxy</argument>
+            <argument name="seeder" xsi:type="object">RunAsRoot\TypeSense\Model\Suggestion\SuggestionSeeder\Proxy</argument>
         </arguments>
     </type>
 

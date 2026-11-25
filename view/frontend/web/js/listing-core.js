@@ -308,6 +308,54 @@
         return Number.isInteger(value) && value > 0 ? value : 1;
     }
 
+    // Typesense's popular-queries analytics count every product search that doesn't opt out: only the term a
+    // visitor typed may count, never `*`, a re-sent term or the facet and direct-match copies of a search.
+    function withoutAnalytics(search) {
+        return Object.assign(search, { enable_analytics: false });
+    }
+
+    const VISITOR_ID_KEY = 'typesense-visitor-id';
+    let pageVisitorId = null;
+
+    function randomId() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+
+        return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    }
+
+    /**
+     * Typesense aggregates the keystrokes of one user ("bir", "birn", "birne") into the query they settled on,
+     * identified by the client IP unless told otherwise; behind a proxy every visitor shares one IP. A random
+     * id in localStorage carries no personal data; without storage one id per page view still groups keystrokes.
+     */
+    function visitorId(storage) {
+        try {
+            const store = storage === undefined ? window.localStorage : storage;
+            const stored = store.getItem(VISITOR_ID_KEY);
+            if (stored) {
+                return stored;
+            }
+            const id = randomId();
+            store.setItem(VISITOR_ID_KEY, id);
+
+            return id;
+        } catch (e) {
+            pageVisitorId = pageVisitorId || randomId();
+
+            return pageVisitorId;
+        }
+    }
+
+    /**
+     * URL parameters of a multi_search. Typesense reads the user id from the URL or a header only (inside a search
+     * the client IP takes precedence); a URL parameter needs no CORS change and is no part of the cache key.
+     */
+    function searchParams(config, storage) {
+        return Object.assign({}, config.cacheParams, { 'x-typesense-user-id': visitorId(storage) });
+    }
+
     function searchContext(state, config) {
         const q = String(state.q || '').trim();
 
@@ -336,6 +384,7 @@
                 per_page: 0,
                 facet_by: field,
                 max_facet_values: maxFacetValues(config, field),
+                enable_analytics: false,
             }),
             buildFilterBy(config.baseFilter, context.filters, context.price, [field], context.booleans, context.numerics),
         );
@@ -347,7 +396,8 @@
         return search;
     }
 
-    function buildSearches(state, config) {
+    /** `recordQuery`: the term is newly searched (page load), not re-sent by paging, sorting or filtering. */
+    function buildSearches(state, config, recordQuery = false) {
         const context = searchContext(state, config);
         const page = positivePage(state.page);
         const { q, filters, price, facetQueries, booleans, numerics, common } = context;
@@ -358,12 +408,15 @@
         if (sortBy !== '') {
             main.sort_by = sortBy;
         }
+        if (!recordQuery || q === '') {
+            withoutAnalytics(main);
+        }
         const searches = [main];
 
         // Direct matches can only be merged into page 1 of a relevance-ordered keyword search.
         if (config.context === 'search' && config.directMatchesFirst && q !== '' && page <= 1
             && isRelevance(resolveSort(state.sort, config))) {
-            searches.push(Object.assign({}, main, { enable_synonyms: false, page: 1 }));
+            searches.push(withoutAnalytics(Object.assign({}, main, { enable_synonyms: false, page: 1 })));
         }
 
         const own = [];
@@ -390,6 +443,7 @@
                     per_page: 0,
                     facet_by: rest.join(','),
                     max_facet_values: maxFacetValues(config, null),
+                    enable_analytics: false,
                 }),
                 mainFilter,
             )) - 1;
@@ -1073,23 +1127,29 @@
             product.group_by = config.groupBy;
             product.group_limit = 1;
         }
+        if (query === '') {
+            withoutAnalytics(product);
+        }
         add(product);
         if (config.directMatchesFirst) {
-            sources.direct = add(Object.assign({}, product, { enable_synonyms: false }));
+            sources.direct = add(withoutAnalytics(Object.assign({}, product, { enable_synonyms: false })));
         }
         if (config.suggestionCollection) {
-            sources.suggestions = add({ collection: config.suggestionCollection, q: query, query_by: 'query', per_page: Number(config.suggestionCount) });
+            sources.suggestions = add({
+                collection: config.suggestionCollection, q: query, query_by: 'q',
+                per_page: Number(config.suggestionCount), enable_analytics: false,
+            });
         }
         if (config.categoryCollection) {
             sources.categories = add({
                 collection: config.categoryCollection, q: query, query_by: 'name',
-                filter_by: 'is_active:=true && level:>1', per_page: Number(config.categoryCount),
+                filter_by: 'is_active:=true && level:>1', per_page: Number(config.categoryCount), enable_analytics: false,
             });
         }
         if (config.pageCollection) {
             sources.pages = add({
                 collection: config.pageCollection, q: query, query_by: 'title',
-                filter_by: 'is_active:=true', per_page: Number(config.pageCount),
+                filter_by: 'is_active:=true', per_page: Number(config.pageCount), enable_analytics: false,
             });
         }
 
@@ -1192,9 +1252,9 @@
             suggestions: sectionHits(results, sources.suggestions).map((hit, i) => {
                 const doc = hitDocument(hit);
                 return autocompleteRow('suggestion', hit, i, {
-                    name: String(doc.query || ''),
-                    url: searchResultUrl(config.searchUrl, doc.query || ''),
-                    segments: hitSegments(hit, 'query', doc.query, highlight),
+                    name: String(doc.q || ''),
+                    url: searchResultUrl(config.searchUrl, doc.q || ''),
+                    segments: hitSegments(hit, 'q', doc.q, highlight),
                 });
             }).filter(row => row.name !== ''),
             products: ((products && products.hits) || []).map((hit, i) => Object.assign(
@@ -1259,6 +1319,7 @@
             collection: config.productCollection,
             q: '*',
             include_fields: autocompleteProductFields(config).join(','),
+            enable_analytics: false,
         };
         const searches = [];
         const sources = { crossSells: null, fallback: null, order: linked, count };
@@ -1317,9 +1378,10 @@
         return {
             collection: config.suggestionCollection,
             q: '*',
-            query_by: 'query',
-            sort_by: 'popularity:desc',
+            query_by: 'q',
+            sort_by: 'count:desc',
             per_page: Math.min(count, MAX_PER_PAGE),
+            enable_analytics: false,
         };
     }
 
@@ -1327,7 +1389,7 @@
         const hits = result && !result.error && Array.isArray(result.hits) ? result.hits : [];
 
         return hits.map((hit, i) => {
-            const query = String(hitDocument(hit).query || '');
+            const query = String(hitDocument(hit).q || '');
 
             return autocompleteRow('popular', hit, i, { name: query, url: searchResultUrl(config.searchUrl, query) });
         }).filter(row => row.name !== '');
@@ -1453,6 +1515,8 @@
         buildFilterBy,
         buildSearches,
         facetValueSearch,
+        visitorId,
+        searchParams,
         mergeFacetCounts,
         facetStats,
         buildSortBy,

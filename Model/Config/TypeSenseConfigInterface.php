@@ -40,6 +40,9 @@ interface TypeSenseConfigInterface
 
     public function isSuggestionIndexingEnabled(?int $storeId = null): bool;
 
+    /** How many popular queries the store's suggestion collection keeps (Typesense analytics rule `limit`). */
+    public function getSuggestionLimit(?int $storeId = null): int;
+
     public function isZeroDowntimeEnabled(?int $storeId = null): bool;
 
     public function isCronEnabled(?int $storeId = null): bool;

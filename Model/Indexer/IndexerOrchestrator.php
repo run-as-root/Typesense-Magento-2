@@ -13,6 +13,7 @@ use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionSettingsProviderInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 use RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface;
+use RunAsRoot\TypeSense\Api\SelfMaintainedEntityInterface;
 use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
 use RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
@@ -83,6 +84,14 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         array $entityIds,
     ): void {
         $this->logger->info("Reindexing {$entityType} for store {$storeCode} (ID: {$storeId})");
+
+        // Its documents are written by Typesense itself: a versioned rebuild would discard them.
+        if ($indexer instanceof SelfMaintainedEntityInterface) {
+            if ($entityIds === []) {
+                $indexer->provision($storeId, $storeCode);
+            }
+            return;
+        }
 
         // Documents are generated lazily, so building, importing and deleting must all happen inside emulation.
         $this->emulation->startEnvironmentEmulation($storeId, Area::AREA_FRONTEND, true);

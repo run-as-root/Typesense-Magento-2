@@ -10,20 +10,22 @@ use RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionIndexer;
 
 final class SuggestionIndexerTest extends TestCase
 {
-    public function test_empty_id_list_does_not_trigger_a_full_reindex(): void
+    public function test_full_reindex_provisions_the_suggestion_entity(): void
+    {
+        $orchestrator = $this->createMock(IndexerOrchestrator::class);
+        $orchestrator->expects(self::once())->method('reindex')->with('suggestion');
+
+        (new SuggestionIndexer($orchestrator))->executeFull();
+    }
+
+    public function test_row_updates_do_nothing_because_typesense_maintains_the_documents(): void
     {
         $orchestrator = $this->createMock(IndexerOrchestrator::class);
         $orchestrator->expects(self::never())->method('reindex');
         $sut = new SuggestionIndexer($orchestrator);
 
+        $sut->executeList([4, 5]);
         $sut->executeList([]);
-    }
-
-    public function test_id_list_is_reindexed_partially(): void
-    {
-        $orchestrator = $this->createMock(IndexerOrchestrator::class);
-        $orchestrator->expects(self::once())->method('reindex')->with('suggestion', [4, 5]);
-
-        (new SuggestionIndexer($orchestrator))->executeList(['4', '5']);
+        $sut->executeRow(4);
     }
 }

@@ -85,6 +85,24 @@ final class TypeSenseConfigTest extends TestCase
         self::assertSame(200, $this->sut->getBatchSize());
     }
 
+    public function test_get_suggestion_limit_reads_store_value(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->with('run_as_root_typesense/indexing/suggestion_limit', ScopeInterface::SCOPE_STORE, 2)
+            ->willReturn('250');
+
+        self::assertSame(250, $this->sut->getSuggestionLimit(2));
+    }
+
+    public function test_get_suggestion_limit_falls_back_to_1000_when_unset_or_not_positive(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturnOnConsecutiveCalls(null, '0', '-5');
+
+        self::assertSame(1000, $this->sut->getSuggestionLimit(2));
+        self::assertSame(1000, $this->sut->getSuggestionLimit(2));
+        self::assertSame(1000, $this->sut->getSuggestionLimit(2));
+    }
+
     public function test_is_conversational_search_enabled_returns_false_when_module_disabled(): void
     {
         $this->scopeConfig->method('isSetFlag')

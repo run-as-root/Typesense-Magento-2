@@ -14,6 +14,7 @@ class TypeSenseConfig implements TypeSenseConfigInterface
 {
     private const string CONFIG_PREFIX = 'run_as_root_typesense';
     private const string DEFAULT_LISTING_IMAGE_ID = 'category_page_grid';
+    private const int DEFAULT_SUGGESTION_LIMIT = 1000;
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -108,6 +109,13 @@ class TypeSenseConfig implements TypeSenseConfigInterface
     public function isSuggestionIndexingEnabled(?int $storeId = null): bool
     {
         return $this->getFlag('indexing/suggestion_enabled', $storeId);
+    }
+
+    public function getSuggestionLimit(?int $storeId = null): int
+    {
+        $limit = (int) $this->getValue('indexing/suggestion_limit', $storeId);
+
+        return $limit > 0 ? $limit : self::DEFAULT_SUGGESTION_LIMIT;
     }
 
     public function isZeroDowntimeEnabled(?int $storeId = null): bool

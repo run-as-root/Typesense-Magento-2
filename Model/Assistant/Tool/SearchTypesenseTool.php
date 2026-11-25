@@ -92,6 +92,8 @@ class SearchTypesenseTool implements ToolInterface
             'query_by' => $queryBy,
             'per_page' => $limit,
             'exclude_fields' => 'embedding',
+            // The assistant's queries are no storefront searches: they must not count for the suggestions.
+            'enable_analytics' => false,
         ];
 
         if ($filterBy !== '') {

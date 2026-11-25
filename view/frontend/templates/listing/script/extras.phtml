@@ -43,6 +43,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     q: '*',
                     filter_by: 'category_ids:=' + categoryId + ' && visibility:[2,4]',
                     per_page: Number(this.config.perPage) || 12,
+                    enable_analytics: false,
                 });
                 const sortBy = listing.buildSortBy(listing.defaultSort(this.config), this.config);
                 if (sortBy !== '') {
@@ -50,7 +51,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                 }
                 try {
                     const client = await window.runAsRootTypesense.getClient();
-                    const response = await client.multiSearch.perform({ searches: [search] }, this.config.cacheParams);
+                    const response = await client.multiSearch.perform({ searches: [search] }, listing.searchParams(this.config));
                     const result = (response.results || [])[0];
                     if (sequencers().suggested.isCurrent(id)) {
                         this.suggestedHits = listing.prepareHits(result && result.hits, 0);
@@ -86,6 +87,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                         exclude_fields: 'embedding',
                         filter_by: this.config.baseFilter,
                         per_page: 3,
+                        enable_analytics: false,
                     }] }, params);
                     if (sequencers().answer.isCurrent(id)) {
                         this.aiAnswer = (response.conversation && response.conversation.answer) || '';

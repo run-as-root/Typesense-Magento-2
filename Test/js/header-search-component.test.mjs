@@ -28,14 +28,14 @@ const baseConfig = {
 const response = (term) => ({
     results: [
         { found: 7, hits: [{ document: { id: '1', name: term + ' Gin', sku: 'S1', url: '/gin.html', final_price: 20 } }] },
-        { hits: [{ document: { id: '9', query: term + ' tonic' } }] },
+        { hits: [{ document: { id: '9', q: term + ' tonic', count: 4 } }] },
         { hits: [{ document: { id: '5', name: 'Spirits', url: '/spirits.html' } }] },
     ],
 });
 
 function createEnvironment(overrides = {}) {
     const config = Object.assign({}, baseConfig, overrides);
-    const env = { events: [], timers: [], requests: [], responder: null };
+    const env = { events: [], timers: [], requests: [], params: [], responder: null, storage: {} };
     const input = {
         value: '',
         focused: true,
@@ -59,13 +59,20 @@ function createEnvironment(overrides = {}) {
         Alpine: { data() {} },
         dispatchEvent: event => env.events.push(event),
         addEventListener() {},
+        localStorage: { getItem: key => env.storage[key] ?? null, setItem: (key, value) => { env.storage[key] = value; } },
     };
     context.window = context;
     vm.createContext(context);
     vm.runInContext(readFileSync(moduleRoot + 'view/frontend/web/js/listing-core.js', 'utf8'), context);
     vm.runInContext(inlineScripts('search/script/header-search.phtml'), context);
     context.runAsRootTypesense.getClient = async () => ({
-        multiSearch: { perform: async (body) => { env.requests.push(body.searches); return env.responder(body); } },
+        multiSearch: {
+            perform: async (body, params) => {
+                env.requests.push(body.searches);
+                env.params.push(params);
+                return env.responder(body);
+            },
+        },
     });
     env.context = context;
     env.input = input;
@@ -120,6 +127,24 @@ test('queries below the minimum length send nothing; longer ones search once aft
     assert.deepEqual(Array.from(search.rows, r => r.type), ['suggestion', 'product', 'category']);
     assert.equal(search.seeAllUrl(), '/catalogsearch/result/?q=gin');
     assert.equal(search.seeAllText(), 'See all (7)');
+});
+
+test('every header search request carries the visitor id kept in localStorage', async () => {
+    const env = createEnvironment({ cacheParams: { use_cache: true }, popularSearchCount: 4 });
+    env.responder = (body) => (body.searches[0].collection === 's' ? { results: [{ hits: [] }] } : response('gin'));
+    const search = env.search();
+
+    search.onFocus();
+    await settle();
+    env.type(search, 'gin');
+    await env.timers[0].fn();
+
+    const visitor = env.storage['typesense-visitor-id'];
+    assert.equal(typeof visitor, 'string');
+    assert.equal(env.params.length, 2);
+    for (const params of env.params) {
+        assert.deepEqual(JSON.parse(JSON.stringify(params)), { use_cache: true, 'x-typesense-user-id': visitor });
+    }
 });
 
 test('a failing Typesense request hides the dropdown and Enter still submits the form', async () => {
@@ -280,7 +305,7 @@ const crossSellResponder = (body) => {
         };
     }
     if (first.collection === 's') {
-        return { results: [{ hits: [{ document: { id: '1', query: 'pear' } }, { document: { id: '2', query: 'gin' } }] }] };
+        return { results: [{ hits: [{ document: { id: '1', q: 'pear', count: 9 } }, { document: { id: '2', q: 'gin', count: 3 } }] }] };
     }
 
     return {

@@ -103,10 +103,20 @@
                     <label>Enable CMS Page Indexing</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
-                <field id="suggestion_enabled" translate="label" type="select"
+                <field id="suggestion_enabled" translate="label comment" type="select"
                        sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>Enable Suggestion Indexing</label>
+                    <label>Enable Search Suggestions</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>The suggestion index holds the queries Typesense's search analytics count on the product index (the Typesense server needs --enable-search-analytics). The TypeSense Suggestion indexer creates it and its analytics rule; bin/magento typesense:suggestions:seed imports existing Magento search terms.</comment>
+                </field>
+                <field id="suggestion_limit" translate="label comment" type="text"
+                       sortOrder="51" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Suggestion Limit</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>How many of the most frequent queries the suggestion index keeps; Typesense drops the rest on every analytics flush. Applied on the next suggestion reindex.</comment>
+                    <depends>
+                        <field id="suggestion_enabled">1</field>
+                    </depends>
                 </field>
                 <field id="additional_attributes" translate="label comment" type="multiselect" sortOrder="55" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Additional Attributes to Index</label>

@@ -19,6 +19,7 @@
                 <category_enabled>1</category_enabled>
                 <cms_page_enabled>1</cms_page_enabled>
                 <suggestion_enabled>1</suggestion_enabled>
+                <suggestion_limit>1000</suggestion_limit>
                 <zero_downtime_enabled>1</zero_downtime_enabled>
                 <cron_enabled>0</cron_enabled>
                 <cron_schedule>0 2 * * *</cron_schedule>

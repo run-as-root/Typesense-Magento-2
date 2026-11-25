@@ -51,6 +51,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                         filter_by: 'id:!=' + this.config.productId + ' && in_stock:true',
                         per_page: this.config.limit,
                         exclude_fields: 'embedding',
+                        enable_analytics: false,
                     });
                     this.recommendations = (result.hits || []).map(hit => hit.document);
                 } catch (e) {
