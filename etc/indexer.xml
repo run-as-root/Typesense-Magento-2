@@ -23,7 +23,7 @@
              view_id="typesense_suggestion"
              class="RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionIndexer">
         <title translate="true">TypeSense Suggestion Index</title>
-        <description translate="true">Rebuilds TypeSense search suggestion index</description>
+        <description translate="true">Creates the TypeSense suggestion collections and their search analytics rules; Typesense fills them from the storefront searches</description>
     </indexer>
     <indexer id="typesense_order"
              view_id="typesense_order"

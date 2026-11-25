@@ -96,9 +96,10 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                     this.cancelSuggested();
                     this.writeHistory(cause);
                     this.dispatchState();
-                    const searches = listing.buildSearches(this.state, this.config);
+                    // Only a page load brings a new term; every other cause re-sends the one already counted.
+                    const searches = listing.buildSearches(this.state, this.config, cause === 'init');
                     const client = await window.runAsRootTypesense.getClient();
-                    const response = await client.multiSearch.perform({ searches }, this.config.cacheParams);
+                    const response = await client.multiSearch.perform({ searches }, listing.searchParams(this.config));
                     if (!sequencer.isCurrent(id)) {
                         return;
                     }
@@ -162,7 +163,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                         return;
                     }
                     const client = await window.runAsRootTypesense.getClient();
-                    const response = await client.multiSearch.perform({ searches: [search] }, this.config.cacheParams);
+                    const response = await client.multiSearch.perform({ searches: [search] }, listing.searchParams(this.config));
                     const result = (response.results || [])[0];
                     if (!sequence.isCurrent(id) || !result || result.error) {
                         return;

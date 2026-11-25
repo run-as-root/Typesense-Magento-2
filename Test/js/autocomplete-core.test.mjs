@@ -20,6 +20,9 @@ function acConfig(overrides = {}) {
         categoryCount: 3,
         pageCount: 2,
         suggestionCount: 5,
+        suggestionMinCount: 3,
+        suggestionMaxLength: 60,
+        suggestionDenylist: ['casino'],
         groupBy: null,
         highlight: true,
         showPrices: true,
@@ -98,9 +101,11 @@ test('buildAutocompleteSearches sends one multi search with only the configured 
     assert.equal(plan.searches[1].enable_synonyms, false);
     assert.equal(plan.searches[1].group_by, 'variant_group');
     assert.deepEqual(plan.sources, { products: 0, direct: 1, suggestions: 2, categories: 3, pages: 4 });
-    assert.deepEqual(plan.searches[2], { collection: 's', q: 'gin', query_by: 'query', per_page: 5 });
-    assert.deepEqual(plan.searches[3], { collection: 'c', q: 'gin', query_by: 'name', filter_by: 'is_active:=true && level:>1', per_page: 3 });
-    assert.deepEqual(plan.searches[4], { collection: 'cms', q: 'gin', query_by: 'title', filter_by: 'is_active:=true', per_page: 2 });
+    assert.deepEqual(plan.searches[2], {
+        collection: 's', q: 'gin', query_by: 'q', filter_by: 'is_valid:=true && count:>=3', per_page: 5, enable_analytics: false,
+    });
+    assert.deepEqual(plan.searches[3], { collection: 'c', q: 'gin', query_by: 'name', filter_by: 'is_active:=true && level:>1', per_page: 3, enable_analytics: false });
+    assert.deepEqual(plan.searches[4], { collection: 'cms', q: 'gin', query_by: 'title', filter_by: 'is_active:=true', per_page: 2, enable_analytics: false });
 
     const minimal = core.buildAutocompleteSearches('gin', acConfig({ categoryCollection: null, pageCollection: null, suggestionCollection: null }));
     assert.equal(minimal.searches[0].include_fields, 'id,name,sku,url,image_url,final_price,price');
@@ -109,13 +114,48 @@ test('buildAutocompleteSearches sends one multi search with only the configured 
     assert.deepEqual(minimal.sources, { products: 0, direct: null, suggestions: null, categories: null, pages: null });
 });
 
+test('only the typed product query of the header search counts for the popular-queries analytics', () => {
+    const plan = core.buildAutocompleteSearches('gin', acConfig({ directMatchesFirst: true }));
+
+    assert.equal('enable_analytics' in plan.searches[0], false);
+    assert.deepEqual(plan.searches.slice(1).map(search => search.enable_analytics), [false, false, false, false]);
+    assert.equal(core.buildAutocompleteSearches('  ', acConfig()).searches[0].enable_analytics, false);
+});
+
+test('suggestions and popular searches show only checked, counted, unblocked plain terms', () => {
+    const config = acConfig({ popularSearchCount: 6 });
+    assert.equal(core.buildPopularSearch(acConfig({ suggestionMinCount: undefined, popularSearchCount: 6 })).filter_by, 'is_valid:=true && count:>=1');
+
+    for (const [term, allowed] of [
+        ['birne', true], ['schnaps 0,7 l', true], ['marillen-likör', true], [' ', false], ['x'.repeat(61), false],
+        ['4711 0815', false], ['https://spam.example', false], ['www.spam.example', false], ['me@spam.example', false],
+        ['Online-CASINO bonus', false],
+    ]) {
+        assert.equal(core.suggestionAllowed(term, config), allowed, term);
+    }
+
+    const chips = core.popularResults({ hits: [
+        { document: { id: '2', q: 'casino', count: 900 } },
+        { document: { id: '3', q: 'www.spam.example', count: 90 } },
+        { document: { id: '1', q: 'birne', count: 9 } },
+    ] }, config);
+    assert.deepEqual(chips.map(chip => [chip.name, chip.index]), [['birne', 0]], 'indexes count shown chips only');
+
+    const plan = core.buildAutocompleteSearches('bi', acConfig({ categoryCollection: null, pageCollection: null }));
+    const rows = core.autocompleteResults([
+        { found: 0, hits: [] },
+        { hits: [{ document: { id: '1', q: 'birne' } }, { document: { id: '2', q: 'bingo casino' } }] },
+    ], plan.sources, 'bi', config);
+    assert.deepEqual(rows.sections.suggestions.map(row => row.name), ['birne']);
+});
+
 test('autocompleteResults builds ordered rows with highlights, URLs, prices and GA4 items', () => {
     const config = acConfig({ directMatchesFirst: true, groupBy: 'variant_group' });
     const plan = core.buildAutocompleteSearches('gin', config);
     const results = [
         { found: 2, found_docs: 3, grouped_hits: [{ hits: [Object.assign(product(1), { highlight: { name: { snippet: '<mark>Gin</mark> 1' } } })] }, { hits: [product(2, { final_price: 0 })] }] },
         { found: 1, grouped_hits: [{ hits: [product(2, { final_price: 0 })] }] },
-        { hits: [{ document: { id: '9', query: 'gin tonic' }, highlight: { query: { snippet: '<mark>gin</mark> tonic' } } }] },
+        { hits: [{ document: { id: '9', q: 'gin tonic', count: 12 }, highlight: { q: { snippet: '<mark>gin</mark> tonic' } } }] },
         { hits: [{ document: { id: '5', name: 'Gin', url: '/spirits/gin.html' } }, { document: { id: '6', name: 'No URL' } }] },
         { hits: [{ document: { id: '7', title: 'Gin FAQ', url_key: 'gin-faq' } }, { document: { id: '8', title: '404', url_key: 'no-route' } }] },
     ];
@@ -332,11 +372,11 @@ test('buildCrossSellSearches asks for the top hit\'s salable cross-sells and bes
 
     assert.deepEqual(plan.searches, [
         {
-            collection: 'p', q: '*', include_fields: 'id,name,url,taste,crosssell_ids', per_page: 2,
+            collection: 'p', q: '*', include_fields: 'id,name,url,taste,crosssell_ids', enable_analytics: false, per_page: 2,
             filter_by: 'id:[`7`,`9`] && in_stock:=true && visibility:[2,4]',
         },
         {
-            collection: 'p', q: '*', include_fields: 'id,name,url,taste,crosssell_ids', per_page: 4,
+            collection: 'p', q: '*', include_fields: 'id,name,url,taste,crosssell_ids', enable_analytics: false, per_page: 4,
             filter_by: 'taste:=[`Pear`,`Quince`] && in_stock:=true && visibility:[2,4] && id:!=[`1`,`2`,`3`,`7`,`9`]',
             sort_by: 'sales_count:desc',
         },
@@ -387,18 +427,19 @@ test('crossSellResults keeps the link order, fills up with fallback products and
     assert.deepEqual(core.crossSellResults([], { crossSells: null, fallback: null, order: [], count: 4 }, config), []);
 });
 
-test('popular searches are the store\'s suggestions by popularity, linked to the search page', () => {
+test('popular searches are the store\'s most counted queries, linked to the search page', () => {
     const config = acConfig({ popularSearchCount: 6 });
 
     assert.deepEqual(core.buildPopularSearch(config), {
-        collection: 's', q: '*', query_by: 'query', sort_by: 'popularity:desc', per_page: 6,
+        collection: 's', q: '*', query_by: 'q', filter_by: 'is_valid:=true && count:>=3', sort_by: 'count:desc', per_page: 6,
+        enable_analytics: false,
     });
     assert.equal(core.buildPopularSearch(acConfig({ popularSearchCount: 0 })), null);
     assert.equal(core.buildPopularSearch(acConfig({ popularSearchCount: 6, suggestionCollection: null })), null);
 
-    const chips = core.popularResults({ hits: [{ document: { id: '3', query: 'Gin & Tonic' } }, { document: { id: '4', query: '' } }] }, config);
+    const chips = core.popularResults({ hits: [{ document: { id: '3', q: 'gin & tonic', count: 40 } }, { document: { id: '4', q: '', count: 2 } }] }, config);
     assert.deepEqual(chips.map(c => [c.key, c.type, c.name, c.url, c.index]), [
-        ['popular-3', 'popular', 'Gin & Tonic', 'https://shop.test/de/catalogsearch/result/?q=Gin%20%26%20Tonic', 0],
+        ['popular-3', 'popular', 'gin & tonic', 'https://shop.test/de/catalogsearch/result/?q=gin%20%26%20tonic', 0],
     ]);
     assert.deepEqual(core.popularResults({ code: 404, error: 'Not found' }, config), []);
     assert.deepEqual(core.popularResults(undefined, config), []);

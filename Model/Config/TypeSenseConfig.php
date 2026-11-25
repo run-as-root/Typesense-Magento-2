@@ -14,6 +14,9 @@ class TypeSenseConfig implements TypeSenseConfigInterface
 {
     private const string CONFIG_PREFIX = 'run_as_root_typesense';
     private const string DEFAULT_LISTING_IMAGE_ID = 'category_page_grid';
+    private const int DEFAULT_SUGGESTION_LIMIT = 1000;
+    private const int DEFAULT_SUGGESTION_MIN_COUNT = 3;
+    private const int DEFAULT_SUGGESTION_MAX_LENGTH = 60;
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -108,6 +111,35 @@ class TypeSenseConfig implements TypeSenseConfigInterface
     public function isSuggestionIndexingEnabled(?int $storeId = null): bool
     {
         return $this->getFlag('indexing/suggestion_enabled', $storeId);
+    }
+
+    public function getSuggestionLimit(?int $storeId = null): int
+    {
+        $limit = (int) $this->getValue('indexing/suggestion_limit', $storeId);
+
+        return $limit > 0 ? $limit : self::DEFAULT_SUGGESTION_LIMIT;
+    }
+
+    public function getSuggestionMinCount(?int $storeId = null): int
+    {
+        $value = $this->getValue('indexing/suggestion_min_count', $storeId);
+
+        return $value === null || $value === '' ? self::DEFAULT_SUGGESTION_MIN_COUNT : max(1, (int) $value);
+    }
+
+    public function getSuggestionMaxLength(?int $storeId = null): int
+    {
+        $length = (int) $this->getValue('indexing/suggestion_max_length', $storeId);
+
+        return $length > 0 ? $length : self::DEFAULT_SUGGESTION_MAX_LENGTH;
+    }
+
+    public function getSuggestionDenylist(?int $storeId = null): array
+    {
+        $lines = preg_split('/\R/u', (string) $this->getValue('indexing/suggestion_denylist', $storeId)) ?: [];
+        $entries = array_map(static fn (string $line): string => mb_strtolower(trim($line)), $lines);
+
+        return array_values(array_unique(array_filter($entries, static fn (string $entry): bool => $entry !== '')));
     }
 
     public function isZeroDowntimeEnabled(?int $storeId = null): bool

@@ -89,6 +89,7 @@ class Load extends Action implements HttpGetActionInterface
         $searchResult = $client->collections[$collectionName]->documents->search([
             'q'         => '*',
             'query_by'  => 'name',
+            'enable_analytics' => false,
             'filter_by' => $this->virtualRuleResolver->resolveFilter($categoryId, $resolvedStoreId),
             'per_page'  => 50,
         ]);

@@ -4,14 +4,27 @@ declare(strict_types=1);
 
 namespace RunAsRoot\TypeSense\Model\Indexer\Suggestion;
 
-use Magento\Search\Model\Query;
+use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
+use RunAsRoot\TypeSense\Api\SelfMaintainedEntityInterface;
+use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
+use RunAsRoot\TypeSense\Model\Suggestion\SuggestionCollectionProvisioner;
+use RunAsRoot\TypeSense\Model\Suggestion\SuggestionPruner;
+use RunAsRoot\TypeSense\Model\Suggestion\SuggestionSeeder;
 
-class SuggestionEntityIndexer implements EntityIndexerInterface
+/**
+ * Suggestions are the queries Typesense's popular-queries analytics count on the product collection; Magento
+ * exports nothing but the one-time seed of a new collection.
+ */
+class SuggestionEntityIndexer implements EntityIndexerInterface, SelfMaintainedEntityInterface
 {
     public function __construct(
-        private readonly SuggestionDataBuilder $dataBuilder,
         private readonly SuggestionSchemaProviderInterface $schemaProvider,
+        private readonly SuggestionCollectionProvisioner $provisioner,
+        private readonly SuggestionSeeder $seeder,
+        private readonly SuggestionPruner $pruner,
+        private readonly TypeSenseConfigInterface $config,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -30,14 +43,26 @@ class SuggestionEntityIndexer implements EntityIndexerInterface
         return $this->schemaProvider->getFields();
     }
 
+    public function provision(int $storeId, string $storeCode): void
+    {
+        if (!$this->config->isSuggestionIndexingEnabled($storeId)) {
+            $this->logger->info("Skipping suggestions for store {$storeCode}: disabled");
+            return;
+        }
+
+        if ($this->provisioner->ensure($storeId, $storeCode)) {
+            $stats = $this->seeder->seed($storeId, $storeCode);
+            $this->logger->info(
+                "Seeded suggestions for {$storeCode}: {$stats['imported']}/{$stats['total']} Magento search terms",
+            );
+        }
+
+        $this->pruner->prune($storeId, $storeCode);
+    }
+
     public function buildDocuments(array $entityIds, int $storeId): iterable
     {
-        $collection = $this->dataBuilder->getQueryCollection($entityIds, $storeId);
-
-        /** @var Query $query */
-        foreach ($collection as $query) {
-            yield $this->dataBuilder->build($query, $storeId);
-        }
+        return [];
     }
 
     public function getDocumentId(int $entityId): string

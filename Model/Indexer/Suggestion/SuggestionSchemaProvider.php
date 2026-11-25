@@ -6,14 +6,18 @@ namespace RunAsRoot\TypeSense\Model\Indexer\Suggestion;
 
 class SuggestionSchemaProvider implements SuggestionSchemaProviderInterface
 {
-    /** @return array<int, array<string, mixed>> */
+    /**
+     * Typesense's popular-queries analytics require `q` and `count`. `is_valid` is set by the pruner; it must be
+     * optional, since Typesense creates documents for new queries without it.
+     *
+     * @return array<int, array<string, mixed>>
+     */
     public function getFields(): array
     {
         return [
-            ['name' => 'id', 'type' => 'string'],
-            ['name' => 'query', 'type' => 'string'],
-            ['name' => 'num_results', 'type' => 'int32'],
-            ['name' => 'popularity', 'type' => 'int32'],
+            ['name' => 'q', 'type' => 'string'],
+            ['name' => 'count', 'type' => 'int32'],
+            ['name' => 'is_valid', 'type' => 'bool', 'optional' => true],
         ];
     }
 }

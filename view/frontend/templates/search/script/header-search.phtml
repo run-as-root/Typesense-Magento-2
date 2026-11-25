@@ -117,7 +117,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                 try {
                     const plan = listing.buildAutocompleteSearches(term, this.config);
                     const client = await window.runAsRootTypesense.getClient();
-                    const response = await client.multiSearch.perform({ searches: plan.searches }, this.config.cacheParams);
+                    const response = await client.multiSearch.perform({ searches: plan.searches }, core().searchParams(this.config));
                     if (!requests.isCurrent(id)) {
                         return;
                     }
@@ -154,7 +154,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                 this.crossSells = [];
                 try {
                     const client = await window.runAsRootTypesense.getClient();
-                    const response = await client.multiSearch.perform({ searches: plan.searches }, this.config.cacheParams);
+                    const response = await client.multiSearch.perform({ searches: plan.searches }, core().searchParams(this.config));
                     const cards = listing.crossSellResults((response && response.results) || [], plan.sources, this.config);
                     crossSellCache.set(plan.key, cards);
                     if (sequence().isCurrent(id)) {
@@ -174,7 +174,7 @@ $hyvaCsp = $viewModels->require(HyvaCsp::class);
                 popularRequested = true;
                 try {
                     const client = await window.runAsRootTypesense.getClient();
-                    const response = await client.multiSearch.perform({ searches: [search] }, this.config.cacheParams);
+                    const response = await client.multiSearch.perform({ searches: [search] }, core().searchParams(this.config));
                     this.popular = listing.popularResults(((response && response.results) || [])[0], this.config);
                     this.openPopular();
                 } catch (error) {

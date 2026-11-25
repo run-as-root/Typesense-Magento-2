@@ -38,7 +38,7 @@ function hit(id, extra = {}) {
 }
 
 function createEnvironment(search = '') {
-    const env = { events: [], history: [], parsed: [], seo: { style: { display: 'flex' } }, responder: null };
+    const env = { events: [], history: [], parsed: [], seo: { style: { display: 'flex' } }, responder: null, requests: [], storage: {} };
     const context = {
         console: { error() {}, warn() {}, log: console.log }, URLSearchParams, JSON, Math, Number, String, Object,
         Array, Promise, setTimeout, clearTimeout, Intl, Map,
@@ -73,6 +73,7 @@ function createEnvironment(search = '') {
         dispatchEvent: event => env.events.push(event),
         addEventListener() {},
         scrollTo() {},
+        localStorage: { getItem: key => env.storage[key] ?? null, setItem: (key, value) => { env.storage[key] = value; } },
     };
     context.window = context;
     vm.createContext(context);
@@ -81,13 +82,18 @@ function createEnvironment(search = '') {
         vm.runInContext(inlineScripts(file), context);
     }
     context.runAsRootTypesense.getClient = async () => ({
-        multiSearch: { perform: async body => env.responder(body) },
+        multiSearch: {
+            perform: async (body, params) => {
+                env.requests.push({ searches: body.searches, params });
+                return env.responder(body);
+            },
+        },
     });
     env.context = context;
-    env.listing = () => {
+    env.listing = (overrides = {}) => {
         const component = context.initTypesenseListing();
         component.$root = {
-            querySelector: () => ({ textContent: JSON.stringify(listingConfig) }),
+            querySelector: () => ({ textContent: JSON.stringify(Object.assign({}, listingConfig, overrides)) }),
             dataset: { eagerImages: '1' },
         };
         return component;
@@ -332,6 +338,40 @@ test('results carry the listing state key and sort and filter changes dispatch t
     listing.onPopState();
     await settle();
     assert.equal(tracked(env, 'typesense:sort-change').length, 1, 'history navigation is no interaction');
+});
+
+test('the search page counts its term for the popular-queries analytics on load only, with the visitor id', async () => {
+    const env = createEnvironment('?q=Birne');
+    env.responder = results(30, [hit(1), hit(2)]);
+    const listing = env.listing({ context: 'search', cacheParams: { use_cache: true } });
+    listing.init();
+    await settle();
+
+    listing.setSort('price:asc');
+    await settle();
+
+    const visitor = env.storage['typesense-visitor-id'];
+    assert.equal(typeof visitor, 'string');
+    const [load, sorted] = env.requests;
+    assert.equal(load.searches[0].q, 'Birne');
+    assert.equal('enable_analytics' in load.searches[0], false);
+    assert.equal(load.searches.slice(1).every(search => search.enable_analytics === false), true);
+    assert.equal(sorted.searches.every(search => search.enable_analytics === false), true);
+    for (const { params } of env.requests) {
+        assert.deepEqual(JSON.parse(JSON.stringify(params)), { use_cache: true, 'x-typesense-user-id': visitor });
+    }
+});
+
+test('the no-results products never count for the popular-queries analytics', async () => {
+    const env = createEnvironment('?q=xyz');
+    env.responder = body => ({ results: body.searches.map(() => ({ found: 0, hits: [], facet_counts: [] })) });
+    const listing = env.listing({ context: 'search', noResultsCategoryId: 7 });
+    listing.init();
+    await settle();
+
+    const suggested = env.requests.find(request => request.searches[0].filter_by.startsWith('category_ids:=7'));
+    assert.equal(suggested.searches[0].enable_analytics, false);
+    assert.equal(typeof suggested.params['x-typesense-user-id'], 'string');
 });
 
 test('a tile click dispatches select-item with the GA4 item at its listing position', async () => {

@@ -40,6 +40,22 @@ interface TypeSenseConfigInterface
 
     public function isSuggestionIndexingEnabled(?int $storeId = null): bool;
 
+    /** How many popular queries the store's suggestion collection keeps (Typesense analytics rule `limit`). */
+    public function getSuggestionLimit(?int $storeId = null): int;
+
+    /** How often a query must have been counted before it is suggested (at least 1). */
+    public function getSuggestionMinCount(?int $storeId = null): int;
+
+    /** Longer suggestion terms are neither suggested nor kept. */
+    public function getSuggestionMaxLength(?int $storeId = null): int;
+
+    /**
+     * Blocked words or word parts, lowercased; a suggestion containing one is neither suggested nor kept.
+     *
+     * @return list<string>
+     */
+    public function getSuggestionDenylist(?int $storeId = null): array;
+
     public function isZeroDowntimeEnabled(?int $storeId = null): bool;
 
     public function isCronEnabled(?int $storeId = null): bool;

@@ -313,6 +313,19 @@ final class AutocompleteConfigViewModelTest extends TestCase
         );
     }
 
+    public function test_suggestion_guards_are_passed_to_the_storefront(): void
+    {
+        $this->config->method('getSuggestionMinCount')->willReturn(3);
+        $this->config->method('getSuggestionMaxLength')->willReturn(60);
+        $this->config->method('getSuggestionDenylist')->willReturn(['casino', 'ärger']);
+
+        $result = $this->sut->getConfig();
+
+        self::assertSame(3, $result['suggestionMinCount']);
+        self::assertSame(60, $result['suggestionMaxLength']);
+        self::assertSame(['casino', 'ärger'], $result['suggestionDenylist']);
+    }
+
     public function test_disabled_cross_sells_and_a_missing_suggestion_index_send_no_extra_searches(): void
     {
         $this->collectionNameResolver->method('resolve')->willReturn('collection');

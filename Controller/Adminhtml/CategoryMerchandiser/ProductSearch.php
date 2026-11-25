@@ -51,6 +51,8 @@ class ProductSearch extends Action implements HttpGetActionInterface
                 'q'        => $query,
                 'query_by' => 'name,sku',
                 'per_page' => 20,
+                // A merchandiser's lookup is no storefront search: it must not count for the suggestions.
+                'enable_analytics' => false,
             ]);
 
             $products = $this->mapHitsToProducts($searchResult['hits'] ?? []);

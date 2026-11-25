@@ -102,6 +102,8 @@ class CollectionViewModel implements ArgumentInterface
             $searchParams = [
                 'q'        => '*',
                 'per_page' => $perPage,
+                // Admin browsing is no storefront search: it must not count for the suggestions.
+                'enable_analytics' => false,
             ];
 
             if ($queryBy !== '') {
