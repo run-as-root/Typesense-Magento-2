@@ -5,4 +5,8 @@
         <observer name="typesense_conversation_config_save"
                   instance="RunAsRoot\TypeSense\Observer\ConversationConfigSave"/>
     </event>
+    <event name="catalog_category_save_after">
+        <observer name="typesense_category_facet_display_save"
+                  instance="RunAsRoot\TypeSense\Observer\CategoryFacetDisplaySave"/>
+    </event>
 </config>
