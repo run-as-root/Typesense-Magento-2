@@ -46,11 +46,19 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         $indexer = $this->indexerPool->getIndexer($entityType);
 
         $changedSchemas = [];
+        $applierFailures = [];
         $stores = $this->storeResolver->getStores($entityType);
         try {
             foreach ($stores as $store) {
                 $storeId = (int) $store->getId();
-                $schemaChanged = $this->reindexStore($indexer, $entityType, $store->getCode(), $storeId, $entityIds);
+                try {
+                    $schemaChanged = $this->reindexStore($indexer, $entityType, $store->getCode(), $storeId, $entityIds);
+                } catch (ApplierFailedException $e) {
+                    // The store keeps its live collection, so the other stores can still be brought up to date.
+                    $this->logger->error($e->getMessage(), ['exception' => $e]);
+                    $applierFailures[] = $e;
+                    continue;
+                }
                 if ($schemaChanged) {
                     $changedSchemas[] = $this->nameResolver->resolve($entityType, $store->getCode(), $storeId);
                 }
@@ -61,6 +69,8 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
                 $this->schemaChangeHandler->handle($changedSchemas);
             }
         }
+
+        $this->throwApplierFailures($applierFailures);
     }
 
     /**
@@ -70,9 +80,33 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
     {
         $entityTypes = array_keys($this->indexerPool->getAll());
 
+        $applierFailures = [];
         foreach ($entityTypes as $entityType) {
-            $this->reindex($entityType);
+            try {
+                $this->reindex($entityType);
+            } catch (ApplierFailedException $e) {
+                $applierFailures[] = $e;
+            }
         }
+
+        $this->throwApplierFailures($applierFailures);
+    }
+
+    /**
+     * @param list<ApplierFailedException> $failures
+     */
+    private function throwApplierFailures(array $failures): void
+    {
+        if ($failures === []) {
+            return;
+        }
+
+        if (count($failures) === 1) {
+            throw $failures[0];
+        }
+
+        $messages = array_map(static fn (ApplierFailedException $e): string => $e->getMessage(), $failures);
+        throw new ApplierFailedException(implode("\n", $messages), 0, $failures[0]);
     }
 
     private function reindexStore(

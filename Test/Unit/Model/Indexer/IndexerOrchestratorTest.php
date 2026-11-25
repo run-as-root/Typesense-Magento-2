@@ -651,6 +651,61 @@ final class IndexerOrchestratorTest extends TestCase
         $this->sut->reindex('product');
     }
 
+    public function test_failed_appliers_of_one_store_do_not_stop_the_other_stores(): void
+    {
+        $this->useTwoStores();
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturnCallback(
+            static fn (string $entityType, string $storeCode): string => "rar_product_{$storeCode}_v2",
+        );
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $this->zeroDowntimeService->expects(self::exactly(2))->method('finishReindex')->willReturnCallback(
+            static fn (string $entityType, string $storeCode): bool => $storeCode === 'de'
+                ? throw new ApplierFailedException('synonyms: typesense down')
+                : true,
+        );
+
+        $this->schemaChangeHandler->expects(self::once())->method('handle')->with(['rar_product_at']);
+        $this->expectException(ApplierFailedException::class);
+        $this->expectExceptionMessage('synonyms: typesense down');
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_failed_appliers_of_one_entity_type_do_not_stop_the_other_types_in_a_full_run(): void
+    {
+        $category = $this->createMock(EntityIndexerInterface::class);
+        $category->method('getSchemaFields')->willReturn([]);
+        $category->method('buildDocuments')->willReturn([]);
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_v2');
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $this->zeroDowntimeService->method('finishReindex')->willReturnCallback(
+            static fn (string $entityType): bool => $entityType === 'product'
+                ? throw new ApplierFailedException('synonyms: typesense down')
+                : false,
+        );
+        $sut = new IndexerOrchestrator(
+            new EntityIndexerPool(['product' => $this->indexer, 'category' => $category]),
+            $this->zeroDowntimeService,
+            $this->batchImportService,
+            $this->nameResolver,
+            $this->config,
+            new IndexableStoreResolver($this->storeRepository, $this->config, $this->logger),
+            $this->aliasManager,
+            $this->collectionManager,
+            $this->documentDeleter,
+            $this->logger,
+            $this->emulation,
+            $this->schemaChangeHandler,
+        );
+
+        $category->expects(self::once())->method('buildDocuments');
+        $this->expectException(ApplierFailedException::class);
+
+        $sut->reindexAll();
+    }
+
     public function test_partial_reindex_never_handles_a_schema_change(): void
     {
         $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
