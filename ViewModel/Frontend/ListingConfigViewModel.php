@@ -19,6 +19,7 @@ use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
 use RunAsRoot\TypeSense\Model\Listing\CategoryFacetResolver;
 use RunAsRoot\TypeSense\Model\Listing\CategoryPositionSortBuilder;
+use RunAsRoot\TypeSense\Model\Listing\CollectionFieldProvider;
 use RunAsRoot\TypeSense\Model\Listing\FacetConfigBuilder;
 use RunAsRoot\TypeSense\Model\Listing\SortOptionProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
@@ -61,6 +62,7 @@ class ListingConfigViewModel implements ArgumentInterface
         private readonly CategoryFacetResolver $categoryFacetResolver,
         private readonly CategoryPositionSortBuilder $positionSortBuilder,
         private readonly SortOptionProvider $sortOptionProvider,
+        private readonly CollectionFieldProvider $fieldProvider,
     ) {
     }
 
@@ -99,7 +101,7 @@ class ListingConfigViewModel implements ArgumentInterface
         $category = $isCategory ? $this->getCurrentCategory() : null;
         $limits = $this->getCatalogLimits($storeId);
         $productCollection = $this->collectionNameResolver->resolve('product', $store->getCode(), $storeId);
-        $sortOptions = $this->getSortOptions($category, $storeId);
+        $sortOptions = $this->getSortOptions($category, $storeId, $productCollection);
 
         return [
             // Only the search-only key may reach the browser.
@@ -116,7 +118,7 @@ class ListingConfigViewModel implements ArgumentInterface
             'facets' => $this->getFacets($isCategory, $category, $store),
             'maxFacetValues' => self::MAX_FACET_VALUES,
             'sortOptions' => $this->toListingOptions($sortOptions),
-            'defaultSort' => $category !== null ? $this->mapMagentoSort((string) $category->getDefaultSortBy(), $sortOptions) : '',
+            'defaultSort' => $category !== null ? $this->mapMagentoSort((string) $category->getDefaultSortBy(), $sortOptions, $productCollection) : '',
             'limits' => $limits,
             'perPage' => $this->getPerPage($isCategory, $limits, $storeId),
             'inStockFirst' => $this->config->isInStockFirst($storeId),
@@ -214,14 +216,14 @@ class ListingConfigViewModel implements ArgumentInterface
     }
 
     /** @return list<array{label: string, value: string, code: string}> */
-    private function getSortOptions(?Category $category, int $storeId): array
+    private function getSortOptions(?Category $category, int $storeId, string $productCollection): array
     {
         $options = [];
         $showPrices = $this->canShowPrices();
         $configured = $this->sortOptionProvider->getOptions($storeId);
         foreach ($configured as $option) {
             // Sorting by a hidden price would still reveal the price order.
-            if (!$showPrices && $option['code'] === 'price') {
+            if ((!$showPrices && $option['code'] === 'price') || !$this->isSortable($option['value'], $productCollection)) {
                 continue;
             }
             $options[] = ['label' => (string) __($option['label']), 'value' => $option['value'], 'code' => $option['code']];
@@ -258,10 +260,12 @@ class ListingConfigViewModel implements ArgumentInterface
      *
      * @param list<array{label: string, value: string, code: string}> $options
      */
-    private function mapMagentoSort(string $sortBy, array $options): ?string
+    private function mapMagentoSort(string $sortBy, array $options, string $productCollection): ?string
     {
         if (isset(self::MAGENTO_SORT_MAP[$sortBy])) {
-            return self::MAGENTO_SORT_MAP[$sortBy];
+            $mapped = self::MAGENTO_SORT_MAP[$sortBy];
+
+            return $this->isSortable($mapped, $productCollection) ? $mapped : null;
         }
 
         $matching = array_values(array_filter($options, static fn (array $option): bool => $option['code'] === $sortBy));
@@ -310,5 +314,18 @@ class ListingConfigViewModel implements ArgumentInterface
         );
 
         return $catalogPerPage > 0 ? $catalogPerPage : ($limits[0] ?? 12);
+    }
+
+    // A collection built before a sort field existed rejects sorting by it, which fails the whole listing.
+    private function isSortable(string $sortBy, string $productCollection): bool
+    {
+        if ($sortBy === '') {
+            return true;
+        }
+
+        $fields = $this->fieldProvider->getFieldNames($productCollection);
+        $field = (string) preg_replace('/[(:].*$/', '', $sortBy);
+
+        return $fields === [] || in_array($field, $fields, true);
     }
 }

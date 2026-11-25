@@ -24,6 +24,7 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface;
 use RunAsRoot\TypeSense\Model\Listing\CategoryFacetResolver;
 use RunAsRoot\TypeSense\Model\Listing\CategoryPositionSortBuilder;
 use RunAsRoot\TypeSense\Model\Listing\FacetConfigBuilder;
+use RunAsRoot\TypeSense\Model\Listing\CollectionFieldProvider;
 use RunAsRoot\TypeSense\Model\Listing\SortOptionProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
@@ -50,6 +51,8 @@ final class ListingConfigViewModelTest extends TestCase
         ['label' => 'Price: Low to High', 'value' => 'price:asc', 'code' => 'price'],
         ['label' => 'Name: A–Z', 'value' => 'name:asc', 'code' => 'name'],
     ];
+    /** @var list<string> fields of the live product collection; empty when its schema is unreadable */
+    private array $collectionFields = ['name', 'price', 'volume_percent_sort'];
     /** @var list<mixed> */
     private array $constructorArguments;
     private ListingConfigViewModel $sut;
@@ -103,6 +106,9 @@ final class ListingConfigViewModelTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->categoryFacetResolver = $this->createMock(CategoryFacetResolver::class);
         $this->positionSortBuilder = $this->createMock(CategoryPositionSortBuilder::class);
+        $fieldProvider = $this->createMock(CollectionFieldProvider::class);
+        $fieldProvider->method('getFieldNames')->with('rar_product_de')
+            ->willReturnCallback(fn (): array => $this->collectionFields);
 
         $this->constructorArguments = [
             $this->config,
@@ -121,6 +127,7 @@ final class ListingConfigViewModelTest extends TestCase
             $this->categoryFacetResolver,
             $this->positionSortBuilder,
             $this->sortOptionProvider,
+            $fieldProvider,
         ];
         $this->sut = new ListingConfigViewModel(...$this->constructorArguments);
     }
@@ -324,6 +331,34 @@ final class ListingConfigViewModelTest extends TestCase
 
         self::assertSame(['', 'volume_percent_sort:desc', 'volume_percent_sort:asc'], array_column($config['sortOptions'], 'value'));
         self::assertSame('volume_percent_sort:asc', $config['defaultSort']);
+    }
+
+    public function test_sorts_by_fields_missing_from_the_live_collection_are_dropped_with_the_default_sort(): void
+    {
+        $this->collectionFields = ['price'];
+        $this->sortOptions = [
+            ['label' => 'Relevance', 'value' => '', 'code' => 'position'],
+            ['label' => 'Price: Low to High', 'value' => 'price:asc', 'code' => 'price'],
+            ['label' => 'Alkohol Vol.-%', 'value' => 'volume_percent_sort(missing_values: last):asc', 'code' => 'volume_percent'],
+            ['label' => 'Name: A–Z', 'value' => 'name:asc', 'code' => 'name'],
+        ];
+        $this->givenCategory(42, 'Gin', 'name');
+        $this->givenCatalogLimits('12', '12');
+
+        $config = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY);
+
+        self::assertSame(['', 'price:asc'], array_column($config['sortOptions'], 'value'));
+        self::assertNull($config['defaultSort']);
+    }
+
+    public function test_unreadable_collection_schema_keeps_every_sort_option(): void
+    {
+        $this->collectionFields = [];
+        $this->givenCatalogLimits('12', '12');
+
+        $config = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH);
+
+        self::assertSame(['', 'price:asc', 'name:asc'], array_column($config['sortOptions'], 'value'));
     }
 
     public function test_hidden_prices_remove_the_price_sorts(): void
