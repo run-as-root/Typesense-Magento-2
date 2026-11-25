@@ -40,6 +40,9 @@ interface TypeSenseConfigInterface
 
     public function isSuggestionIndexingEnabled(?int $storeId = null): bool;
 
+    /** Reads `indexing/<entity type>_enabled`; an entity type without such a flag is always indexed. */
+    public function isEntityIndexingEnabled(string $entityType, ?int $storeId = null): bool;
+
     /** How many popular queries the store's suggestion collection keeps (Typesense analytics rule `limit`). */
     public function getSuggestionLimit(?int $storeId = null): int;
 
@@ -98,6 +101,9 @@ interface TypeSenseConfigInterface
     public function getSplitJoinTokens(?int $storeId = null): string;
 
     public function isPrefixSearchEnabled(?int $storeId = null): bool;
+
+    /** Whether Typesense considers every candidate instead of stopping once it found enough good matches. */
+    public function isExhaustiveSearchEnabled(?int $storeId = null): bool;
 
     public function isSearchCacheEnabled(?int $storeId = null): bool;
 
@@ -183,8 +189,19 @@ interface TypeSenseConfigInterface
     /** @return string[] */
     public function getFacetFilters(?int $storeId = null): array;
 
-    /** @return array<int, array{label: string, value: string}> */
+    /**
+     * @deprecated Only the fixed options; use \RunAsRoot\TypeSense\Model\Listing\SortOptionProvider::getOptions(),
+     *     which also returns the attribute sort options.
+     * @return array<int, array{label: string, value: string}>
+     */
     public function getEnabledSortOptions(?int $storeId = null): array;
+
+    /**
+     * Configured sort option keys in order: fixed ones (`price_asc`) and attribute ones (`attr:<code>:<direction>`).
+     *
+     * @return list<string>
+     */
+    public function getSortOptionKeys(?int $storeId = null): array;
 
     public function isConversationalSearchEnabled(?int $storeId = null): bool;
 

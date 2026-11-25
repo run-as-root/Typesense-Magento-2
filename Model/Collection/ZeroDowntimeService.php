@@ -39,31 +39,105 @@ class ZeroDowntimeService
         return $collectionName;
     }
 
-    public function finishReindex(string $entityType, string $storeCode, string $collectionName, ?int $storeId = null): void
+    /**
+     * @return bool whether the new collection's schema differs from the one that was live (true for a first build)
+     * @throws ApplierFailedException when the collection state could not be re-created on a collection that
+     *     would replace a live one; the alias keeps pointing at the live collection
+     */
+    public function finishReindex(string $entityType, string $storeCode, string $collectionName, ?int $storeId = null): bool
     {
         $aliasName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
-
-        // Synonyms and overrides live on the collection, so the new one must carry them before it goes live.
-        $this->runAppliers($entityType, $storeCode, $collectionName, $storeId);
-
-        // A plain collection squatting on the alias name blocks alias creation (pre-versioning installs).
-        if ($this->collectionManager->collectionExists($aliasName) && !$this->aliasManager->aliasExists($aliasName)) {
-            $this->collectionManager->deleteCollection($aliasName);
-            $this->logger->info("One-time migration: deleted plain collection {$aliasName} to make way for the alias");
-        }
 
         // Read before the swap: the version that was live is the only safe rollback target. The
         // highest lower number may be a half-built orphan or the version rolled away from.
         $previouslyLive = $this->getAliasTarget($aliasName);
+        // A plain collection squatting on the alias name blocks alias creation (pre-versioning installs).
+        $plainLive = $previouslyLive === null
+            && $this->collectionManager->collectionExists($aliasName)
+            && !$this->aliasManager->aliasExists($aliasName);
+
+        // Synonyms and overrides live on the collection, so the new one must carry them before it goes live.
+        $this->runAppliers($entityType, $storeCode, $collectionName, $storeId, $previouslyLive !== null || $plainLive);
+
+        if ($plainLive) {
+            $this->collectionManager->deleteCollection($aliasName);
+            $this->logger->info("One-time migration: deleted plain collection {$aliasName} to make way for the alias");
+        }
+
+        $schemaChanged = $previouslyLive === null || $this->schemaDiffers($previouslyLive, $collectionName);
 
         $this->aliasManager->upsertAlias($aliasName, $collectionName);
         $this->logger->info("Swapped alias {$aliasName} → {$collectionName}");
 
         $this->cleanupOldVersions($aliasName, $collectionName, $previouslyLive);
+
+        return $schemaChanged;
     }
 
-    private function runAppliers(string $entityType, string $storeCode, string $collectionName, ?int $storeId): void
+    // Fields a pattern field (category_position_.*) created follow the data, so only declared fields count.
+    private function schemaDiffers(string $previousCollection, string $newCollection): bool
     {
+        try {
+            $previous = $this->collectionManager->getCollection($previousCollection);
+            $new = $this->collectionManager->getCollection($newCollection);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                "Could not compare the schemas of {$previousCollection} and {$newCollection}: {$e->getMessage()}",
+                ['exception' => $e],
+            );
+
+            return true;
+        }
+
+        return $this->fieldSignature($previous) !== $this->fieldSignature($new);
+    }
+
+    /**
+     * @param array<string, mixed> $collection
+     * @return array<string, array<string, mixed>> field name => normalized definition
+     */
+    private function fieldSignature(array $collection): array
+    {
+        $signature = [];
+        $fields = is_array($collection['fields'] ?? null) ? $collection['fields'] : [];
+        $patterns = array_values(array_filter(
+            array_map(static fn (array $field): string => (string) ($field['name'] ?? ''), $fields),
+            static fn (string $name): bool => str_contains($name, '.*'),
+        ));
+        foreach ($fields as $field) {
+            $name = (string) ($field['name'] ?? '');
+            if ($this->isPatternCreated($name, $patterns)) {
+                continue;
+            }
+            ksort($field);
+            $signature[$name] = $field;
+        }
+        ksort($signature);
+
+        return $signature;
+    }
+
+    /**
+     * @param list<string> $patterns
+     */
+    private function isPatternCreated(string $name, array $patterns): bool
+    {
+        foreach ($patterns as $pattern) {
+            if ($name !== $pattern && preg_match('/^(?:' . str_replace('/', '\\/', $pattern) . ')$/', $name) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function runAppliers(
+        string $entityType,
+        string $storeCode,
+        string $collectionName,
+        ?int $storeId,
+        bool $replacesLiveCollection,
+    ): void {
         if ($storeId === null) {
             $this->logger->info(
                 "No store id for {$entityType}/{$storeCode}: skipping post-swap appliers on {$collectionName}",
@@ -71,6 +145,8 @@ class ZeroDowntimeService
             return;
         }
 
+        $failures = [];
+        $firstFailure = null;
         foreach ($this->appliers as $code => $applier) {
             try {
                 $applier->apply($entityType, $storeId, $storeCode, $collectionName);
@@ -79,8 +155,25 @@ class ZeroDowntimeService
                     "Post-swap applier {$code} failed on {$collectionName}: {$e->getMessage()}",
                     ['exception' => $e],
                 );
+                $failures[] = "{$code}: {$e->getMessage()}";
+                $firstFailure ??= $e;
             }
         }
+
+        // A first build has nothing live to protect: serving it without synonyms beats serving no search at all.
+        if ($failures === [] || !$replacesLiveCollection) {
+            return;
+        }
+
+        throw new ApplierFailedException(
+            sprintf(
+                'Could not re-create the collection state on %s (%s); the previous collection stays live',
+                $collectionName,
+                implode('; ', $failures),
+            ),
+            0,
+            $firstFailure,
+        );
     }
 
     public function rollback(string $entityType, string $storeCode, ?int $storeId = null): string

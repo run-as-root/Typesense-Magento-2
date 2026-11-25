@@ -127,6 +127,18 @@ final class CacheableSearchResultPluginTest extends TestCase
         self::assertSame($page, $this->sut->aroundExecute($this->controller, static fn () => 'core result'));
     }
 
+    public function test_magento_page_param_keeps_the_page_cacheable(): void
+    {
+        $this->enable(true, true, true);
+        $this->request->method('getParam')->with('q')->willReturn('gin');
+        $this->request->method('getParams')->willReturn(['q' => 'gin', 'p' => '2']);
+        $this->query->method('getRedirect')->willReturn('');
+        $page = $this->createMock(Page::class);
+        $this->pageFactory->expects(self::once())->method('create')->willReturn($page);
+
+        self::assertSame($page, $this->sut->aroundExecute($this->controller, static fn () => 'core result'));
+    }
+
     #[DataProvider('unknownParamProvider')]
     public function test_unknown_params_fall_through_to_the_uncached_core_page(array $params): void
     {

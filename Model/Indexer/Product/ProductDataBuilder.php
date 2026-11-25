@@ -37,6 +37,7 @@ class ProductDataBuilder
         private readonly NewProductResolverInterface $newProductResolver,
         private readonly CompositeChildrenDataResolver $compositeChildrenResolver,
         private readonly CrossSellResolver $crossSellResolver,
+        private readonly SortableAttributeProvider $sortableAttributes,
     ) {
     }
 
@@ -138,7 +139,8 @@ class ProductDataBuilder
         $document['review_count'] = $this->reviewResolver->getReviewCount($productId, $storeId);
         $document['crosssell_ids'] = $this->crossSellResolver->getCrossSellIds($productId);
 
-        $attributes = $this->attributeResolver->getExtraAttributes($product);
+        $ownAttributes = $this->attributeResolver->getExtraAttributes($product);
+        $attributes = $ownAttributes;
         if ($product->isComposite()) {
             $children = $this->compositeChildrenResolver->getChildren($productId, $storeId);
             $attributes = $this->mergeChildAttributes($attributes, $children);
@@ -147,6 +149,8 @@ class ProductDataBuilder
                 $document['children_text'] = $childrenText;
             }
         }
+
+        $document += $this->sortableAttributes->buildSortFields($ownAttributes, $attributes, $storeId);
 
         return $document + $attributes;
     }

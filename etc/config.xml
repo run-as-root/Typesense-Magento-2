@@ -19,6 +19,10 @@
                 <category_enabled>1</category_enabled>
                 <cms_page_enabled>1</cms_page_enabled>
                 <suggestion_enabled>1</suggestion_enabled>
+                <customer_enabled>0</customer_enabled>
+                <order_enabled>0</order_enabled>
+                <store_enabled>0</store_enabled>
+                <system_config_enabled>0</system_config_enabled>
                 <suggestion_limit>1000</suggestion_limit>
                 <suggestion_min_count>3</suggestion_min_count>
                 <suggestion_max_length>60</suggestion_max_length>
@@ -42,6 +46,7 @@
                 <prioritize_exact_match>1</prioritize_exact_match>
                 <split_join_tokens>fallback</split_join_tokens>
                 <prefix_search>1</prefix_search>
+                <exhaustive_search>0</exhaustive_search>
                 <infix_enabled>0</infix_enabled>
                 <infix_fields>name</infix_fields>
                 <infix_mode>fallback</infix_mode>

@@ -8,10 +8,13 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProvider;
+use RunAsRoot\TypeSense\Model\Indexer\Product\SortableAttributeProvider;
+use RunAsRoot\TypeSense\Model\Listing\SortOptionProvider;
 
 final class ProductSchemaProviderTest extends TestCase
 {
     private TypeSenseConfigInterface&MockObject $config;
+    private SortableAttributeProvider&MockObject $sortableAttributes;
     private ProductSchemaProvider $sut;
 
     protected function setUp(): void
@@ -19,7 +22,9 @@ final class ProductSchemaProviderTest extends TestCase
         $this->config = $this->createMock(TypeSenseConfigInterface::class);
         $this->config->method('getAdditionalAttributes')->willReturn([]);
 
-        $this->sut = new ProductSchemaProvider($this->config);
+        $this->sortableAttributes = $this->createMock(SortableAttributeProvider::class);
+
+        $this->sut = new ProductSchemaProvider($this->config, $this->sortableAttributes);
     }
 
     public function test_get_fields_returns_array(): void
@@ -158,6 +163,51 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertTrue($field['sort'] ?? false);
     }
 
+    public function test_name_is_sortable_for_the_name_sort_options(): void
+    {
+        $field = $this->findField($this->sut->getFields(), 'name');
+
+        self::assertTrue($field['sort'] ?? false);
+    }
+
+    public function test_every_offered_sort_option_sorts_by_a_sortable_field(): void
+    {
+        $fields = $this->sut->getFields();
+
+        foreach (SortOptionProvider::STATIC_OPTIONS as $option) {
+            $clauses = $option['value'] === '' ? [] : explode(',', $option['value']);
+            foreach ($clauses as $clause) {
+                $field = $this->findField($fields, explode(':', $clause)[0]);
+                $numeric = in_array($field['type'], ['int32', 'int64', 'float', 'bool'], true);
+                self::assertTrue($numeric || ($field['sort'] ?? false), "{$field['name']} is not sortable");
+            }
+        }
+    }
+
+    public function test_sortable_attributes_get_an_optional_sortable_companion_field(): void
+    {
+        $this->sortableAttributes->method('getSortableAttributes')->willReturn([
+            'volume_percent' => 'float',
+            'trade_name' => 'string',
+        ]);
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->config->method('getAdditionalAttributes')->willReturn(['volume_percent']);
+        $sut = new ProductSchemaProvider($this->config, $this->sortableAttributes);
+
+        $fields = $sut->getFields();
+
+        self::assertSame(
+            ['name' => 'volume_percent_sort', 'type' => 'float', 'optional' => true, 'sort' => true],
+            $this->findField($fields, 'volume_percent_sort'),
+        );
+        self::assertSame(
+            ['name' => 'trade_name_sort', 'type' => 'string', 'optional' => true, 'sort' => true],
+            $this->findField($fields, 'trade_name_sort'),
+        );
+        self::assertSame('string[]', $this->findField($fields, 'trade_name')['type']);
+        self::assertCount(1, array_keys(array_column($fields, 'name'), 'volume_percent'));
+    }
+
     public function test_get_fields_contains_type_id_as_string_facet(): void
     {
         $fields = $this->sut->getFields();
@@ -263,7 +313,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config = $this->createMock(TypeSenseConfigInterface::class);
         $config->method('getAdditionalAttributes')->willReturn(['color', 'size']);
 
-        $sut = new ProductSchemaProvider($config);
+        $sut = new ProductSchemaProvider($config, $this->createMock(SortableAttributeProvider::class));
         $fields = $sut->getFields();
 
         // Composite parents hold their children's values too, so even a single select can have several.
@@ -283,7 +333,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config = $this->createMock(TypeSenseConfigInterface::class);
         $config->method('getAdditionalAttributes')->willReturn(['short_description', 'color', 'price']);
 
-        $sut = new ProductSchemaProvider($config);
+        $sut = new ProductSchemaProvider($config, $this->createMock(SortableAttributeProvider::class));
         $fields = $sut->getFields();
         $fieldNames = array_column($fields, 'name');
 
@@ -303,7 +353,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config->method('isConversationalSearchEnabled')->willReturn(true);
         $config->method('getEmbeddingFields')->willReturn(['name']);
 
-        $fields = (new ProductSchemaProvider($config))->getFields();
+        $fields = (new ProductSchemaProvider($config, $this->createMock(SortableAttributeProvider::class)))->getFields();
         $fieldNames = array_column($fields, 'name');
 
         self::assertSame($fieldNames, array_values(array_unique($fieldNames)));
@@ -319,7 +369,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config->method('isConversationalSearchEnabled')->willReturn(true);
         $config->method('getEmbeddingFields')->willReturn(['name']);
 
-        $fieldNames = array_column((new ProductSchemaProvider($config))->getFields(), 'name');
+        $fieldNames = array_column((new ProductSchemaProvider($config, $this->createMock(SortableAttributeProvider::class)))->getFields(), 'name');
 
         self::assertEqualsCanonicalizing($fieldNames, ProductSchemaProvider::RESERVED_FIELDS);
     }
@@ -329,7 +379,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config = $this->createMock(TypeSenseConfigInterface::class);
         $config->method('getAdditionalAttributes')->willReturn([]);
 
-        $sut = new ProductSchemaProvider($config);
+        $sut = new ProductSchemaProvider($config, $this->createMock(SortableAttributeProvider::class));
         $fieldNames = array_column($sut->getFields(), 'name');
 
         $coreNames = ['id', 'product_id', 'name', 'sku', 'url', 'image_url', 'price',
@@ -348,7 +398,7 @@ final class ProductSchemaProviderTest extends TestCase
         $this->config->method('getEmbeddingFields')->willReturn(['name', 'description']);
         $this->config->method('getAdditionalAttributes')->willReturn([]);
 
-        $sut = new ProductSchemaProvider($this->config);
+        $sut = new ProductSchemaProvider($this->config, $this->createMock(SortableAttributeProvider::class));
         $fields = $sut->getFields();
         $fieldNames = array_column($fields, 'name');
 
@@ -365,7 +415,7 @@ final class ProductSchemaProviderTest extends TestCase
         $this->config->method('isConversationalSearchEnabled')->willReturn(false);
         $this->config->method('getAdditionalAttributes')->willReturn([]);
 
-        $sut = new ProductSchemaProvider($this->config);
+        $sut = new ProductSchemaProvider($this->config, $this->createMock(SortableAttributeProvider::class));
         $fields = $sut->getFields();
         $fieldNames = array_column($fields, 'name');
 
@@ -378,7 +428,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config->method('getAdditionalAttributes')->willReturn(['color']);
         $config->method('isStemEnabled')->willReturn(true);
         $config->method('isGermanDecompoundingEnabled')->willReturn(true);
-        $fields = (new ProductSchemaProvider($config))->getFields();
+        $fields = (new ProductSchemaProvider($config, $this->createMock(SortableAttributeProvider::class)))->getFields();
 
         $stemmed = ['name', 'description', 'short_description', 'categories_text', 'name_decompounded', 'children_text'];
         foreach ($stemmed as $name) {
@@ -405,7 +455,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config->method('getAdditionalAttributes')->willReturn([]);
         $config->method('isInfixEnabled')->willReturn(true);
         $config->method('getInfixFields')->willReturn(['name', 'price']);
-        $fields = (new ProductSchemaProvider($config))->getFields();
+        $fields = (new ProductSchemaProvider($config, $this->createMock(SortableAttributeProvider::class)))->getFields();
 
         self::assertTrue($this->findField($fields, 'name')['infix']);
         self::assertArrayNotHasKey('infix', $this->findField($fields, 'sku'));
@@ -418,7 +468,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config->method('getAdditionalAttributes')->willReturn([]);
         $config->method('isInfixEnabled')->willReturn(false);
         $config->method('getInfixFields')->willReturn(['name']);
-        $fields = (new ProductSchemaProvider($config))->getFields();
+        $fields = (new ProductSchemaProvider($config, $this->createMock(SortableAttributeProvider::class)))->getFields();
 
         self::assertArrayNotHasKey('infix', $this->findField($fields, 'name'));
     }
@@ -430,7 +480,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config = $this->createMock(TypeSenseConfigInterface::class);
         $config->method('getAdditionalAttributes')->willReturn([]);
         $config->method('isGermanDecompoundingEnabled')->willReturn(true);
-        $fields = (new ProductSchemaProvider($config))->getFields();
+        $fields = (new ProductSchemaProvider($config, $this->createMock(SortableAttributeProvider::class)))->getFields();
 
         self::assertSame(
             ['name' => 'name_decompounded', 'type' => 'string', 'optional' => true],
@@ -447,7 +497,7 @@ final class ProductSchemaProviderTest extends TestCase
         $config->method('isInfixEnabled')->willReturn(true);
         $config->method('getInfixFields')->willReturn(['name_decompounded']);
 
-        $field = $this->findField((new ProductSchemaProvider($config))->getFields(), 'name_decompounded');
+        $field = $this->findField((new ProductSchemaProvider($config, $this->createMock(SortableAttributeProvider::class)))->getFields(), 'name_decompounded');
 
         self::assertTrue($field['stem']);
         self::assertTrue($field['infix']);

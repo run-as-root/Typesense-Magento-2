@@ -675,6 +675,11 @@ test('a facet param is the URL key of its field and accepts only listed values',
     const odd = searchConfig({ facets: [categoryFacet({ param: 'a b' }), { field: 'color', param: 'page', type: 'dropdown' }] });
     assert.equal(core.serializeUrlState(state({ filters: { category_ids: ['7'], color: ['Red'] } }), odd),
         '?category_ids=7&color=Red');
+
+    // Magento's p page parameter cannot be taken over by a facet either.
+    const pagedFacet = searchConfig({ facets: [{ field: 'color', param: 'p', type: 'dropdown' }] });
+    assert.equal(core.parseUrlState('?p=3', pagedFacet).page, 3);
+    assert.deepEqual(core.parseUrlState('?p=3', pagedFacet).filters, {});
 });
 
 test('a facet with its own value limit gets its own search, with or without an active filter', () => {
@@ -816,4 +821,30 @@ test('only the Typesense numeric kinds mark a facet numeric', () => {
     assert.deepEqual(core.parseUrlState('?volume=0.7|x', config).filters, { volume: ['0.7', 'x'] });
     assert.equal(core.buildSearches(state({ filters: { volume: ['0.7'] } }), config)[0].filter_by,
         'visibility:[3,4] && volume:=[`0.7`]');
+});
+
+test('every product search of the listing and the header search carries the shared request params', () => {
+    const requestParams = { query_by: 'name,sku', infix: 'off', exhaustive_search: true };
+    const listing = core.buildSearches(state({ q: 'marille', filters: { color: ['Red'] } }), searchConfig({ requestParams }));
+    const header = core.buildAutocompleteSearches('marille', {
+        productCollection: 'shop_default_products', productCount: 6, requestParams, directMatchesFirst: true,
+    });
+
+    assert.ok(listing.length >= 3);
+    for (const search of [...listing, ...header.searches]) {
+        assert.equal(search.exhaustive_search, true);
+    }
+    assert.notEqual(header.sources.direct, null);
+});
+
+test('parseUrlState reads Magento\'s p as the page, page wins over it, and the URL is written with page', () => {
+    const config = searchConfig();
+
+    assert.equal(core.parseUrlState('?p=2', config).page, 2);
+    assert.equal(core.parseUrlState('?q=gin&p=3', config).page, 3);
+    assert.equal(core.parseUrlState('?p=3&page=2', config).page, 2);
+    assert.equal(core.parseUrlState('?page=2&p=3', config).page, 2);
+    assert.equal(core.parseUrlState('?page=abc&p=3', config).page, 1);
+    assert.equal(core.parseUrlState('?p=abc', config).page, 1);
+    assert.equal(core.serializeUrlState(core.parseUrlState('?q=gin&p=2', config), config), '?q=gin&page=2');
 });

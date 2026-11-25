@@ -30,9 +30,21 @@ class CollectionFieldProvider
 
     public function hasField(string $collection, string $field): bool
     {
-        $this->fieldNames[$collection] ??= $this->loadFieldNames($collection);
+        return in_array($field, $this->getFieldNames($collection), true);
+    }
 
-        return in_array($field, $this->fieldNames[$collection], true);
+    /**
+     * @return list<string> empty when the schema could not be read
+     */
+    public function getFieldNames(string $collection): array
+    {
+        return $this->fieldNames[$collection] ??= $this->loadFieldNames($collection);
+    }
+
+    public function invalidate(string $collection): void
+    {
+        unset($this->fieldNames[$collection]);
+        $this->cache->remove(self::CACHE_KEY_PREFIX . $collection);
     }
 
     /**

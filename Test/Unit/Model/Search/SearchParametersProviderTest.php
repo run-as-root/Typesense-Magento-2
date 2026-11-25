@@ -36,9 +36,17 @@ final class SearchParametersProviderTest extends TestCase
                 'prioritize_num_matching_fields' => true,
                 'split_join_tokens' => 'fallback',
                 'prefix' => true,
+                'exhaustive_search' => false,
             ],
             $this->sut->getParameters(),
         );
+    }
+
+    public function test_exhaustive_search_follows_the_store_config(): void
+    {
+        $this->config->method('isExhaustiveSearchEnabled')->with(3)->willReturn(true);
+
+        self::assertTrue($this->sut->getParameters(3)['exhaustive_search']);
     }
 
     public function test_typo_tolerance_off_sets_num_typos_zero(): void

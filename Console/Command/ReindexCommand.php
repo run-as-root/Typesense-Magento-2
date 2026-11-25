@@ -8,6 +8,7 @@ use Magento\Framework\App\State;
 use Magento\Framework\Console\Cli;
 use RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface;
 use RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool;
+use RunAsRoot\TypeSense\Model\Indexer\IndexableStoreResolver;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -21,6 +22,7 @@ class ReindexCommand extends Command
         private readonly IndexerOrchestratorInterface $orchestrator,
         private readonly EntityIndexerPool $indexerPool,
         private readonly State $appState,
+        private readonly IndexableStoreResolver $storeResolver,
     ) {
         parent::__construct();
     }
@@ -33,7 +35,8 @@ class ReindexCommand extends Command
                 self::OPTION_ENTITY,
                 null,
                 InputOption::VALUE_OPTIONAL,
-                'Entity type to reindex (product, category, cms_page, suggestion). If omitted, reindexes all.',
+                'Entity type to reindex (product, category, cms_page, suggestion, customer, order, store, system_config).'
+                . ' If omitted, reindexes all enabled ones.',
             )
         ;
     }
@@ -58,9 +61,16 @@ class ReindexCommand extends Command
             // Area code already set
         }
 
+        if ($entityType !== null && !$this->isIndexedAnywhere($entityType)) {
+            $this->writeSkipped($output, $entityType);
+
+            return Cli::RETURN_SUCCESS;
+        }
+
         try {
             if ($entityType === null) {
                 $output->writeln('<info>Reindexing all entity types...</info>');
+                $this->reportDisabledEntityTypes($output);
                 $this->orchestrator->reindexAll();
                 $output->writeln('<info>Reindex complete.</info>');
             } else {
@@ -75,5 +85,29 @@ class ReindexCommand extends Command
         }
 
         return Cli::RETURN_SUCCESS;
+    }
+
+    private function reportDisabledEntityTypes(OutputInterface $output): void
+    {
+        $entityTypes = array_keys($this->indexerPool->getAll());
+        foreach ($entityTypes as $entityType) {
+            if (!$this->isIndexedAnywhere($entityType)) {
+                $this->writeSkipped($output, $entityType);
+            }
+        }
+    }
+
+    private function isIndexedAnywhere(string $entityType): bool
+    {
+        return $this->storeResolver->getStores($entityType) !== [];
+    }
+
+    private function writeSkipped(OutputInterface $output, string $entityType): void
+    {
+        $output->writeln(sprintf(
+            '<comment>Skipping %1$s: indexing is disabled in every active store with TypeSense enabled'
+            . ' (run_as_root_typesense/indexing/%1$s_enabled).</comment>',
+            $entityType,
+        ));
     }
 }

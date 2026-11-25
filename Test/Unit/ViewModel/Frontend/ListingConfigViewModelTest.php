@@ -24,6 +24,8 @@ use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface;
 use RunAsRoot\TypeSense\Model\Listing\CategoryFacetResolver;
 use RunAsRoot\TypeSense\Model\Listing\CategoryPositionSortBuilder;
 use RunAsRoot\TypeSense\Model\Listing\FacetConfigBuilder;
+use RunAsRoot\TypeSense\Model\Listing\CollectionFieldProvider;
+use RunAsRoot\TypeSense\Model\Listing\SortOptionProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchParametersProvider;
 use RunAsRoot\TypeSense\Model\Search\SearchRequestParamsBuilder;
 use RunAsRoot\TypeSense\Model\VirtualRule\CategoryListingFilterBuilder;
@@ -42,6 +44,15 @@ final class ListingConfigViewModelTest extends TestCase
     private LoggerInterface&MockObject $logger;
     private CategoryFacetResolver&MockObject $categoryFacetResolver;
     private CategoryPositionSortBuilder&MockObject $positionSortBuilder;
+    private SortOptionProvider&MockObject $sortOptionProvider;
+    /** @var list<array{label: string, value: string, code: string}> */
+    private array $sortOptions = [
+        ['label' => 'Relevance', 'value' => '', 'code' => 'position'],
+        ['label' => 'Price: Low to High', 'value' => 'price:asc', 'code' => 'price'],
+        ['label' => 'Name: A–Z', 'value' => 'name:asc', 'code' => 'name'],
+    ];
+    /** @var list<string> fields of the live product collection; empty when its schema is unreadable */
+    private array $collectionFields = ['name', 'price', 'volume_percent_sort'];
     /** @var list<mixed> */
     private array $constructorArguments;
     private ListingConfigViewModel $sut;
@@ -53,11 +64,8 @@ final class ListingConfigViewModelTest extends TestCase
         $this->config->method('getSearchPort')->willReturn(443);
         $this->config->method('getSearchProtocol')->willReturn('https');
         $this->config->method('getSearchOnlyApiKey')->willReturn('search-only-key');
-        $this->config->method('getEnabledSortOptions')->willReturn([
-            ['label' => 'Relevance', 'value' => ''],
-            ['label' => 'Price: Low to High', 'value' => 'price:asc'],
-            ['label' => 'Name: A–Z', 'value' => 'name:asc'],
-        ]);
+        $this->sortOptionProvider = $this->createMock(SortOptionProvider::class);
+        $this->sortOptionProvider->method('getOptions')->with(1)->willReturnCallback(fn (): array => $this->sortOptions);
         $this->config->method('getProductsPerPage')->willReturn(12);
         $this->config->method('isInStockFirst')->willReturn(true);
         $this->config->method('isDirectMatchesFirstEnabled')->willReturn(true);
@@ -98,6 +106,9 @@ final class ListingConfigViewModelTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->categoryFacetResolver = $this->createMock(CategoryFacetResolver::class);
         $this->positionSortBuilder = $this->createMock(CategoryPositionSortBuilder::class);
+        $fieldProvider = $this->createMock(CollectionFieldProvider::class);
+        $fieldProvider->method('getFieldNames')->with('rar_product_de')
+            ->willReturnCallback(fn (): array => $this->collectionFields);
 
         $this->constructorArguments = [
             $this->config,
@@ -115,6 +126,8 @@ final class ListingConfigViewModelTest extends TestCase
             $this->logger,
             $this->categoryFacetResolver,
             $this->positionSortBuilder,
+            $this->sortOptionProvider,
+            $fieldProvider,
         ];
         $this->sut = new ListingConfigViewModel(...$this->constructorArguments);
     }
@@ -301,6 +314,51 @@ final class ListingConfigViewModelTest extends TestCase
             ['label' => 'Price: Low to High', 'value' => 'price:asc'],
             ['label' => 'Name: A–Z', 'value' => 'name:asc'],
         ], $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY)['sortOptions']);
+    }
+
+    public function test_attribute_sort_option_follows_the_category_available_sort_by_and_default_sort(): void
+    {
+        $this->sortOptions = [
+            ['label' => 'Relevance', 'value' => '', 'code' => 'position'],
+            ['label' => 'Alkohol Vol.-%: High to Low', 'value' => 'volume_percent_sort:desc', 'code' => 'volume_percent'],
+            ['label' => 'Alkohol Vol.-%: Low to High', 'value' => 'volume_percent_sort:asc', 'code' => 'volume_percent'],
+            ['label' => 'Name: A–Z', 'value' => 'name:asc', 'code' => 'name'],
+        ];
+        $this->givenCategory(42, 'Gin', 'volume_percent', ['position', 'volume_percent']);
+        $this->givenCatalogLimits('12', '12');
+
+        $config = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY);
+
+        self::assertSame(['', 'volume_percent_sort:desc', 'volume_percent_sort:asc'], array_column($config['sortOptions'], 'value'));
+        self::assertSame('volume_percent_sort:asc', $config['defaultSort']);
+    }
+
+    public function test_sorts_by_fields_missing_from_the_live_collection_are_dropped_with_the_default_sort(): void
+    {
+        $this->collectionFields = ['price'];
+        $this->sortOptions = [
+            ['label' => 'Relevance', 'value' => '', 'code' => 'position'],
+            ['label' => 'Price: Low to High', 'value' => 'price:asc', 'code' => 'price'],
+            ['label' => 'Alkohol Vol.-%', 'value' => 'volume_percent_sort(missing_values: last):asc', 'code' => 'volume_percent'],
+            ['label' => 'Name: A–Z', 'value' => 'name:asc', 'code' => 'name'],
+        ];
+        $this->givenCategory(42, 'Gin', 'name');
+        $this->givenCatalogLimits('12', '12');
+
+        $config = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY);
+
+        self::assertSame(['', 'price:asc'], array_column($config['sortOptions'], 'value'));
+        self::assertNull($config['defaultSort']);
+    }
+
+    public function test_unreadable_collection_schema_keeps_every_sort_option(): void
+    {
+        $this->collectionFields = [];
+        $this->givenCatalogLimits('12', '12');
+
+        $config = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH);
+
+        self::assertSame(['', 'price:asc', 'name:asc'], array_column($config['sortOptions'], 'value'));
     }
 
     public function test_hidden_prices_remove_the_price_sorts(): void

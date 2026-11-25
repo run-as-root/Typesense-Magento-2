@@ -616,4 +616,40 @@ final class TypeSenseConfigTest extends TestCase
         self::assertSame([], $this->sut->getAutocompleteProductMetaFields());
         self::assertSame(0, $this->sut->getAutocompletePopularSearchCount());
     }
+
+    public function test_entity_indexing_reads_the_entity_type_flag(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturnMap([
+            ['run_as_root_typesense/indexing/customer_enabled', ScopeInterface::SCOPE_STORE, 3, '0'],
+            ['run_as_root_typesense/indexing/order_enabled', ScopeInterface::SCOPE_STORE, 3, '1'],
+        ]);
+
+        self::assertFalse($this->sut->isEntityIndexingEnabled('customer', 3));
+        self::assertTrue($this->sut->isEntityIndexingEnabled('order', 3));
+    }
+
+    public function test_entity_type_without_a_flag_stays_indexed(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertTrue($this->sut->isEntityIndexingEnabled('third_party_entity', 3));
+    }
+
+    public function test_exhaustive_search_reads_the_search_flag(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/search/exhaustive_search', ScopeInterface::SCOPE_STORE, 2)
+            ->willReturn(true);
+
+        self::assertTrue($this->sut->isExhaustiveSearchEnabled(2));
+    }
+
+    public function test_sort_option_keys_are_trimmed_and_empty_ones_dropped(): void
+    {
+        $this->scopeConfig->method('getValue')
+            ->with('run_as_root_typesense/instant_search/sort_options', ScopeInterface::SCOPE_STORE, 2)
+            ->willReturn('relevance, attr:volume_percent:asc,,price_asc');
+
+        self::assertSame(['relevance', 'attr:volume_percent:asc', 'price_asc'], $this->sut->getSortOptionKeys(2));
+    }
 }

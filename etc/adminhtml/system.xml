@@ -103,6 +103,30 @@
                     <label>Enable CMS Page Indexing</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
+                <field id="customer_enabled" translate="label comment" type="select"
+                       sortOrder="41" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Customer Indexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Copies customer names, e-mail addresses and addresses into Typesense for the admin AI assistant. Keep disabled unless the assistant needs them: every customer save is reindexed. Remove existing collections with bin/magento typesense:collection:delete --entity=customer --force.</comment>
+                </field>
+                <field id="order_enabled" translate="label comment" type="select"
+                       sortOrder="42" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Order Indexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Copies orders with customer names and e-mail addresses into Typesense for the admin AI assistant. Keep disabled unless the assistant needs them: every order save is reindexed. Remove existing collections with bin/magento typesense:collection:delete --entity=order --force.</comment>
+                </field>
+                <field id="store_enabled" translate="label comment" type="select"
+                       sortOrder="43" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Store Indexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Indexes the store views for the admin AI assistant.</comment>
+                </field>
+                <field id="system_config_enabled" translate="label comment" type="select"
+                       sortOrder="44" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable System Configuration Indexing</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Indexes the system configuration for the admin AI assistant.</comment>
+                </field>
                 <field id="suggestion_enabled" translate="label comment" type="select"
                        sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Enable Search Suggestions</label>
@@ -253,6 +277,12 @@
                     <source_model>RunAsRoot\TypeSense\Model\Config\Source\SplitJoinTokens</source_model>
                     <comment>Also match "smart watch" against "smartwatch" and vice versa.</comment>
                 </field>
+                <field id="exhaustive_search" translate="label comment" type="select"
+                       sortOrder="121" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Exhaustive Search</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Let Typesense consider every matching token variant (typos, prefixes) instead of stopping once it found enough results. Finds more products on small catalogs, but makes searches slower on large ones.</comment>
+                </field>
                 <field id="prefix_search" translate="label comment" type="select"
                        sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Enable Prefix Search</label>
@@ -356,7 +386,7 @@
                 <field id="sort_options" translate="label comment" type="multiselect" sortOrder="26" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Sort Options</label>
                     <source_model>RunAsRoot\TypeSense\Model\Config\Source\SortOptionSource</source_model>
-                    <comment>Sort options available to customers on search results and category pages.</comment>
+                    <comment>Sort options available to customers on search results and category pages, in this order. Attribute options list the product attributes with "Used for Sorting in Product Listing" = Yes; they need a full product reindex.</comment>
                     <can_be_empty>1</can_be_empty>
                 </field>
                 <field id="facet_filters" translate="label comment" type="multiselect" sortOrder="27" showInDefault="1" showInWebsite="1" showInStore="1">

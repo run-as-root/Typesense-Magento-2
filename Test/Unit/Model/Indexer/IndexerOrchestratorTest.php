@@ -16,13 +16,16 @@ use RunAsRoot\TypeSense\Api\CollectionManagerInterface;
 use RunAsRoot\TypeSense\Api\CollectionSettingsProviderInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 use RunAsRoot\TypeSense\Api\SelfMaintainedEntityInterface;
+use RunAsRoot\TypeSense\Model\Collection\ApplierFailedException;
 use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
 use RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Indexer\BatchImportService;
 use RunAsRoot\TypeSense\Model\Indexer\DocumentDeleter;
 use RunAsRoot\TypeSense\Model\Indexer\EntityIndexerPool;
+use RunAsRoot\TypeSense\Model\Indexer\IndexableStoreResolver;
 use RunAsRoot\TypeSense\Model\Indexer\IndexerOrchestrator;
+use RunAsRoot\TypeSense\Model\Indexer\SchemaChangeHandler;
 
 final class IndexerOrchestratorTest extends TestCase
 {
@@ -37,6 +40,7 @@ final class IndexerOrchestratorTest extends TestCase
     private DocumentDeleter&MockObject $documentDeleter;
     private LoggerInterface&MockObject $logger;
     private Emulation&MockObject $emulation;
+    private SchemaChangeHandler&MockObject $schemaChangeHandler;
     private IndexerOrchestrator $sut;
 
     protected function setUp(): void
@@ -53,6 +57,7 @@ final class IndexerOrchestratorTest extends TestCase
 
         $this->config = $this->createMock(TypeSenseConfigInterface::class);
         $this->config->method('isEnabled')->willReturn(true);
+        $this->config->method('isEntityIndexingEnabled')->willReturn(true);
 
         $store = $this->createStore(3, 'de', true);
         $this->storeRepository = $this->createMock(StoreRepositoryInterface::class);
@@ -63,6 +68,7 @@ final class IndexerOrchestratorTest extends TestCase
         $this->documentDeleter = $this->createMock(DocumentDeleter::class);
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->emulation = $this->createMock(Emulation::class);
+        $this->schemaChangeHandler = $this->createMock(SchemaChangeHandler::class);
 
         $this->sut = new IndexerOrchestrator(
             new EntityIndexerPool(['product' => $this->indexer]),
@@ -70,12 +76,13 @@ final class IndexerOrchestratorTest extends TestCase
             $this->batchImportService,
             $this->nameResolver,
             $this->config,
-            $this->storeRepository,
+            new IndexableStoreResolver($this->storeRepository, $this->config, $this->logger),
             $this->aliasManager,
             $this->collectionManager,
             $this->documentDeleter,
             $this->logger,
             $this->emulation,
+            $this->schemaChangeHandler,
         );
     }
 
@@ -227,6 +234,35 @@ final class IndexerOrchestratorTest extends TestCase
         $this->sut->reindex('product');
     }
 
+    public function test_failed_appliers_delete_the_new_collection_and_rethrow(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_product_de_v2');
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $this->zeroDowntimeService->method('finishReindex')
+            ->willThrowException(new ApplierFailedException('synonyms: typesense down'));
+
+        $this->collectionManager->expects(self::once())->method('deleteCollection')->with('rar_product_de_v2');
+
+        $this->expectException(ApplierFailedException::class);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_failure_after_the_swap_keeps_the_new_collection(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_product_de_v2');
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $this->zeroDowntimeService->method('finishReindex')->willThrowException(new \RuntimeException('cleanup failed'));
+
+        $this->collectionManager->expects(self::never())->method('deleteCollection');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->sut->reindex('product');
+    }
+
     public function test_failed_orphan_cleanup_still_rethrows_build_error(): void
     {
         $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
@@ -308,6 +344,7 @@ final class IndexerOrchestratorTest extends TestCase
         $this->config->method('isEnabled')->willReturnCallback(
             static fn (?int $storeId = null): bool => $storeId !== 5,
         );
+        $this->config->method('isEntityIndexingEnabled')->willReturn(true);
         $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
         $this->sut = $this->buildSut();
 
@@ -326,6 +363,7 @@ final class IndexerOrchestratorTest extends TestCase
         $this->config->method('isEnabled')->willReturnCallback(
             static fn (?int $storeId = null): bool => $storeId === 3,
         );
+        $this->config->method('isEntityIndexingEnabled')->willReturn(true);
         $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
         $this->sut = $this->buildSut();
 
@@ -351,12 +389,13 @@ final class IndexerOrchestratorTest extends TestCase
             $this->batchImportService,
             $this->nameResolver,
             $this->config,
-            $this->storeRepository,
+            new IndexableStoreResolver($this->storeRepository, $this->config, $this->logger),
             $this->aliasManager,
             $this->collectionManager,
             $this->documentDeleter,
             $this->logger,
             $this->emulation,
+            $this->schemaChangeHandler,
         );
 
         $this->indexer->expects(self::once())->method('buildDocuments');
@@ -481,12 +520,214 @@ final class IndexerOrchestratorTest extends TestCase
             $this->batchImportService,
             $this->nameResolver,
             $this->config,
-            $this->storeRepository,
+            new IndexableStoreResolver($this->storeRepository, $this->config, $this->logger),
             $this->aliasManager,
             $this->collectionManager,
             $this->documentDeleter,
             $this->logger,
             $this->emulation,
+            $this->schemaChangeHandler,
         );
+    }
+
+    public function test_full_reindex_skips_entity_type_disabled_for_the_store(): void
+    {
+        $this->useConfigWithEntityIndexingDisabled();
+
+        $this->indexer->expects(self::never())->method('buildDocuments');
+        $this->zeroDowntimeService->expects(self::never())->method('startReindex');
+        $this->collectionManager->expects(self::never())->method('createCollection');
+        $this->batchImportService->expects(self::never())->method('import');
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_partial_reindex_skips_entity_type_disabled_for_the_store(): void
+    {
+        $this->useConfigWithEntityIndexingDisabled();
+
+        $this->indexer->expects(self::never())->method('buildDocuments');
+        $this->batchImportService->expects(self::never())->method('import');
+        $this->documentDeleter->expects(self::never())->method('deleteByIds');
+
+        $this->sut->reindex('product', [5]);
+    }
+
+    public function test_reindex_all_skips_disabled_entity_types(): void
+    {
+        $customer = $this->createMock(EntityIndexerInterface::class);
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->config->method('isEnabled')->willReturn(true);
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
+        $this->config->method('isEntityIndexingEnabled')->willReturnCallback(
+            static fn (string $entityType, ?int $storeId = null): bool => $entityType !== 'customer',
+        );
+        $this->collectionManager->method('collectionExists')->willReturn(true);
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $sut = new IndexerOrchestrator(
+            new EntityIndexerPool(['product' => $this->indexer, 'customer' => $customer]),
+            $this->zeroDowntimeService,
+            $this->batchImportService,
+            $this->nameResolver,
+            $this->config,
+            new IndexableStoreResolver($this->storeRepository, $this->config, $this->logger),
+            $this->aliasManager,
+            $this->collectionManager,
+            $this->documentDeleter,
+            $this->logger,
+            $this->emulation,
+            $this->schemaChangeHandler,
+        );
+
+        $this->indexer->expects(self::once())->method('buildDocuments');
+        $customer->expects(self::never())->method('buildDocuments');
+        $customer->expects(self::never())->method('getSchemaFields');
+
+        $sut->reindexAll();
+    }
+
+    private function useConfigWithEntityIndexingDisabled(): void
+    {
+        $this->config = $this->createMock(TypeSenseConfigInterface::class);
+        $this->config->method('isEnabled')->willReturn(true);
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->config->method('isEntityIndexingEnabled')->with('product', 3)->willReturn(false);
+        $this->aliasManager->method('aliasExists')->willReturn(true);
+        $this->sut = $this->buildSut();
+    }
+
+    public function test_schema_change_of_a_zero_downtime_build_is_handled_once_after_all_stores(): void
+    {
+        $this->useTwoStores();
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_product_v2');
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $this->zeroDowntimeService->method('finishReindex')->willReturnCallback(
+            static fn (string $entityType, string $storeCode): bool => $storeCode === 'at',
+        );
+
+        $this->schemaChangeHandler->expects(self::once())->method('handle')->with(['rar_product_at']);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_unchanged_schema_is_not_handled(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_product_de_v2');
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $this->zeroDowntimeService->method('finishReindex')->willReturn(false);
+
+        $this->schemaChangeHandler->expects(self::once())->method('handle')->with([]);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_collection_created_without_zero_downtime_counts_as_a_schema_change(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(false);
+        $this->collectionManager->method('collectionExists')->willReturn(false);
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+
+        $this->schemaChangeHandler->expects(self::once())->method('handle')->with(['rar_product_de']);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_schema_change_of_an_earlier_store_is_handled_when_a_later_store_fails(): void
+    {
+        $this->useTwoStores();
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_product_v2');
+        $this->batchImportService->method('import')->willReturnOnConsecutiveCalls(
+            ['success' => 1, 'failed' => 0, 'total' => 1],
+            self::throwException(new \RuntimeException('import failed')),
+        );
+        $this->zeroDowntimeService->method('finishReindex')->willReturn(true);
+
+        $this->schemaChangeHandler->expects(self::once())->method('handle')->with(['rar_product_de']);
+        $this->expectException(\RuntimeException::class);
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_failed_appliers_of_one_store_do_not_stop_the_other_stores(): void
+    {
+        $this->useTwoStores();
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturnCallback(
+            static fn (string $entityType, string $storeCode): string => "rar_product_{$storeCode}_v2",
+        );
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $this->zeroDowntimeService->expects(self::exactly(2))->method('finishReindex')->willReturnCallback(
+            static fn (string $entityType, string $storeCode): bool => $storeCode === 'de'
+                ? throw new ApplierFailedException('synonyms: typesense down')
+                : true,
+        );
+
+        $this->schemaChangeHandler->expects(self::once())->method('handle')->with(['rar_product_at']);
+        $this->expectException(ApplierFailedException::class);
+        $this->expectExceptionMessage('synonyms: typesense down');
+
+        $this->sut->reindex('product');
+    }
+
+    public function test_failed_appliers_of_one_entity_type_do_not_stop_the_other_types_in_a_full_run(): void
+    {
+        $category = $this->createMock(EntityIndexerInterface::class);
+        $category->method('getSchemaFields')->willReturn([]);
+        $category->method('buildDocuments')->willReturn([]);
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->zeroDowntimeService->method('startReindex')->willReturn('rar_v2');
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+        $this->zeroDowntimeService->method('finishReindex')->willReturnCallback(
+            static fn (string $entityType): bool => $entityType === 'product'
+                ? throw new ApplierFailedException('synonyms: typesense down')
+                : false,
+        );
+        $sut = new IndexerOrchestrator(
+            new EntityIndexerPool(['product' => $this->indexer, 'category' => $category]),
+            $this->zeroDowntimeService,
+            $this->batchImportService,
+            $this->nameResolver,
+            $this->config,
+            new IndexableStoreResolver($this->storeRepository, $this->config, $this->logger),
+            $this->aliasManager,
+            $this->collectionManager,
+            $this->documentDeleter,
+            $this->logger,
+            $this->emulation,
+            $this->schemaChangeHandler,
+        );
+
+        $category->expects(self::once())->method('buildDocuments');
+        $this->expectException(ApplierFailedException::class);
+
+        $sut->reindexAll();
+    }
+
+    public function test_partial_reindex_never_handles_a_schema_change(): void
+    {
+        $this->config->method('isZeroDowntimeEnabled')->willReturn(true);
+        $this->aliasManager->method('aliasExists')->willReturn(true);
+        $this->batchImportService->method('import')->willReturn(['success' => 1, 'failed' => 0, 'total' => 1]);
+
+        $this->schemaChangeHandler->expects(self::never())->method('handle');
+
+        $this->sut->reindex('product', [5]);
+    }
+
+    private function useTwoStores(): void
+    {
+        $this->storeRepository = $this->createMock(StoreRepositoryInterface::class);
+        $this->storeRepository->method('getList')->willReturn([
+            $this->createStore(3, 'de', true),
+            $this->createStore(4, 'at', true),
+        ]);
+        $this->nameResolver = $this->createMock(CollectionNameResolver::class);
+        $this->nameResolver->method('resolve')->willReturnCallback(
+            static fn (string $entityType, string $storeCode): string => "rar_{$entityType}_{$storeCode}",
+        );
+        $this->sut = $this->buildSut();
     }
 }

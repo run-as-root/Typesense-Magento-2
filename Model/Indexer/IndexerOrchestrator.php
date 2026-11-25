@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace RunAsRoot\TypeSense\Model\Indexer;
 
 use Magento\Framework\App\Area;
-use Magento\Store\Api\StoreRepositoryInterface;
 use Magento\Store\Model\App\Emulation;
 use Psr\Log\LoggerInterface;
 use RunAsRoot\TypeSense\Api\AliasManagerInterface;
@@ -14,6 +13,7 @@ use RunAsRoot\TypeSense\Api\CollectionSettingsProviderInterface;
 use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 use RunAsRoot\TypeSense\Api\IndexerOrchestratorInterface;
 use RunAsRoot\TypeSense\Api\SelfMaintainedEntityInterface;
+use RunAsRoot\TypeSense\Model\Collection\ApplierFailedException;
 use RunAsRoot\TypeSense\Model\Collection\CollectionNameResolver;
 use RunAsRoot\TypeSense\Model\Collection\ZeroDowntimeService;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
@@ -26,12 +26,13 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         private readonly BatchImportService $batchImportService,
         private readonly CollectionNameResolver $nameResolver,
         private readonly TypeSenseConfigInterface $config,
-        private readonly StoreRepositoryInterface $storeRepository,
+        private readonly IndexableStoreResolver $storeResolver,
         private readonly AliasManagerInterface $aliasManager,
         private readonly CollectionManagerInterface $collectionManager,
         private readonly DocumentDeleter $documentDeleter,
         private readonly LoggerInterface $logger,
         private readonly Emulation $emulation,
+        private readonly SchemaChangeHandler $schemaChangeHandler,
     ) {
     }
 
@@ -42,26 +43,34 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
      */
     public function reindex(string $entityType, array $entityIds = []): void
     {
-        // No default-scope gate: a module enabled for a single store view must still be indexed there.
         $indexer = $this->indexerPool->getIndexer($entityType);
 
-        $stores = $this->storeRepository->getList();
-
-        foreach ($stores as $store) {
-            $storeId = (int) $store->getId();
-            $storeCode = $store->getCode();
-
-            if ($storeCode === 'admin') {
-                continue;
+        $changedSchemas = [];
+        $applierFailures = [];
+        $stores = $this->storeResolver->getStores($entityType);
+        try {
+            foreach ($stores as $store) {
+                $storeId = (int) $store->getId();
+                try {
+                    $schemaChanged = $this->reindexStore($indexer, $entityType, $store->getCode(), $storeId, $entityIds);
+                } catch (ApplierFailedException $e) {
+                    // The store keeps its live collection, so the other stores can still be brought up to date.
+                    $this->logger->error($e->getMessage(), ['exception' => $e]);
+                    $applierFailures[] = $e;
+                    continue;
+                }
+                if ($schemaChanged) {
+                    $changedSchemas[] = $this->nameResolver->resolve($entityType, $store->getCode(), $storeId);
+                }
             }
-
-            if (!$store->getIsActive() || !$this->config->isEnabled($storeId)) {
-                $this->logger->info("Skipping {$entityType} for store {$storeCode}: inactive or TypeSense disabled");
-                continue;
+        } finally {
+            // The stores reindexed before a failing one are live with their new schema.
+            if ($entityIds === []) {
+                $this->schemaChangeHandler->handle($changedSchemas);
             }
-
-            $this->reindexStore($indexer, $entityType, $storeCode, $storeId, $entityIds);
         }
+
+        $this->throwApplierFailures($applierFailures);
     }
 
     /**
@@ -71,9 +80,33 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
     {
         $entityTypes = array_keys($this->indexerPool->getAll());
 
+        $applierFailures = [];
         foreach ($entityTypes as $entityType) {
-            $this->reindex($entityType);
+            try {
+                $this->reindex($entityType);
+            } catch (ApplierFailedException $e) {
+                $applierFailures[] = $e;
+            }
         }
+
+        $this->throwApplierFailures($applierFailures);
+    }
+
+    /**
+     * @param list<ApplierFailedException> $failures
+     */
+    private function throwApplierFailures(array $failures): void
+    {
+        if ($failures === []) {
+            return;
+        }
+
+        if (count($failures) === 1) {
+            throw $failures[0];
+        }
+
+        $messages = array_map(static fn (ApplierFailedException $e): string => $e->getMessage(), $failures);
+        throw new ApplierFailedException(implode("\n", $messages), 0, $failures[0]);
     }
 
     private function reindexStore(
@@ -82,7 +115,7 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         string $storeCode,
         int $storeId,
         array $entityIds,
-    ): void {
+    ): bool {
         $this->logger->info("Reindexing {$entityType} for store {$storeCode} (ID: {$storeId})");
 
         // Its documents are written by Typesense itself: a versioned rebuild would discard them.
@@ -90,18 +123,19 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
             if ($entityIds === []) {
                 $indexer->provision($storeId, $storeCode);
             }
-            return;
+            return false;
         }
 
         // Documents are generated lazily, so building, importing and deleting must all happen inside emulation.
         $this->emulation->startEnvironmentEmulation($storeId, Area::AREA_FRONTEND, true);
         try {
             if ($entityIds === []) {
-                $this->reindexStoreFull($indexer, $entityType, $storeCode, $storeId);
-                return;
+                return $this->reindexStoreFull($indexer, $entityType, $storeCode, $storeId);
             }
 
             $this->reindexStorePartial($indexer, $entityType, $storeCode, $storeId, $entityIds);
+
+            return false;
         } finally {
             $this->emulation->stopEnvironmentEmulation();
         }
@@ -112,20 +146,23 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         string $entityType,
         string $storeCode,
         int $storeId,
-    ): void {
+    ): bool {
         $schema = ['fields' => $indexer->getSchemaFields()];
         if ($indexer instanceof CollectionSettingsProviderInterface) {
             $schema += $indexer->getCollectionSettings();
         }
         $zeroDowntime = $this->config->isZeroDowntimeEnabled($storeId);
+        $schemaChanged = false;
 
         if ($zeroDowntime) {
             $collectionName = $this->zeroDowntimeService->startReindex($entityType, $storeCode, $schema, $storeId);
         } else {
             $collectionName = $this->nameResolver->resolve($entityType, $storeCode, $storeId);
 
+            // An existing collection is reused as it is, so only a new one can bring a new schema.
             if (!$this->collectionManager->collectionExists($collectionName)) {
                 $this->collectionManager->createCollection($collectionName, ['name' => $collectionName] + $schema);
+                $schemaChanged = true;
             }
         }
 
@@ -140,10 +177,23 @@ class IndexerOrchestrator implements IndexerOrchestratorInterface
         }
 
         if ($zeroDowntime) {
-            $this->zeroDowntimeService->finishReindex($entityType, $storeCode, $collectionName, $storeId);
+            try {
+                $schemaChanged = $this->zeroDowntimeService->finishReindex(
+                    $entityType,
+                    $storeCode,
+                    $collectionName,
+                    $storeId,
+                );
+            } catch (ApplierFailedException $e) {
+                // Only this failure is raised before the swap; after it the new collection is live.
+                $this->discardFailedBuild($collectionName);
+                throw $e;
+            }
         }
 
         $this->logComplete($entityType, $storeCode, $stats);
+
+        return $schemaChanged;
     }
 
     private function discardFailedBuild(string $collectionName): void

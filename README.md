@@ -118,7 +118,7 @@ Navigate to **Stores > Configuration > TypeSense > TypeSense Search**.
 
 #### Search-only key scope
 
-The search-only key is sent to every visitor's browser, so it must allow only `documents:search` on the storefront collections: `product`, `category`, `cms_page` and `suggestion`. The module also indexes customers, orders, stores and system config into the same Typesense server for the admin search; a key with `"collections": ["*"]` would let anyone read those.
+The search-only key is sent to every visitor's browser, so it must allow only `documents:search` on the storefront collections: `product`, `category`, `cms_page` and `suggestion`. When enabled for the admin assistant, the module also indexes customers, orders, stores and system config into the same Typesense server; a key with `"collections": ["*"]` would let anyone read those.
 
 Create the key with the admin key (replace `rar` with your Index Prefix):
 
@@ -140,9 +140,10 @@ Typesense treats each `collections` entry as a regular expression that must matc
 | Setting | Default | Description |
 |---|---|---|
 | Batch Size | 200 | Documents per import batch |
-| Index Products | Yes | Enable product indexing |
+| Index Products | Yes | Enable product indexing. Every flag applies per store view to full reindexes (cron, queue, CLI) and mview updates |
 | Index Categories | Yes | Enable category indexing |
 | Index CMS Pages | Yes | Enable CMS page indexing |
+| Enable Customer / Order / Store / System Configuration Indexing | No | `indexing/{customer,order,store,system_config}_enabled`. Admin assistant collections ([Additional Indexers](#additional-indexers)). Customers and orders carry names, e-mail and postal addresses: keep them off unless the assistant needs them |
 | Enable Search Suggestions | Yes | Suggestion collection and analytics rule per store view ([Search Suggestions](#search-suggestions)) |
 | Suggestion Limit | 1000 | How many of the most frequent queries a store's suggestion collection keeps (analytics rule `limit`); also the seed maximum |
 | Suggestion Minimum Count | 3 | Count a query needs before it is shown in suggestions and popular searches |
@@ -157,7 +158,7 @@ Typesense treats each `collections` entry as a regular expression that must matc
 
 ### Search Settings
 
-Store-view scope. These drive the search page, autocomplete product results and (with "Replace Category Pages") category listings. Settings marked "Reindex" change the collection schema: run `bin/magento typesense:reindex --entity=product` after changing them. Searches can fail until that reindex has finished. Schema changes (infix, stemming, decompounding) only take effect with Zero-Downtime Reindex enabled, which builds a new collection; without it the existing collection is reused, so delete it first (`typesense:collection:delete`). Flush the full page cache after the reindex, because cached pages still send the old search parameters.
+Store-view scope. These drive the search page, autocomplete product results and (with "Replace Category Pages") category listings. Settings marked "Reindex" change the collection schema: run `bin/magento typesense:reindex --entity=product` after changing them. Searches can fail until that reindex has finished. Schema changes (infix, stemming, decompounding) only take effect with Zero-Downtime Reindex enabled, which builds a new collection; without it the existing collection is reused, so delete it first (`typesense:collection:delete`). A full reindex whose schema differs from the previously live collection cleans the full page cache by itself, because cached pages still send the old search parameters; flush it manually after changing settings that need no reindex.
 
 | Setting | Default | Description |
 |---|---|---|
@@ -171,6 +172,7 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | Prioritize Exact Matches | Yes | `prioritize_exact_match` |
 | Split/Join Words | Fallback | Match "smart watch" against "smartwatch" (`split_join_tokens`: `fallback`, `always`, `off`) |
 | Enable Prefix Search | Yes | Match the last query word as a prefix |
+| Exhaustive Search | No | `exhaustive_search` on every storefront product search: Typesense considers all token variants (typos, prefixes) instead of stopping once it has enough matches. Recommended for small catalogs (a few thousand products or fewer), where the default can miss products (e.g. 54 instead of 83 hits for "marille" on ~430 products). Large catalogs can instead raise Typesense's `max_candidates` (default 4) with a theme plugin on `SearchParametersProvider::getParameters()`, which widens the search without considering every variant. No reindex |
 | Enable Infix Search | No | Match query words inside other words. Reindex |
 | Infix Search Fields | name | Fields that get the infix flag; the `infix` request parameter is `off` for every other `query_by` field. Reindex |
 | Infix Search Mode | Fallback | `fallback` uses infix matching only when the normal search finds nothing; `always` combines both |
@@ -189,7 +191,7 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | Enable Instant Search | Yes | Replace the Magento search results page |
 | Products Per Page | 12 | Results per page on the search results page |
 | Product Tile Attributes | — | Attributes displayed on product cards (must also be indexed) |
-| Sort Options | relevance, price asc/desc, newest | Sort options available to customers (see below) |
+| Sort Options | relevance, price asc/desc, newest | Sort options available to customers, including attribute options such as "Alcohol Vol.-%" (see below) |
 | Facet Filters | — | Facets shown in the filter bar: additional attributes plus Price, Availability (`in_stock`) and New (`is_new`). The category filter is always added first (see [Category facet](#category-facet)); `categories.lvl0`/`lvl1`/`lvl2` or `category_ids` in this list are ignored. The search page leaves out attributes (Price included) whose "Use in Search Results Layered Navigation" is No. The price slider is hidden when all results have the same price |
 | Facet Types | — | Per facet: dropdown, checkbox (Yes/No fields) or slider (Price only), and "Value Search" for dropdowns. Price defaults to a slider |
 | Show Out-of-Stock Products Last | Yes | Sorts by `in_stock:desc` before the chosen sort |
@@ -289,11 +291,16 @@ Choose which sort options are available to customers on search results and categ
 | Price: Low to High | Ascending price |
 | Price: High to Low | Descending price |
 | Newest | Most recently created products |
-| Name: A–Z | Alphabetical ascending |
+| Name: A–Z | Alphabetical ascending (`name` is declared sortable; collections built by 0.2.0 or earlier need a full product reindex) |
 | Name: Z–A | Alphabetical descending |
 | Best Selling | Based on sales order data |
 | Top Rated | Based on review ratings |
 | Most Reviewed | Based on review count |
+| *Attribute* (ascending / descending) | One pair per product attribute with "Used for Sorting in Product Listing" = Yes (e.g. "Alcohol Vol.-% (ascending)", key `attr:volume_percent:asc`) |
+
+Options appear in the order they are configured (store-view scope).
+
+**Attribute sort options.** Typesense cannot sort on the `string[]` attribute fields, so every attribute with a configured sort option also gets a single-valued, sortable field `<code>_sort` (and is indexed like an additional attribute even when it is not listed there). Its type follows the attribute: `float` for select/multiselect attributes whose option labels are all numbers, optionally with a unit ("40.0 %", "0,7 l"), and for other `decimal`/`int` attributes; `string` otherwise. The value is the product's own value; a composite product without one takes the lowest value of its children (a multiselect also its lowest). Products without a value sort last in both directions. The storefront label is the attribute's store label, with ": Low to High" / ": High to Low" when both directions are enabled. On category pages the attribute options follow the category's "Available Product Listing Sort By" (the attribute code, e.g. `volume_percent`), and a category whose "Default Product Listing Sort By" is the attribute opens with its ascending option. Adding an attribute sort option needs a full product reindex (`bin/magento typesense:reindex --entity=product`); the reindex cleans the full page cache.
 
 ---
 
@@ -301,9 +308,10 @@ Choose which sort options are available to customers on search results and categ
 
 | Command | Description |
 |---|---|
-| `bin/magento typesense:reindex [--entity=TYPE]` | Reindex all or a specific entity type into Typesense. Storefront types: `product`, `category`, `cms_page`, `suggestion`; admin search types: `customer`, `order`, `store`, `system_config`. Without `--entity` every type is reindexed, including the admin search collections with customer and order data (see [Search-only key scope](#search-only-key-scope)) |
+| `bin/magento typesense:reindex [--entity=TYPE]` | Reindex all or a specific entity type into Typesense. Storefront types: `product`, `category`, `cms_page`, `suggestion`; admin search types: `customer`, `order`, `store`, `system_config`. Without `--entity` every type enabled under Indexing is reindexed; customer, order, store and system config are off by default (see [Search-only key scope](#search-only-key-scope)). A disabled type is reported as skipped |
 | `bin/magento typesense:collection:list` | List all Typesense collections with document count and alias mappings |
-| `bin/magento typesense:collection:delete <name>` | Delete a named Typesense collection |
+| `bin/magento typesense:collection:delete <name> --force` | Delete a named Typesense collection |
+| `bin/magento typesense:collection:delete --entity=TYPE --force` | Delete the aliases and all collections (versioned and plain) of an entity type in every store view; refused while the type is still enabled in a store view |
 | `bin/magento typesense:health` | Check the health status of the Typesense server |
 | `bin/magento typesense:import:elasticsuite [--synonyms] [--boosts] [--positions] [--dry-run] [--store=CODE]` | Import ElasticSuite thesauri, optimizers and category positions, see [Migrating from ElasticSuite](#migrating-from-elasticsuite) |
 | `bin/magento typesense:suggestions:seed [--limit=N] [--store=CODE]` | Import the most popular Magento search terms into the suggestion collections; terms already present keep their count, so it can run again, see [Search Suggestions](#search-suggestions) |
@@ -311,8 +319,11 @@ Choose which sort options are available to customers on search results and categ
 ### Examples
 
 ```bash
-# Full reindex of all entity types (storefront and admin search)
+# Full reindex of all enabled entity types
 bin/magento typesense:reindex
+
+# Remove the customer collections built before customer indexing was disabled
+bin/magento typesense:collection:delete --entity=customer --force
 
 # Reindex only products
 bin/magento typesense:reindex --entity=product
@@ -363,7 +374,9 @@ When zero-downtime reindexing is enabled:
 
 1. `ZeroDowntimeService::startReindex()` creates a new versioned collection (e.g., `rar_product_v2` while `rar_product` alias points at `rar_product_v1`)
 2. All documents are indexed into the new versioned collection
-3. `ZeroDowntimeService::finishReindex()` atomically swaps the alias to point at the new collection, keeps the previously live collection as a rollback target, and deletes older versions
+3. `ZeroDowntimeService::finishReindex()` re-creates the synonyms and merchandising overrides on the new collection, atomically swaps the alias to point at it, keeps the previously live collection as a rollback target, and deletes older versions. If the synonyms or overrides cannot be re-created, the alias is not swapped: the new collection is deleted and the reindex fails (non-zero exit code, cron error log), so the live search keeps its synonyms. Only the first build of a collection, with nothing live yet, goes live anyway
+
+When the new collection's schema differs from the one that was live (new or changed fields, including category position fields), the reindex cleans the full page cache and the cached field list of that collection once all store views are done.
 
 This means the live alias (`rar_product`) always points at a fully populated collection. If a new version turns out bad, `bin/magento typesense:collection:rollback --entity=<type> --store=<code>` points the alias back to the previous version.
 
@@ -567,7 +580,7 @@ Popular Searches Count > 0 shows the store's most popular search terms (suggesti
 
 ### Instant Search Page
 
-Replaces the Magento search results page (`/catalogsearch/result`) with the storefront listing below (handle `typesense_search_result`, added only while the module and instant search are enabled). With "Cacheable Search Page" on, a URL holding only listing parameters (`q`, `page`, `sort`, `limit`, `price` and configured facets) is answered by a cacheable shell instead of the core search action, and the term is logged from the browser through `catalogsearch/searchTermsLog/save`. Search terms with a redirect URL still redirect.
+Replaces the Magento search results page (`/catalogsearch/result`) with the storefront listing below (handle `typesense_search_result`, added only while the module and instant search are enabled). With "Cacheable Search Page" on, a URL holding only listing parameters (`q`, `page` or Magento's `p`, `sort`, `limit`, `price` and configured facets) is answered by a cacheable shell instead of the core search action, and the term is logged from the browser through `catalogsearch/searchTermsLog/save`. Search terms with a redirect URL still redirect.
 
 Other `around` plugins on `Magento\CatalogSearch\Controller\Result\Index` that are declared before ours still wrap the shell. Smile ElasticSuite's `search_term_and_single_result_redirect` is one: with "Redirect to product page if only one result" on, it runs an ElasticSuite query on every search page and redirects whenever that query finds a single product, whatever Typesense finds. Turn `smile_elasticsuite_catalogsearch_settings/catalogsearch/redirect_if_one_result` off on Typesense stores.
 
@@ -612,7 +625,7 @@ The Alpine components of the filters and toolbar slots (`typesenseFilterBar` wit
 
 The listing block takes `eager_load_images_count` (default 4). `listing-core.js` (`window.runAsRootTypesense.listing`) holds the logic (filters, URL state, facet counts, GA4 items) and is loaded once, deferred in the head, by `typesense.listing.core` on pages whose handle sets its `is_required` argument. Child components read the listing state from the `typesense-state` window event (`typesenseListingState()` mixin) and change it by dispatching `typesense-filter-change`, `typesense-sort-change`, `typesense-limit-change` and `typesense-page-change`.
 
-URL state uses `q`, `page`, `sort` (e.g. `price:asc`), `limit`, `price` (`min-max`) and one parameter per facet with values joined by `|`: the facet's `param` when it has one (`cat` for the category facet), else its field name. Unknown keys are dropped, invalid values fall back to the defaults, a facet with a `values` list accepts only those values, and `page` is clamped to the available pages.
+URL state uses `q`, `page`, `sort` (e.g. `price:asc`), `limit`, `price` (`min-max`) and one parameter per facet with values joined by `|`: the facet's `param` when it has one (`cat` for the category facet), else its field name. Unknown keys are dropped, invalid values fall back to the defaults, a facet with a `values` list accepts only those values, and `page` is clamped to the available pages. Magento's `p` (old links, `?p=2`) is read as `page` when there is no `page` parameter; the URL is rewritten with `page`.
 
 #### Tile API for theme overrides
 
@@ -777,7 +790,7 @@ The Admin AI Assistant is an agentic analytics tool built into the Magento admin
 
 ### Additional Indexers
 
-The assistant indexes four additional entity types into Typesense beyond the standard search collections:
+The assistant can index four additional entity types into Typesense beyond the standard search collections. Each is off by default and enabled under **Indexing** (Enable Customer / Order / Store / System Configuration Indexing); the `search_typesense` tool answers with an error for a type that is not indexed, and the SQL tools work either way. To remove collections of a type you disabled, run `bin/magento typesense:collection:delete --entity=<type> --force`.
 
 | Entity | Purpose |
 |---|---|

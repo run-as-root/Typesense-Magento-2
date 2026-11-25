@@ -66,4 +66,18 @@ final class CollectionFieldProviderTest extends TestCase
 
         self::assertFalse($this->sut->hasField('rar_product_de', 'category_position_10'));
     }
+
+    public function test_invalidate_drops_the_cached_and_the_remembered_fields(): void
+    {
+        $this->collection->expects(self::exactly(2))->method('retrieve')->willReturnOnConsecutiveCalls(
+            ['fields' => [['name' => 'id']]],
+            ['fields' => [['name' => 'id'], ['name' => 'volume_percent_sort']]],
+        );
+        $this->cache->expects(self::once())->method('remove')->with('run_as_root_typesense_fields_rar_product_de');
+
+        self::assertFalse($this->sut->hasField('rar_product_de', 'volume_percent_sort'));
+        $this->sut->invalidate('rar_product_de');
+
+        self::assertTrue($this->sut->hasField('rar_product_de', 'volume_percent_sort'));
+    }
 }
