@@ -21,6 +21,7 @@ use RunAsRoot\TypeSense\Api\CollectionNameResolverInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Conversation\ConversationModelManager;
 use RunAsRoot\TypeSense\Model\Indexer\Product\ProductSchemaProviderInterface;
+use RunAsRoot\TypeSense\Model\Listing\CategoryFacetDisplay;
 use RunAsRoot\TypeSense\Model\Listing\CategoryFacetResolver;
 use RunAsRoot\TypeSense\Model\Listing\CategoryPositionSortBuilder;
 use RunAsRoot\TypeSense\Model\Listing\FacetConfigBuilder;
@@ -53,6 +54,8 @@ final class ListingConfigViewModelTest extends TestCase
     ];
     /** @var list<string> fields of the live product collection; empty when its schema is unreadable */
     private array $collectionFields = ['name', 'price', 'volume_percent_sort'];
+    /** @var array<int, list<string>> category id => hidden facet fields */
+    private array $hiddenFacets = [];
     /** @var list<mixed> */
     private array $constructorArguments;
     private ListingConfigViewModel $sut;
@@ -106,6 +109,9 @@ final class ListingConfigViewModelTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->categoryFacetResolver = $this->createMock(CategoryFacetResolver::class);
         $this->positionSortBuilder = $this->createMock(CategoryPositionSortBuilder::class);
+        $facetDisplay = $this->createMock(CategoryFacetDisplay::class);
+        $facetDisplay->method('getHiddenFields')
+            ->willReturnCallback(fn (int $categoryId): array => $this->hiddenFacets[$categoryId] ?? []);
         $fieldProvider = $this->createMock(CollectionFieldProvider::class);
         $fieldProvider->method('getFieldNames')->with('rar_product_de')
             ->willReturnCallback(fn (): array => $this->collectionFields);
@@ -128,6 +134,7 @@ final class ListingConfigViewModelTest extends TestCase
             $this->positionSortBuilder,
             $this->sortOptionProvider,
             $fieldProvider,
+            $facetDisplay,
         ];
         $this->sut = new ListingConfigViewModel(...$this->constructorArguments);
     }
@@ -436,6 +443,42 @@ final class ListingConfigViewModelTest extends TestCase
             ['color', 'taste'],
             array_column($this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY)['facets'], 'field'),
         );
+    }
+
+    public function test_category_page_drops_the_filters_hidden_for_that_category_but_keeps_its_category_facet(): void
+    {
+        $category = $this->givenCategory(139, 'Geschenke für Männer', 'position');
+        $this->config->method('getFacetFilters')->willReturn(['gift_for_man', 'gift_for_woman', 'taste']);
+        $this->schemaProvider->method('getFields')->willReturn([
+            ['name' => 'gift_for_man', 'type' => 'string[]', 'facet' => true],
+            ['name' => 'gift_for_woman', 'type' => 'string[]', 'facet' => true],
+            ['name' => 'taste', 'type' => 'string[]', 'facet' => true],
+        ]);
+        $this->eavConfig->method('getAttribute')->willReturn($this->createMock(Attribute::class));
+        $categoryFacet = $this->categoryFacet();
+        $this->categoryFacetResolver->method('resolve')->with($category, 1)->willReturn($categoryFacet);
+        $this->hiddenFacets = [139 => ['gift_for_woman', 'category_ids']];
+        $this->givenCatalogLimits('12', '12');
+
+        $facets = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_CATEGORY)['facets'];
+
+        self::assertSame($categoryFacet, $facets[0]);
+        self::assertSame(['gift_for_man', 'taste'], array_column(array_slice($facets, 1), 'field'));
+    }
+
+    public function test_search_page_ignores_category_filter_settings(): void
+    {
+        $this->config->method('getFacetFilters')->willReturn(['taste']);
+        $this->schemaProvider->method('getFields')->willReturn([['name' => 'taste', 'type' => 'string[]', 'facet' => true]]);
+        $taste = $this->createMock(Attribute::class);
+        $taste->method('getData')->willReturnMap([['is_filterable_in_search', null, '1']]);
+        $this->eavConfig->method('getAttribute')->willReturn($taste);
+        $this->hiddenFacets = [2 => ['taste']];
+        $this->givenCatalogLimits('12', '12');
+
+        $facets = $this->sut->getConfig(ListingConfigViewModel::CONTEXT_SEARCH)['facets'];
+
+        self::assertSame(['taste'], array_column($facets, 'field'));
     }
 
     public function test_search_pages_start_with_the_facet_of_the_top_level_categories(): void

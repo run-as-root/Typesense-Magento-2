@@ -75,6 +75,22 @@
                     referenceTable="store" referenceColumn="store_id" onDelete="CASCADE"/>
     </table>
 
+    <!-- Category filter display: per category, which listing filters are always hidden or always shown -->
+    <table name="run_as_root_typesense_category_facet" resource="default" engine="innodb"
+           comment="TypeSense Category Filter Display">
+        <column xsi:type="int" name="category_id" unsigned="true" nullable="false" comment="Category ID"/>
+        <column xsi:type="varchar" name="attribute_code" nullable="false" length="255" comment="Facet Field"/>
+        <column xsi:type="smallint" name="display_mode" unsigned="true" nullable="false" default="0"
+                comment="Display Mode (0 auto, 1 always hidden, 2 always shown)"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="category_id"/>
+            <column name="attribute_code"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="FK_TS_CAT_FACET_CATEGORY"
+                    table="run_as_root_typesense_category_facet" column="category_id"
+                    referenceTable="catalog_category_entity" referenceColumn="entity_id" onDelete="CASCADE"/>
+    </table>
+
     <!-- Synonyms: source of truth for collection synonyms, re-applied to every new versioned collection -->
     <table name="run_as_root_typesense_synonym" resource="default" engine="innodb"
            comment="TypeSense Synonyms">
