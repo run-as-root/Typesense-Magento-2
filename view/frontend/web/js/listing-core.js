@@ -585,6 +585,8 @@
         const params = facetParams(config);
         const seen = [];
         const pairs = rawPairs(search);
+        // Magento's own page parameter, used by old links; `page` wins when both are present.
+        let magentoPage = null;
 
         for (const [rawKey, rawValue] of pairs) {
             const key = decode(rawKey);
@@ -613,6 +615,8 @@
                 state.q = value.trim();
             } else if (key === 'page') {
                 state.page = PAGE_PARAM.test(value) ? Number(value) : 1;
+            } else if (key === 'p') {
+                magentoPage = PAGE_PARAM.test(value) ? Number(value) : 1;
             } else if (key === 'sort') {
                 state.sort = resolveSort(value, config);
             } else if (key === 'limit') {
@@ -621,6 +625,9 @@
                 const match = PRICE_PARAM.exec(value);
                 state.price = match ? priceRange({ min: match[1], max: match[2] }) : null;
             }
+        }
+        if (magentoPage !== null && !seen.includes('page')) {
+            state.page = magentoPage;
         }
 
         return state;

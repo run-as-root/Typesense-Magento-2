@@ -831,3 +831,15 @@ test('every product search of the listing and the header search carries the shar
     }
     assert.notEqual(header.sources.direct, null);
 });
+
+test('parseUrlState reads Magento\'s p as the page, page wins over it, and the URL is written with page', () => {
+    const config = searchConfig();
+
+    assert.equal(core.parseUrlState('?p=2', config).page, 2);
+    assert.equal(core.parseUrlState('?q=gin&p=3', config).page, 3);
+    assert.equal(core.parseUrlState('?p=3&page=2', config).page, 2);
+    assert.equal(core.parseUrlState('?page=2&p=3', config).page, 2);
+    assert.equal(core.parseUrlState('?page=abc&p=3', config).page, 1);
+    assert.equal(core.parseUrlState('?p=abc', config).page, 1);
+    assert.equal(core.serializeUrlState(core.parseUrlState('?q=gin&p=2', config), config), '?q=gin&page=2');
+});

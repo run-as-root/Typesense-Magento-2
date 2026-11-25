@@ -20,7 +20,10 @@ use RunAsRoot\TypeSense\Model\Listing\CategoryFacetResolver;
 class CacheableSearchResultPlugin
 {
     public const string CACHEABLE_PAGE_HANDLE = 'typesense_cacheable_search_result';
-    private const array LISTING_STATE_PARAMS = ['q', 'page', 'sort', 'limit', 'price', CategoryFacetResolver::URL_PARAM];
+    // `p` is Magento's page parameter, which the listing reads like `page`.
+    private const array LISTING_STATE_PARAMS = [
+        'q', 'page', 'p', 'sort', 'limit', 'price', CategoryFacetResolver::URL_PARAM,
+    ];
 
     public function __construct(
         private readonly TypeSenseConfigInterface $config,
