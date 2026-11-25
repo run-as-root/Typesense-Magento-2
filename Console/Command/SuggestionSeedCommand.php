@@ -9,6 +9,7 @@ use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Api\StoreRepositoryInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Suggestion\SuggestionCollectionProvisioner;
+use RunAsRoot\TypeSense\Model\Suggestion\SuggestionPruner;
 use RunAsRoot\TypeSense\Model\Suggestion\SuggestionSeeder;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -25,6 +26,7 @@ class SuggestionSeedCommand extends Command
         private readonly TypeSenseConfigInterface $config,
         private readonly SuggestionCollectionProvisioner $provisioner,
         private readonly SuggestionSeeder $seeder,
+        private readonly SuggestionPruner $pruner,
     ) {
         parent::__construct();
     }
@@ -33,8 +35,8 @@ class SuggestionSeedCommand extends Command
     {
         $this->setName('typesense:suggestions:seed')
             ->setDescription(
-                'Import the most popular Magento search terms into the Typesense suggestion collections. '
-                . 'Terms already present keep their count, so it is safe to run again.',
+                'Import the most popular Magento search terms into the Typesense suggestion collections, then '
+                . 'prune them. Terms already present keep their count, so it is safe to run again.',
             )
             ->addOption(
                 self::OPTION_LIMIT,
@@ -90,6 +92,7 @@ class SuggestionSeedCommand extends Command
         try {
             $this->provisioner->ensure($storeId, $code);
             $stats = $this->seeder->seed($storeId, $code, $limit);
+            $pruned = $this->pruner->prune($storeId, $code);
         } catch (\Throwable $e) {
             $output->writeln(sprintf('<error>%s: %s</error>', $code, $e->getMessage()));
 
@@ -97,11 +100,14 @@ class SuggestionSeedCommand extends Command
         }
 
         $output->writeln(sprintf(
-            '%s: %d imported, %d already present, %d failed',
+            '%s: %d imported, %d already present, %d failed; pruned: %d shown, %d without results, %d deleted',
             $code,
             $stats['imported'],
             $stats['existing'],
             $stats['failed'],
+            $pruned['valid'],
+            $pruned['invalid'],
+            $pruned['deleted'],
         ));
 
         return $stats['failed'] === 0;

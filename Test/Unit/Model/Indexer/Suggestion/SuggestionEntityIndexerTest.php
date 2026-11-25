@@ -12,12 +12,14 @@ use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionEntityIndexer;
 use RunAsRoot\TypeSense\Model\Indexer\Suggestion\SuggestionSchemaProvider;
 use RunAsRoot\TypeSense\Model\Suggestion\SuggestionCollectionProvisioner;
+use RunAsRoot\TypeSense\Model\Suggestion\SuggestionPruner;
 use RunAsRoot\TypeSense\Model\Suggestion\SuggestionSeeder;
 
 final class SuggestionEntityIndexerTest extends TestCase
 {
     private SuggestionCollectionProvisioner&MockObject $provisioner;
     private SuggestionSeeder&MockObject $seeder;
+    private SuggestionPruner&MockObject $pruner;
     private TypeSenseConfigInterface&MockObject $config;
     private SuggestionEntityIndexer $sut;
 
@@ -25,12 +27,14 @@ final class SuggestionEntityIndexerTest extends TestCase
     {
         $this->provisioner = $this->createMock(SuggestionCollectionProvisioner::class);
         $this->seeder = $this->createMock(SuggestionSeeder::class);
+        $this->pruner = $this->createMock(SuggestionPruner::class);
         $this->config = $this->createMock(TypeSenseConfigInterface::class);
 
         $this->sut = new SuggestionEntityIndexer(
             new SuggestionSchemaProvider(),
             $this->provisioner,
             $this->seeder,
+            $this->pruner,
             $this->config,
             $this->createMock(LoggerInterface::class),
         );
@@ -42,7 +46,11 @@ final class SuggestionEntityIndexerTest extends TestCase
         self::assertSame('suggestion', $this->sut->getEntityType());
         self::assertSame('typesense_suggestion', $this->sut->getIndexerCode());
         self::assertSame(
-            [['name' => 'q', 'type' => 'string'], ['name' => 'count', 'type' => 'int32']],
+            [
+                ['name' => 'q', 'type' => 'string'],
+                ['name' => 'count', 'type' => 'int32'],
+                ['name' => 'is_valid', 'type' => 'bool', 'optional' => true],
+            ],
             $this->sut->getSchemaFields(),
         );
         self::assertSame([], iterator_to_array($this->sut->buildDocuments([], 3)));
@@ -57,16 +65,18 @@ final class SuggestionEntityIndexerTest extends TestCase
             ->method('seed')
             ->with(3, 'de')
             ->willReturn(['total' => 2, 'imported' => 2, 'existing' => 0, 'failed' => 0]);
+        $this->pruner->expects(self::once())->method('prune')->with(3, 'de');
 
         $this->sut->provision(3, 'de');
     }
 
-    public function test_an_existing_collection_is_not_seeded_again(): void
+    public function test_an_existing_collection_is_not_seeded_again_but_pruned(): void
     {
         $this->config->method('isSuggestionIndexingEnabled')->willReturn(true);
         $this->provisioner->method('ensure')->willReturn(false);
 
         $this->seeder->expects(self::never())->method('seed');
+        $this->pruner->expects(self::once())->method('prune')->with(3, 'de');
 
         $this->sut->provision(3, 'de');
     }
@@ -77,6 +87,7 @@ final class SuggestionEntityIndexerTest extends TestCase
 
         $this->provisioner->expects(self::never())->method('ensure');
         $this->seeder->expects(self::never())->method('seed');
+        $this->pruner->expects(self::never())->method('prune');
 
         $this->sut->provision(3, 'de');
     }

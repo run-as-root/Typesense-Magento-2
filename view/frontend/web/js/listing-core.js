@@ -1107,6 +1107,30 @@
     // Magento's 404 CMS page is indexed like any other page but is no search result.
     const HIDDEN_PAGE_KEYS = ['no-route'];
 
+    // Anyone can make Typesense count any text. Suggestion documents are checked server-side (SuggestionPruner:
+    // `is_valid`, deletions) and need a minimum count; the browser repeats the term rules of SuggestionTermFilter.
+    const DEFAULT_SUGGESTION_MAX_LENGTH = 60;
+
+    function suggestionFilter(config) {
+        return 'is_valid:=true && count:>=' + Math.max(1, Math.floor(Number(config.suggestionMinCount)) || 1);
+    }
+
+    function suggestionAllowed(term, config) {
+        const text = String(term || '').trim();
+        const maxLength = Number(config.suggestionMaxLength) > 0 ? Number(config.suggestionMaxLength) : DEFAULT_SUGGESTION_MAX_LENGTH;
+        if (text === '' || Array.from(text).length > maxLength || /@|:\/\/|(^|\s)www\./i.test(text)) {
+            return false;
+        }
+        const letters = (text.match(/\p{L}/gu) || []).length;
+        if (2 * letters < (text.match(/\S/gu) || []).length) {
+            return false;
+        }
+        const lower = text.toLowerCase();
+        const denylist = Array.isArray(config.suggestionDenylist) ? config.suggestionDenylist : [];
+
+        return !denylist.some(blocked => blocked !== '' && lower.includes(String(blocked).toLowerCase()));
+    }
+
     function buildAutocompleteSearches(q, config) {
         const query = String(q || '').trim();
         const searches = [];
@@ -1136,7 +1160,7 @@
         }
         if (config.suggestionCollection) {
             sources.suggestions = add({
-                collection: config.suggestionCollection, q: query, query_by: 'q',
+                collection: config.suggestionCollection, q: query, query_by: 'q', filter_by: suggestionFilter(config),
                 per_page: Number(config.suggestionCount), enable_analytics: false,
             });
         }
@@ -1249,14 +1273,16 @@
         const highlight = Boolean(config.highlight);
 
         const sections = {
-            suggestions: sectionHits(results, sources.suggestions).map((hit, i) => {
-                const doc = hitDocument(hit);
-                return autocompleteRow('suggestion', hit, i, {
-                    name: String(doc.q || ''),
-                    url: searchResultUrl(config.searchUrl, doc.q || ''),
-                    segments: hitSegments(hit, 'q', doc.q, highlight),
-                });
-            }).filter(row => row.name !== ''),
+            suggestions: sectionHits(results, sources.suggestions)
+                .filter(hit => suggestionAllowed(hitDocument(hit).q, config))
+                .map((hit, i) => {
+                    const doc = hitDocument(hit);
+                    return autocompleteRow('suggestion', hit, i, {
+                        name: String(doc.q),
+                        url: searchResultUrl(config.searchUrl, doc.q),
+                        segments: hitSegments(hit, 'q', doc.q, highlight),
+                    });
+                }),
             products: ((products && products.hits) || []).map((hit, i) => Object.assign(
                 productCard('product', hit, i, config, config.productMetaFields),
                 { segments: hitSegments(hit, 'name', hitDocument(hit).name, highlight) },
@@ -1379,6 +1405,7 @@
             collection: config.suggestionCollection,
             q: '*',
             query_by: 'q',
+            filter_by: suggestionFilter(config),
             sort_by: 'count:desc',
             per_page: Math.min(count, MAX_PER_PAGE),
             enable_analytics: false,
@@ -1388,11 +1415,11 @@
     function popularResults(result, config) {
         const hits = result && !result.error && Array.isArray(result.hits) ? result.hits : [];
 
-        return hits.map((hit, i) => {
-            const query = String(hitDocument(hit).q || '');
+        return hits.filter(hit => suggestionAllowed(hitDocument(hit).q, config)).map((hit, i) => {
+            const query = String(hitDocument(hit).q);
 
             return autocompleteRow('popular', hit, i, { name: query, url: searchResultUrl(config.searchUrl, query) });
-        }).filter(row => row.name !== '');
+        });
     }
 
     function suggestionClickDetail(row, term) {
@@ -1549,6 +1576,7 @@
         crossSellResults,
         buildPopularSearch,
         popularResults,
+        suggestionAllowed,
         suggestionClickDetail,
         filterChanges,
         createGa4Tracker,

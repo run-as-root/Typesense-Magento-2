@@ -118,6 +118,37 @@
                         <field id="suggestion_enabled">1</field>
                     </depends>
                 </field>
+                <field id="suggestion_min_count" translate="label comment" type="text"
+                       sortOrder="52" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Suggestion Minimum Count</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>A query is shown in Suggestions and Popular Searches only after it was counted this often (seeded terms count with their Magento popularity). Raises the effort to push a term in.</comment>
+                    <depends>
+                        <field id="suggestion_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="suggestion_max_length" translate="label comment" type="text"
+                       sortOrder="53" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Suggestion Maximum Length</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>Longer queries are deleted from the suggestion index and never shown. Queries that are mostly not letters (numbers, links, e-mail addresses) are always removed.</comment>
+                    <depends>
+                        <field id="suggestion_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="suggestion_denylist" translate="label comment" type="textarea"
+                       sortOrder="54" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Blocked Suggestion Words</label>
+                    <comment>One word or word part per line, case-insensitive. Queries containing one are deleted from the suggestion index and never shown. The list is part of the storefront page source.</comment>
+                    <depends>
+                        <field id="suggestion_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="suggestion_prune_schedule" translate="label comment" type="text"
+                       sortOrder="56" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Suggestion Check Schedule</label>
+                    <comment>Cron expression of the check that deletes blocked queries and shows only queries the search finds products for. New queries stay hidden until it has run.</comment>
+                </field>
                 <field id="additional_attributes" translate="label comment" type="multiselect" sortOrder="55" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Additional Attributes to Index</label>
                     <source_model>RunAsRoot\TypeSense\Model\Config\Source\ProductAttributeSource</source_model>

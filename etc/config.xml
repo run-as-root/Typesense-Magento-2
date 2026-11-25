@@ -20,6 +20,10 @@
                 <cms_page_enabled>1</cms_page_enabled>
                 <suggestion_enabled>1</suggestion_enabled>
                 <suggestion_limit>1000</suggestion_limit>
+                <suggestion_min_count>3</suggestion_min_count>
+                <suggestion_max_length>60</suggestion_max_length>
+                <suggestion_denylist/>
+                <suggestion_prune_schedule>20 * * * *</suggestion_prune_schedule>
                 <zero_downtime_enabled>1</zero_downtime_enabled>
                 <cron_enabled>0</cron_enabled>
                 <cron_schedule>0 2 * * *</cron_schedule>

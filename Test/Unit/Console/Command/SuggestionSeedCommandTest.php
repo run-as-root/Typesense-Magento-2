@@ -12,6 +12,7 @@ use PHPUnit\Framework\TestCase;
 use RunAsRoot\TypeSense\Console\Command\SuggestionSeedCommand;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Suggestion\SuggestionCollectionProvisioner;
+use RunAsRoot\TypeSense\Model\Suggestion\SuggestionPruner;
 use RunAsRoot\TypeSense\Model\Suggestion\SuggestionSeeder;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -21,6 +22,7 @@ final class SuggestionSeedCommandTest extends TestCase
     private TypeSenseConfigInterface&MockObject $config;
     private SuggestionCollectionProvisioner&MockObject $provisioner;
     private SuggestionSeeder&MockObject $seeder;
+    private SuggestionPruner&MockObject $pruner;
     private CommandTester $tester;
 
     protected function setUp(): void
@@ -39,12 +41,15 @@ final class SuggestionSeedCommandTest extends TestCase
         );
         $this->provisioner = $this->createMock(SuggestionCollectionProvisioner::class);
         $this->seeder = $this->createMock(SuggestionSeeder::class);
+        $this->pruner = $this->createMock(SuggestionPruner::class);
+        $this->pruner->method('prune')->willReturn(['checked' => 12, 'valid' => 9, 'invalid' => 2, 'deleted' => 1]);
 
         $this->tester = new CommandTester(new SuggestionSeedCommand(
             $this->storeRepository,
             $this->config,
             $this->provisioner,
             $this->seeder,
+            $this->pruner,
         ));
     }
 
@@ -55,11 +60,15 @@ final class SuggestionSeedCommandTest extends TestCase
             ->method('seed')
             ->with(3, 'de', null)
             ->willReturn(['total' => 12, 'imported' => 10, 'existing' => 2, 'failed' => 0]);
+        $this->pruner->expects(self::once())->method('prune')->with(3, 'de');
 
         $exitCode = $this->tester->execute([]);
 
         self::assertSame(0, $exitCode);
-        self::assertStringContainsString('de: 10 imported, 2 already present, 0 failed', $this->tester->getDisplay());
+        self::assertStringContainsString(
+            'de: 10 imported, 2 already present, 0 failed; pruned: 9 shown, 2 without results, 1 deleted',
+            $this->tester->getDisplay(),
+        );
         self::assertStringContainsString('at: suggestions disabled, skipped', $this->tester->getDisplay());
     }
 
@@ -102,6 +111,7 @@ final class SuggestionSeedCommandTest extends TestCase
             $this->config,
             $this->provisioner,
             $this->seeder,
+            $this->pruner,
         ));
         $this->provisioner->method('ensure')->willReturnCallback(static function (int $storeId): bool {
             if ($storeId === 3) {

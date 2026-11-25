@@ -13,6 +13,7 @@ use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Suggestion\AnalyticsQueryKey;
 use RunAsRoot\TypeSense\Model\Suggestion\SearchQueryReader;
 use RunAsRoot\TypeSense\Model\Suggestion\SuggestionSeeder;
+use RunAsRoot\TypeSense\Model\Suggestion\SuggestionTermFilter;
 use Typesense\Client;
 use Typesense\Collection;
 use Typesense\Collections;
@@ -32,6 +33,8 @@ final class SuggestionSeederTest extends TestCase
         $this->config = $this->createMock(TypeSenseConfigInterface::class);
         $this->config->method('getSuggestionLimit')->willReturn(1000);
         $this->config->method('getBatchSize')->willReturn(200);
+        $this->config->method('getSuggestionMaxLength')->willReturn(60);
+        $this->config->method('getSuggestionDenylist')->willReturn(['casino']);
 
         $this->documents = $this->createMock(Documents::class);
         $collection = $this->createMock(Collection::class);
@@ -51,6 +54,7 @@ final class SuggestionSeederTest extends TestCase
         $this->sut = new SuggestionSeeder(
             $this->reader,
             new AnalyticsQueryKey(),
+            new SuggestionTermFilter($this->config),
             $nameResolver,
             $this->config,
             $clientFactory,
@@ -82,7 +86,7 @@ final class SuggestionSeederTest extends TestCase
         );
     }
 
-    public function test_terms_normalizing_to_the_same_query_are_merged_and_unusable_terms_skipped(): void
+    public function test_terms_normalizing_to_the_same_query_are_merged_and_terms_never_suggested_skipped(): void
     {
         $this->reader->method('getTopQueries')->willReturn([
             ['query' => 'Birne', 'popularity' => 42],
@@ -90,7 +94,10 @@ final class SuggestionSeederTest extends TestCase
             ['query' => '   ', 'popularity' => 5],
             ['query' => '*', 'popularity' => 3],
             ['query' => "\xC3\x28", 'popularity' => 3],
-            ['query' => '2024', 'popularity' => 2],
+            ['query' => 'Gin', 'popularity' => 2],
+            ['query' => 'casino bonus', 'popularity' => 90],
+            ['query' => '4711', 'popularity' => 9],
+            ['query' => str_repeat('x', 61), 'popularity' => 9],
         ]);
 
         $imported = [];
@@ -104,7 +111,7 @@ final class SuggestionSeederTest extends TestCase
 
         $this->sut->seed(3, 'de');
 
-        self::assertSame(['birne', '2024'], array_column($imported, 'q'));
+        self::assertSame(['birne', 'gin'], array_column($imported, 'q'));
         self::assertSame([50, 2], array_column($imported, 'count'));
     }
 

@@ -103,6 +103,35 @@ final class TypeSenseConfigTest extends TestCase
         self::assertSame(1000, $this->sut->getSuggestionLimit(2));
     }
 
+    public function test_suggestion_guards_read_store_values(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturnMap([
+            ['run_as_root_typesense/indexing/suggestion_min_count', ScopeInterface::SCOPE_STORE, 2, '5'],
+            ['run_as_root_typesense/indexing/suggestion_max_length', ScopeInterface::SCOPE_STORE, 2, '40'],
+            ['run_as_root_typesense/indexing/suggestion_denylist', ScopeInterface::SCOPE_STORE, 2, " Casino \r\n\nviagra\n casino\n  \nÄRGER"],
+        ]);
+
+        self::assertSame(5, $this->sut->getSuggestionMinCount(2));
+        self::assertSame(40, $this->sut->getSuggestionMaxLength(2));
+        self::assertSame(['casino', 'viagra', 'ärger'], $this->sut->getSuggestionDenylist(2));
+    }
+
+    public function test_suggestion_guards_fall_back_to_safe_defaults(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn(null);
+
+        self::assertSame(3, $this->sut->getSuggestionMinCount(2));
+        self::assertSame(60, $this->sut->getSuggestionMaxLength(2));
+        self::assertSame([], $this->sut->getSuggestionDenylist(2));
+    }
+
+    public function test_suggestion_min_count_is_at_least_one(): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn('0');
+
+        self::assertSame(1, $this->sut->getSuggestionMinCount(2));
+    }
+
     public function test_is_conversational_search_enabled_returns_false_when_module_disabled(): void
     {
         $this->scopeConfig->method('isSetFlag')

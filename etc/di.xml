@@ -196,6 +196,7 @@
         <arguments>
             <argument name="provisioner" xsi:type="object">RunAsRoot\TypeSense\Model\Suggestion\SuggestionCollectionProvisioner\Proxy</argument>
             <argument name="seeder" xsi:type="object">RunAsRoot\TypeSense\Model\Suggestion\SuggestionSeeder\Proxy</argument>
+            <argument name="pruner" xsi:type="object">RunAsRoot\TypeSense\Model\Suggestion\SuggestionPruner\Proxy</argument>
         </arguments>
     </type>
 

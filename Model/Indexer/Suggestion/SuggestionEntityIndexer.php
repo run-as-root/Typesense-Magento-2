@@ -9,6 +9,7 @@ use RunAsRoot\TypeSense\Api\EntityIndexerInterface;
 use RunAsRoot\TypeSense\Api\SelfMaintainedEntityInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Suggestion\SuggestionCollectionProvisioner;
+use RunAsRoot\TypeSense\Model\Suggestion\SuggestionPruner;
 use RunAsRoot\TypeSense\Model\Suggestion\SuggestionSeeder;
 
 /**
@@ -21,6 +22,7 @@ class SuggestionEntityIndexer implements EntityIndexerInterface, SelfMaintainedE
         private readonly SuggestionSchemaProviderInterface $schemaProvider,
         private readonly SuggestionCollectionProvisioner $provisioner,
         private readonly SuggestionSeeder $seeder,
+        private readonly SuggestionPruner $pruner,
         private readonly TypeSenseConfigInterface $config,
         private readonly LoggerInterface $logger,
     ) {
@@ -48,14 +50,14 @@ class SuggestionEntityIndexer implements EntityIndexerInterface, SelfMaintainedE
             return;
         }
 
-        if (!$this->provisioner->ensure($storeId, $storeCode)) {
-            return;
+        if ($this->provisioner->ensure($storeId, $storeCode)) {
+            $stats = $this->seeder->seed($storeId, $storeCode);
+            $this->logger->info(
+                "Seeded suggestions for {$storeCode}: {$stats['imported']}/{$stats['total']} Magento search terms",
+            );
         }
 
-        $stats = $this->seeder->seed($storeId, $storeCode);
-        $this->logger->info(
-            "Seeded suggestions for {$storeCode}: {$stats['imported']}/{$stats['total']} Magento search terms",
-        );
+        $this->pruner->prune($storeId, $storeCode);
     }
 
     public function buildDocuments(array $entityIds, int $storeId): iterable

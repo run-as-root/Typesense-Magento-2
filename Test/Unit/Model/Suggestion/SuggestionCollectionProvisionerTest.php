@@ -22,6 +22,7 @@ final class SuggestionCollectionProvisionerTest extends TestCase
         'fields' => [
             ['name' => 'q', 'type' => 'string'],
             ['name' => 'count', 'type' => 'int32'],
+            ['name' => 'is_valid', 'type' => 'bool', 'optional' => true],
         ],
     ];
 

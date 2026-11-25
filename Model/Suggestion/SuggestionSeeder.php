@@ -17,13 +17,12 @@ use RunAsRoot\TypeSense\Model\Indexer\BatchImportService;
 class SuggestionSeeder
 {
     private const INT32_MAX = 2147483647;
-    // Typesense analytics ignore longer queries (QueryAnalytics::max_query_length).
-    private const MAX_QUERY_LENGTH = 1024;
     private const HTTP_CONFLICT = 409;
 
     public function __construct(
         private readonly SearchQueryReader $reader,
         private readonly AnalyticsQueryKey $queryKey,
+        private readonly SuggestionTermFilter $termFilter,
         private readonly CollectionNameResolverInterface $nameResolver,
         private readonly TypeSenseConfigInterface $config,
         private readonly TypeSenseClientFactoryInterface $clientFactory,
@@ -42,7 +41,7 @@ class SuggestionSeeder
     {
         $ruleLimit = $this->config->getSuggestionLimit($storeId);
         $rows = $this->reader->getTopQueries($storeId, min($limit ?? $ruleLimit, $ruleLimit));
-        $documents = $this->buildDocuments($rows);
+        $documents = $this->buildDocuments($rows, $storeId);
         $stats = ['total' => 0, 'imported' => 0, 'existing' => 0, 'failed' => 0];
         if ($documents === []) {
             return $stats;
@@ -64,15 +63,13 @@ class SuggestionSeeder
      * @param list<array{query: string, popularity: int}> $rows
      * @return list<array{id: string, q: string, count: int}>
      */
-    private function buildDocuments(array $rows): array
+    private function buildDocuments(array $rows, int $storeId): array
     {
         $counts = [];
         foreach ($rows as $row) {
             $query = $this->queryKey->normalize($row['query']);
-            // typesense-php encodes documents with JSON_THROW_ON_ERROR: one malformed term would abort the import.
-            if ($query === '' || $query === '*' || strlen($query) >= self::MAX_QUERY_LENGTH
-                || !mb_check_encoding($query, 'UTF-8')
-            ) {
+            // Also keeps malformed UTF-8 out: typesense-php's JSON_THROW_ON_ERROR would abort the whole import.
+            if (!$this->termFilter->isAllowed($query, $storeId)) {
                 continue;
             }
             $counts[$query] = ($counts[$query] ?? 0) + $row['popularity'];
@@ -80,7 +77,6 @@ class SuggestionSeeder
 
         $documents = [];
         foreach ($counts as $query => $count) {
-            // Numeric terms such as "2024" become integer array keys.
             $query = (string) $query;
             $documents[] = [
                 'id' => $this->queryKey->documentId($query),

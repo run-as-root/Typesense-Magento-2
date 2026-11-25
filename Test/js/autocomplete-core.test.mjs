@@ -20,6 +20,9 @@ function acConfig(overrides = {}) {
         categoryCount: 3,
         pageCount: 2,
         suggestionCount: 5,
+        suggestionMinCount: 3,
+        suggestionMaxLength: 60,
+        suggestionDenylist: ['casino'],
         groupBy: null,
         highlight: true,
         showPrices: true,
@@ -98,7 +101,9 @@ test('buildAutocompleteSearches sends one multi search with only the configured 
     assert.equal(plan.searches[1].enable_synonyms, false);
     assert.equal(plan.searches[1].group_by, 'variant_group');
     assert.deepEqual(plan.sources, { products: 0, direct: 1, suggestions: 2, categories: 3, pages: 4 });
-    assert.deepEqual(plan.searches[2], { collection: 's', q: 'gin', query_by: 'q', per_page: 5, enable_analytics: false });
+    assert.deepEqual(plan.searches[2], {
+        collection: 's', q: 'gin', query_by: 'q', filter_by: 'is_valid:=true && count:>=3', per_page: 5, enable_analytics: false,
+    });
     assert.deepEqual(plan.searches[3], { collection: 'c', q: 'gin', query_by: 'name', filter_by: 'is_active:=true && level:>1', per_page: 3, enable_analytics: false });
     assert.deepEqual(plan.searches[4], { collection: 'cms', q: 'gin', query_by: 'title', filter_by: 'is_active:=true', per_page: 2, enable_analytics: false });
 
@@ -115,6 +120,33 @@ test('only the typed product query of the header search counts for the popular-q
     assert.equal('enable_analytics' in plan.searches[0], false);
     assert.deepEqual(plan.searches.slice(1).map(search => search.enable_analytics), [false, false, false, false]);
     assert.equal(core.buildAutocompleteSearches('  ', acConfig()).searches[0].enable_analytics, false);
+});
+
+test('suggestions and popular searches show only checked, counted, unblocked plain terms', () => {
+    const config = acConfig({ popularSearchCount: 6 });
+    assert.equal(core.buildPopularSearch(acConfig({ suggestionMinCount: undefined, popularSearchCount: 6 })).filter_by, 'is_valid:=true && count:>=1');
+
+    for (const [term, allowed] of [
+        ['birne', true], ['schnaps 0,7 l', true], ['marillen-likör', true], [' ', false], ['x'.repeat(61), false],
+        ['4711 0815', false], ['https://spam.example', false], ['www.spam.example', false], ['me@spam.example', false],
+        ['Online-CASINO bonus', false],
+    ]) {
+        assert.equal(core.suggestionAllowed(term, config), allowed, term);
+    }
+
+    const chips = core.popularResults({ hits: [
+        { document: { id: '2', q: 'casino', count: 900 } },
+        { document: { id: '3', q: 'www.spam.example', count: 90 } },
+        { document: { id: '1', q: 'birne', count: 9 } },
+    ] }, config);
+    assert.deepEqual(chips.map(chip => [chip.name, chip.index]), [['birne', 0]], 'indexes count shown chips only');
+
+    const plan = core.buildAutocompleteSearches('bi', acConfig({ categoryCollection: null, pageCollection: null }));
+    const rows = core.autocompleteResults([
+        { found: 0, hits: [] },
+        { hits: [{ document: { id: '1', q: 'birne' } }, { document: { id: '2', q: 'bingo casino' } }] },
+    ], plan.sources, 'bi', config);
+    assert.deepEqual(rows.sections.suggestions.map(row => row.name), ['birne']);
 });
 
 test('autocompleteResults builds ordered rows with highlights, URLs, prices and GA4 items', () => {
@@ -399,7 +431,8 @@ test('popular searches are the store\'s most counted queries, linked to the sear
     const config = acConfig({ popularSearchCount: 6 });
 
     assert.deepEqual(core.buildPopularSearch(config), {
-        collection: 's', q: '*', query_by: 'q', sort_by: 'count:desc', per_page: 6, enable_analytics: false,
+        collection: 's', q: '*', query_by: 'q', filter_by: 'is_valid:=true && count:>=3', sort_by: 'count:desc', per_page: 6,
+        enable_analytics: false,
     });
     assert.equal(core.buildPopularSearch(acConfig({ popularSearchCount: 0 })), null);
     assert.equal(core.buildPopularSearch(acConfig({ popularSearchCount: 6, suggestionCollection: null })), null);

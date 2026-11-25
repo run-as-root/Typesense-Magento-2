@@ -123,6 +123,10 @@ class AutocompleteConfigViewModel implements ArgumentInterface
             'categoryCount'        => $categoryCount,
             'pageCount'            => $pageCount,
             'suggestionCount'      => $suggestionCount,
+            // The pruner applies these too; the browser repeats them, e.g. for words blocked since its last run.
+            'suggestionMinCount'   => $this->config->getSuggestionMinCount($storeId),
+            'suggestionMaxLength'  => $this->config->getSuggestionMaxLength($storeId),
+            'suggestionDenylist'   => $this->config->getSuggestionDenylist($storeId),
             'groupBy'              => $this->getGroupByField($storeId),
             'highlight'            => $this->config->isHighlightEnabled($storeId),
             'showPrices'           => $this->canShowPrices(),
