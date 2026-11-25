@@ -118,7 +118,7 @@ Navigate to **Stores > Configuration > TypeSense > TypeSense Search**.
 
 #### Search-only key scope
 
-The search-only key is sent to every visitor's browser, so it must allow only `documents:search` on the storefront collections: `product`, `category`, `cms_page` and `suggestion`. The module also indexes customers, orders, stores and system config into the same Typesense server for the admin search; a key with `"collections": ["*"]` would let anyone read those.
+The search-only key is sent to every visitor's browser, so it must allow only `documents:search` on the storefront collections: `product`, `category`, `cms_page` and `suggestion`. When enabled for the admin assistant, the module also indexes customers, orders, stores and system config into the same Typesense server; a key with `"collections": ["*"]` would let anyone read those.
 
 Create the key with the admin key (replace `rar` with your Index Prefix):
 
@@ -140,9 +140,10 @@ Typesense treats each `collections` entry as a regular expression that must matc
 | Setting | Default | Description |
 |---|---|---|
 | Batch Size | 200 | Documents per import batch |
-| Index Products | Yes | Enable product indexing |
+| Index Products | Yes | Enable product indexing. Every flag applies per store view to full reindexes (cron, queue, CLI) and mview updates |
 | Index Categories | Yes | Enable category indexing |
 | Index CMS Pages | Yes | Enable CMS page indexing |
+| Enable Customer / Order / Store / System Configuration Indexing | No | Admin assistant collections ([Additional Indexers](#additional-indexers)). Customers and orders carry names, e-mail and postal addresses: keep them off unless the assistant needs them |
 | Enable Search Suggestions | Yes | Suggestion collection and analytics rule per store view ([Search Suggestions](#search-suggestions)) |
 | Suggestion Limit | 1000 | How many of the most frequent queries a store's suggestion collection keeps (analytics rule `limit`); also the seed maximum |
 | Suggestion Minimum Count | 3 | Count a query needs before it is shown in suggestions and popular searches |
@@ -171,6 +172,7 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | Prioritize Exact Matches | Yes | `prioritize_exact_match` |
 | Split/Join Words | Fallback | Match "smart watch" against "smartwatch" (`split_join_tokens`: `fallback`, `always`, `off`) |
 | Enable Prefix Search | Yes | Match the last query word as a prefix |
+| Exhaustive Search | No | `exhaustive_search` on every storefront product search: Typesense considers all token variants (typos, prefixes) instead of stopping once it has enough matches. Recommended for small catalogs (a few thousand products or fewer), where the default can miss products (e.g. 54 instead of 83 hits for "marille" on ~430 products). Large catalogs can instead raise Typesense's `max_candidates` (default 4) with a theme plugin on `SearchParametersProvider::getParameters()`, which widens the search without considering every variant. No reindex |
 | Enable Infix Search | No | Match query words inside other words. Reindex |
 | Infix Search Fields | name | Fields that get the infix flag; the `infix` request parameter is `off` for every other `query_by` field. Reindex |
 | Infix Search Mode | Fallback | `fallback` uses infix matching only when the normal search finds nothing; `always` combines both |
@@ -301,9 +303,10 @@ Choose which sort options are available to customers on search results and categ
 
 | Command | Description |
 |---|---|
-| `bin/magento typesense:reindex [--entity=TYPE]` | Reindex all or a specific entity type into Typesense. Storefront types: `product`, `category`, `cms_page`, `suggestion`; admin search types: `customer`, `order`, `store`, `system_config`. Without `--entity` every type is reindexed, including the admin search collections with customer and order data (see [Search-only key scope](#search-only-key-scope)) |
+| `bin/magento typesense:reindex [--entity=TYPE]` | Reindex all or a specific entity type into Typesense. Storefront types: `product`, `category`, `cms_page`, `suggestion`; admin search types: `customer`, `order`, `store`, `system_config`. Without `--entity` every type enabled under Indexing is reindexed; customer, order, store and system config are off by default (see [Search-only key scope](#search-only-key-scope)). A disabled type is reported as skipped |
 | `bin/magento typesense:collection:list` | List all Typesense collections with document count and alias mappings |
-| `bin/magento typesense:collection:delete <name>` | Delete a named Typesense collection |
+| `bin/magento typesense:collection:delete <name> --force` | Delete a named Typesense collection |
+| `bin/magento typesense:collection:delete --entity=TYPE --force` | Delete the aliases and all collections (versioned and plain) of an entity type in every store view; refused while the type is still enabled in a store view |
 | `bin/magento typesense:health` | Check the health status of the Typesense server |
 | `bin/magento typesense:import:elasticsuite [--synonyms] [--boosts] [--positions] [--dry-run] [--store=CODE]` | Import ElasticSuite thesauri, optimizers and category positions, see [Migrating from ElasticSuite](#migrating-from-elasticsuite) |
 | `bin/magento typesense:suggestions:seed [--limit=N] [--store=CODE]` | Import the most popular Magento search terms into the suggestion collections; terms already present keep their count, so it can run again, see [Search Suggestions](#search-suggestions) |
@@ -311,8 +314,11 @@ Choose which sort options are available to customers on search results and categ
 ### Examples
 
 ```bash
-# Full reindex of all entity types (storefront and admin search)
+# Full reindex of all enabled entity types
 bin/magento typesense:reindex
+
+# Remove the customer collections built before customer indexing was disabled
+bin/magento typesense:collection:delete --entity=customer --force
 
 # Reindex only products
 bin/magento typesense:reindex --entity=product
@@ -777,7 +783,7 @@ The Admin AI Assistant is an agentic analytics tool built into the Magento admin
 
 ### Additional Indexers
 
-The assistant indexes four additional entity types into Typesense beyond the standard search collections:
+The assistant can index four additional entity types into Typesense beyond the standard search collections. Each is off by default and enabled under **Indexing** (Enable Customer / Order / Store / System Configuration Indexing); the `search_typesense` tool answers with an error for a type that is not indexed, and the SQL tools work either way. To remove collections of a type you disabled, run `bin/magento typesense:collection:delete --entity=<type> --force`.
 
 | Entity | Purpose |
 |---|---|

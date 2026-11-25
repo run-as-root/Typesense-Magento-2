@@ -102,6 +102,9 @@ interface TypeSenseConfigInterface
 
     public function isPrefixSearchEnabled(?int $storeId = null): bool;
 
+    /** Whether Typesense considers every candidate instead of stopping once it found enough good matches. */
+    public function isExhaustiveSearchEnabled(?int $storeId = null): bool;
+
     public function isSearchCacheEnabled(?int $storeId = null): bool;
 
     public function getSearchCacheTtl(?int $storeId = null): int;

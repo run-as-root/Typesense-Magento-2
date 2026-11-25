@@ -46,6 +46,7 @@
                 <prioritize_exact_match>1</prioritize_exact_match>
                 <split_join_tokens>fallback</split_join_tokens>
                 <prefix_search>1</prefix_search>
+                <exhaustive_search>0</exhaustive_search>
                 <infix_enabled>0</infix_enabled>
                 <infix_fields>name</infix_fields>
                 <infix_mode>fallback</infix_mode>

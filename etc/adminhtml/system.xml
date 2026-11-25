@@ -277,6 +277,12 @@
                     <source_model>RunAsRoot\TypeSense\Model\Config\Source\SplitJoinTokens</source_model>
                     <comment>Also match "smart watch" against "smartwatch" and vice versa.</comment>
                 </field>
+                <field id="exhaustive_search" translate="label comment" type="select"
+                       sortOrder="121" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Exhaustive Search</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Let Typesense consider every matching token variant (typos, prefixes) instead of stopping once it found enough results. Finds more products on small catalogs, but makes searches slower on large ones.</comment>
+                </field>
                 <field id="prefix_search" translate="label comment" type="select"
                        sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Enable Prefix Search</label>

@@ -817,3 +817,17 @@ test('only the Typesense numeric kinds mark a facet numeric', () => {
     assert.equal(core.buildSearches(state({ filters: { volume: ['0.7'] } }), config)[0].filter_by,
         'visibility:[3,4] && volume:=[`0.7`]');
 });
+
+test('every product search of the listing and the header search carries the shared request params', () => {
+    const requestParams = { query_by: 'name,sku', infix: 'off', exhaustive_search: true };
+    const listing = core.buildSearches(state({ q: 'marille', filters: { color: ['Red'] } }), searchConfig({ requestParams }));
+    const header = core.buildAutocompleteSearches('marille', {
+        productCollection: 'shop_default_products', productCount: 6, requestParams, directMatchesFirst: true,
+    });
+
+    assert.ok(listing.length >= 3);
+    for (const search of [...listing, ...header.searches]) {
+        assert.equal(search.exhaustive_search, true);
+    }
+    assert.notEqual(header.sources.direct, null);
+});

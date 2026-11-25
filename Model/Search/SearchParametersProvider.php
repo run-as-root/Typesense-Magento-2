@@ -24,7 +24,8 @@ class SearchParametersProvider
      *     prioritize_exact_match: bool,
      *     prioritize_num_matching_fields: bool,
      *     split_join_tokens: string,
-     *     prefix: bool
+     *     prefix: bool,
+     *     exhaustive_search: bool
      * }
      */
     public function getParameters(?int $storeId = null): array
@@ -40,6 +41,7 @@ class SearchParametersProvider
             'prioritize_num_matching_fields' => true,
             'split_join_tokens' => $this->config->getSplitJoinTokens($storeId),
             'prefix' => $this->config->isPrefixSearchEnabled($storeId),
+            'exhaustive_search' => $this->config->isExhaustiveSearchEnabled($storeId),
         ];
     }
 

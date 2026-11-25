@@ -634,4 +634,13 @@ final class TypeSenseConfigTest extends TestCase
 
         self::assertTrue($this->sut->isEntityIndexingEnabled('third_party_entity', 3));
     }
+
+    public function test_exhaustive_search_reads_the_search_flag(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/search/exhaustive_search', ScopeInterface::SCOPE_STORE, 2)
+            ->willReturn(true);
+
+        self::assertTrue($this->sut->isExhaustiveSearchEnabled(2));
+    }
 }

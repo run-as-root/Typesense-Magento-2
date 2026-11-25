@@ -260,6 +260,11 @@ class TypeSenseConfig implements TypeSenseConfigInterface
         return $this->getFlag('search/prefix_search', $storeId);
     }
 
+    public function isExhaustiveSearchEnabled(?int $storeId = null): bool
+    {
+        return $this->getFlag('search/exhaustive_search', $storeId);
+    }
+
     public function isSearchCacheEnabled(?int $storeId = null): bool
     {
         return $this->getFlag('search/use_cache', $storeId);
