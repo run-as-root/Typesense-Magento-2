@@ -60,6 +60,28 @@ final class ProductEntityIndexerTest extends TestCase
         self::assertSame(['preload', 'build'], $calls);
     }
 
+    public function test_cross_sells_of_the_batch_are_preloaded_before_documents_are_built(): void
+    {
+        $product = $this->createMock(Product::class);
+        $collection = $this->createMock(ProductCollection::class);
+        $collection->method('getIterator')->willReturn(new \ArrayIterator([$product]));
+        $this->dataBuilder->method('getProductCollection')->willReturn($collection);
+        $calls = [];
+        $this->dataBuilder->expects(self::once())->method('preloadCrossSells')->with($collection)
+            ->willReturnCallback(static function () use (&$calls): void {
+                $calls[] = 'preload';
+            });
+        $this->dataBuilder->method('build')->willReturnCallback(static function () use (&$calls): array {
+            $calls[] = 'build';
+
+            return ['id' => '1'];
+        });
+
+        iterator_to_array($this->sut->buildDocuments([1], 2), false);
+
+        self::assertSame(['preload', 'build'], $calls);
+    }
+
     public function test_collection_settings_come_from_the_schema_provider(): void
     {
         $this->schemaProvider->method('getCollectionSettings')->willReturn(['enable_nested_fields' => true]);

@@ -529,4 +529,44 @@ final class TypeSenseConfigTest extends TestCase
         self::assertSame(0, $this->sut->getAutocompleteCmsPageCount());
         self::assertSame('', $this->sut->getAutocompleteGroupBy());
     }
+
+    public function test_autocomplete_cross_sell_popular_and_meta_settings_read_autocomplete_group(): void
+    {
+        $this->scopeConfig->method('isSetFlag')
+            ->with('run_as_root_typesense/autocomplete/crosssell_enabled', ScopeInterface::SCOPE_STORE, 2)
+            ->willReturn(true);
+        $this->scopeConfig->method('getValue')->willReturnMap([
+            ['run_as_root_typesense/autocomplete/crosssell_count', ScopeInterface::SCOPE_STORE, 2, '4'],
+            ['run_as_root_typesense/autocomplete/crosssell_fallback_attribute', ScopeInterface::SCOPE_STORE, 2, ' taste '],
+            ['run_as_root_typesense/autocomplete/crosssell_fallback_sort', ScopeInterface::SCOPE_STORE, 2, ' sales_count:desc '],
+            ['run_as_root_typesense/autocomplete/crosssell_meta_fields', ScopeInterface::SCOPE_STORE, 2, 'trade_name, taste'],
+            ['run_as_root_typesense/autocomplete/product_meta_fields', ScopeInterface::SCOPE_STORE, 2, ' categories.lvl1 ,volume_percent,,taste'],
+            ['run_as_root_typesense/autocomplete/popular_search_count', ScopeInterface::SCOPE_STORE, 2, '6'],
+        ]);
+
+        self::assertTrue($this->sut->isAutocompleteCrossSellEnabled(2));
+        self::assertSame(4, $this->sut->getAutocompleteCrossSellCount(2));
+        self::assertSame('taste', $this->sut->getAutocompleteCrossSellFallbackAttribute(2));
+        self::assertSame('sales_count:desc', $this->sut->getAutocompleteCrossSellFallbackSort(2));
+        self::assertSame(['trade_name', 'taste'], $this->sut->getAutocompleteCrossSellMetaFields(2));
+        self::assertSame(['categories.lvl1', 'volume_percent', 'taste'], $this->sut->getAutocompleteProductMetaFields(2));
+        self::assertSame(6, $this->sut->getAutocompletePopularSearchCount(2));
+    }
+
+    public function test_unset_autocomplete_cross_sell_popular_and_meta_settings_turn_the_features_off(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->scopeConfig->method('getValue')->willReturnMap([
+            ['run_as_root_typesense/autocomplete/crosssell_count', ScopeInterface::SCOPE_STORE, null, '-2'],
+            ['run_as_root_typesense/autocomplete/popular_search_count', ScopeInterface::SCOPE_STORE, null, '-1'],
+        ]);
+
+        self::assertFalse($this->sut->isAutocompleteCrossSellEnabled());
+        self::assertSame(0, $this->sut->getAutocompleteCrossSellCount());
+        self::assertSame('', $this->sut->getAutocompleteCrossSellFallbackAttribute());
+        self::assertSame('', $this->sut->getAutocompleteCrossSellFallbackSort());
+        self::assertSame([], $this->sut->getAutocompleteCrossSellMetaFields());
+        self::assertSame([], $this->sut->getAutocompleteProductMetaFields());
+        self::assertSame(0, $this->sut->getAutocompletePopularSearchCount());
+    }
 }

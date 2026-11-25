@@ -1103,8 +1103,11 @@
     }
 
     function autocompleteRow(type, hit, index, fields) {
+        const id = String(hitDocument(hit).id);
+
         return Object.assign({
-            key: type + '-' + String(hitDocument(hit).id),
+            key: type + '-' + id,
+            id,
             type,
             index,
             position: 0,
@@ -1113,8 +1116,60 @@
             hasImage: false,
             price: null,
             hasPrice: false,
+            meta: '',
+            hasMeta: false,
             item: null,
         }, fields);
+    }
+
+    // Category paths ("A > B") show their last name; whole decimals lose their zeros ("42.0 %" -> "42 %").
+    function metaValue(doc, field) {
+        const raw = doc[field];
+        const value = Array.isArray(raw) ? raw.find(entry => entry !== null && String(entry).trim() !== '') : raw;
+        if (value === undefined || value === null || typeof value === 'object') {
+            return '';
+        }
+        let text = String(value).trim();
+        if (/^categories\.lvl\d+$/.test(field)) {
+            text = text.split(' > ').pop().trim();
+        }
+
+        return text.replace(/(\d)\.0+(?!\d)/g, '$1').replace(/(\d\.\d*?[1-9])0+(?!\d)/g, '$1');
+    }
+
+    /**
+     * One line of document values (e.g. "Old Varieties · 42 % · Pear") for header search rows and cards; lists
+     * show their first value, missing or empty fields are left out.
+     */
+    function metaLine(doc, fields) {
+        if (!doc || !Array.isArray(fields)) {
+            return '';
+        }
+
+        return fields
+            .filter(field => FIELD_NAME.test(String(field)))
+            .map(field => metaValue(doc, field))
+            .filter(text => text !== '')
+            .join(' · ');
+    }
+
+    function productCard(type, hit, index, config, metaFields) {
+        const doc = hitDocument(hit);
+        const price = hitPrice(doc);
+        const shownPrice = config.showPrices !== false && price !== null && price > 0 ? price : null;
+        const meta = metaLine(doc, metaFields);
+
+        return autocompleteRow(type, hit, index, {
+            name: String(doc.name || ''),
+            url: String(doc.url || ''),
+            imageUrl: String(doc.image_url || ''),
+            hasImage: Boolean(doc.image_url),
+            price: shownPrice,
+            hasPrice: shownPrice !== null,
+            meta,
+            hasMeta: meta !== '',
+            item: toGa4Items([hit], index, AUTOCOMPLETE_LIST_NAME, config.showPrices !== false)[0],
+        });
     }
 
     /**
@@ -1131,7 +1186,6 @@
         if (sources.direct !== null) {
             products = reorderByDirectMatches(products, flattenGroupedResult(results[sources.direct]), 1);
         }
-        const showPrices = config.showPrices !== false;
         const highlight = Boolean(config.highlight);
 
         const sections = {
@@ -1143,21 +1197,10 @@
                     segments: hitSegments(hit, 'query', doc.query, highlight),
                 });
             }).filter(row => row.name !== ''),
-            products: ((products && products.hits) || []).map((hit, i) => {
-                const doc = hitDocument(hit);
-                const price = hitPrice(doc);
-                const shownPrice = showPrices && price !== null && price > 0 ? price : null;
-                return autocompleteRow('product', hit, i, {
-                    name: String(doc.name || ''),
-                    url: String(doc.url || ''),
-                    segments: hitSegments(hit, 'name', doc.name, highlight),
-                    imageUrl: String(doc.image_url || ''),
-                    hasImage: Boolean(doc.image_url),
-                    price: shownPrice,
-                    hasPrice: shownPrice !== null,
-                    item: toGa4Items([hit], i, AUTOCOMPLETE_LIST_NAME, showPrices)[0],
-                });
-            }).filter(row => row.url !== ''),
+            products: ((products && products.hits) || []).map((hit, i) => Object.assign(
+                productCard('product', hit, i, config, config.productMetaFields),
+                { segments: hitSegments(hit, 'name', hitDocument(hit).name, highlight) },
+            )).filter(row => row.url !== ''),
             categories: sectionHits(results, sources.categories).map((hit, i) => {
                 const doc = hitDocument(hit);
                 return autocompleteRow('category', hit, i, {
@@ -1184,7 +1227,110 @@
             row.domId = 'typesense-ac-option-' + position;
         });
 
-        return { sections, rows, found: Number(products && products.found) || 0 };
+        const topHit = ((products && products.hits) || [])[0];
+
+        return {
+            sections,
+            rows,
+            found: Number(products && products.found) || 0,
+            topDocument: topHit ? hitDocument(topHit) : null,
+        };
+    }
+
+    // Catalog visibility, as Magento's own cross-sell block lists them.
+    const CROSS_SELL_FILTER = 'in_stock:=true && visibility:[2,4]';
+    // Typesense's maximum page size.
+    const MAX_PER_PAGE = 250;
+
+    /**
+     * Searches for the cross-sell cards of the top hit, sent after its results arrived: its Magento cross-sells
+     * (salable, visible in the catalog), and, with a fallback field configured, best sellers sharing one of the
+     * top hit's values of that field to fill up. Products shown as rows are left out. Null when nothing is asked.
+     */
+    function buildCrossSellSearches(top, shownIds, config) {
+        const count = Number(config.crossSellCount) || 0;
+        if (!top || count <= 0 || !config.productCollection) {
+            return null;
+        }
+        const excluded = valueList([top.id].concat(shownIds || []));
+        const linked = valueList(top.crosssell_ids)
+            .filter(id => INTEGER_VALUE.test(id) && Number(id) > 0 && !excluded.includes(id));
+        const base = {
+            collection: config.productCollection,
+            q: '*',
+            include_fields: autocompleteProductFields(config).join(','),
+        };
+        const searches = [];
+        const sources = { crossSells: null, fallback: null, order: linked, count };
+        const quoteAll = ids => ids.map(quoteValue).filter(value => value !== null).join(',');
+
+        if (linked.length > 0) {
+            sources.crossSells = searches.push(Object.assign({}, base, {
+                per_page: Math.min(linked.length, MAX_PER_PAGE),
+                filter_by: 'id:[' + quoteAll(linked) + '] && ' + CROSS_SELL_FILTER,
+            })) - 1;
+        }
+        const field = config.crossSellFallbackField;
+        const values = field && FIELD_NAME.test(field)
+            ? valueList(top[field]).map(quoteValue).filter(value => value !== null)
+            : [];
+        if (values.length > 0) {
+            const fallback = Object.assign({}, base, {
+                per_page: Math.min(count, MAX_PER_PAGE),
+                filter_by: field + ':=[' + values.join(',') + '] && ' + CROSS_SELL_FILTER
+                    + ' && id:!=[' + quoteAll(excluded.concat(linked)) + ']',
+            });
+            if (config.crossSellFallbackSortBy) {
+                fallback.sort_by = config.crossSellFallbackSortBy;
+            }
+            sources.fallback = searches.push(fallback) - 1;
+        }
+
+        return searches.length > 0 ? { searches, sources, key: JSON.stringify(searches) } : null;
+    }
+
+    function crossSellResults(results, sources, config) {
+        const order = sources.order || [];
+        const linked = sectionHits(results, sources.crossSells).slice()
+            .sort((a, b) => order.indexOf(String(hitDocument(a).id)) - order.indexOf(String(hitDocument(b).id)));
+        const cards = [];
+        const seen = [];
+
+        for (const hit of linked.concat(sectionHits(results, sources.fallback))) {
+            const doc = hitDocument(hit);
+            if (cards.length >= sources.count || seen.includes(String(doc.id)) || !doc.url) {
+                continue;
+            }
+            seen.push(String(doc.id));
+            cards.push(productCard('crosssell', hit, cards.length, config, config.crossSellMetaFields));
+        }
+
+        return cards;
+    }
+
+    function buildPopularSearch(config) {
+        const count = Number(config.popularSearchCount) || 0;
+        if (count <= 0 || !config.suggestionCollection) {
+            return null;
+        }
+
+        return {
+            collection: config.suggestionCollection,
+            q: '*',
+            query_by: 'query',
+            sort_by: 'popularity:desc',
+            per_page: Math.min(count, MAX_PER_PAGE),
+        };
+    }
+
+    function popularResults(result, config) {
+        const hits = result && !result.error && Array.isArray(result.hits) ? result.hits : [];
+
+        return hits.map((hit, i) => {
+            const query = String(hitDocument(hit).query || '');
+
+            return autocompleteRow('popular', hit, i, { name: query, url: searchResultUrl(config.searchUrl, query) });
+        }).filter(row => row.name !== '');
     }
 
     function suggestionClickDetail(row, term) {
@@ -1334,6 +1480,11 @@
         flattenGroupedResult,
         buildAutocompleteSearches,
         autocompleteResults,
+        metaLine,
+        buildCrossSellSearches,
+        crossSellResults,
+        buildPopularSearch,
+        popularResults,
         suggestionClickDetail,
         filterChanges,
         createGa4Tracker,

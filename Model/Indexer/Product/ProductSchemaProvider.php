@@ -21,7 +21,8 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
         'id', 'product_id', 'name', 'sku', 'url', 'image_url', 'price', 'final_price', 'regular_price',
         'description', 'short_description', 'categories', 'category_ids', 'categories.lvl0', 'categories.lvl1',
         'categories.lvl2', 'in_stock', 'is_new', 'type_id', 'visibility', 'created_at', 'updated_at',
-        'sales_count', 'rating_summary', 'review_count', 'children', 'children_text', 'categories_text',
+        'sales_count', 'rating_summary', 'review_count', 'children', 'children_text', 'crosssell_ids',
+        'categories_text',
         NameDecompounder::FIELD, 'embedding',
     ];
 
@@ -75,6 +76,8 @@ class ProductSchemaProvider implements ProductSchemaProviderInterface
             // carry the children's values for filtering and search.
             ['name' => 'children', 'type' => 'object[]', 'optional' => true, 'index' => false],
             ['name' => 'children_text', 'type' => 'string[]', 'optional' => true],
+            // Read by the header search for the top hit's cross-sells.
+            ['name' => 'crosssell_ids', 'type' => 'int32[]', 'optional' => true],
         ];
 
         // Config imported from files bypasses the admin source that hides core attributes, and Typesense

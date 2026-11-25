@@ -1,0 +1,31 @@
+<?php
+/**
+ * Header search dropdown, cross-sell cards of `typesenseHeaderSearch` (Show Cross-Sells of the Top Hit): the first
+ * product hit's Magento cross-sells, filled up with the configured fallback products. They load after the hits.
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+?>
+<div x-show="hasCrossSells" role="group" aria-labelledby="typesense-ac-crosssell-title" class="border-b border-gray-200 p-2">
+    <p id="typesense-ac-crosssell-title" class="mb-1 px-2 text-xs font-bold uppercase tracking-wide text-gray-500"><?= $escaper->escapeHtml(__('Goes well with')) ?></p>
+    <div class="grid grid-cols-2 gap-2 px-2 py-1 sm:grid-cols-4">
+        <template x-for="card in crossSells" :key="card.key">
+            <a :href="card.url" @click="onCardClick" class="flex flex-col items-center gap-1 rounded p-2 text-center hover:bg-gray-100">
+                <span class="h-16 w-16 bg-gray-100">
+                    <template x-if="card.hasImage">
+                        <img :src="card.imageUrl" alt="" loading="lazy" width="64" height="64" class="h-16 w-16 object-contain bg-white">
+                    </template>
+                </span>
+                <span class="line-clamp-2 text-sm font-medium text-gray-800" x-text="card.name"></span>
+                <span x-show="hasCardMeta" class="text-xs uppercase tracking-wide text-gray-500" x-text="cardMeta"></span>
+                <template x-if="card.hasPrice">
+                    <span class="text-sm text-gray-600" x-text="cardPriceText"></span>
+                </template>
+            </a>
+        </template>
+    </div>
+</div>

@@ -1,4 +1,4 @@
-// Runs the inline Alpine component of search/form-mini.phtml against stubs (no browser, no Alpine).
+// Runs the Alpine component of search/script/header-search.phtml against stubs (no browser, no Alpine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -18,7 +18,7 @@ function inlineScripts(file) {
         .join('\n');
 }
 
-const config = {
+const baseConfig = {
     minQueryLength: 3, searchUrl: '/catalogsearch/result/', baseUrl: '/', productCollection: 'p',
     categoryCollection: 'c', pageCollection: null, suggestionCollection: 's', productCount: 4, categoryCount: 3,
     pageCount: 0, suggestionCount: 3, groupBy: null, highlight: true, showPrices: true, requestParams: {},
@@ -33,10 +33,12 @@ const response = (term) => ({
     ],
 });
 
-function createEnvironment() {
+function createEnvironment(overrides = {}) {
+    const config = Object.assign({}, baseConfig, overrides);
     const env = { events: [], timers: [], requests: [], responder: null };
     const input = {
         value: '',
+        focused: true,
         validity: '',
         reported: 0,
         setCustomValidity(message) { this.validity = message; },
@@ -52,7 +54,7 @@ function createEnvironment() {
         clearTimeout: () => { env.timers = []; },
         CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } },
         location: { href: '/' },
-        document: { activeElement: input },
+        document: { get activeElement() { return input.focused ? input : null; } },
         hyva: { str: (template, ...args) => template.replace(/%(\d)/g, (_, i) => args[i - 1]), formatPrice: value => 'EUR ' + value },
         Alpine: { data() {} },
         dispatchEvent: event => env.events.push(event),
@@ -61,7 +63,7 @@ function createEnvironment() {
     context.window = context;
     vm.createContext(context);
     vm.runInContext(readFileSync(moduleRoot + 'view/frontend/web/js/listing-core.js', 'utf8'), context);
-    vm.runInContext(inlineScripts('search/form-mini.phtml'), context);
+    vm.runInContext(inlineScripts('search/script/header-search.phtml'), context);
     context.runAsRootTypesense.getClient = async () => ({
         multiSearch: { perform: async (body) => { env.requests.push(body.searches); return env.responder(body); } },
     });
@@ -256,4 +258,178 @@ test('the dropdown shows the no-results line when no product matches', async () 
     assert.equal(search.hasFound(), false);
     assert.equal(search.hasNoProducts(), true);
     assert.equal(search.noResultsText(), 'No products for "xyz"');
+});
+
+const crossSellConfig = {
+    productMetaFields: ['type', 'volume_percent'], crossSellCount: 2, crossSellFallbackField: 'taste',
+    crossSellFallbackSortBy: 'sales_count:desc', crossSellMetaFields: ['type'], popularSearchCount: 2,
+};
+const productHit = (id, extra = {}) => ({
+    document: Object.assign({ id: String(id), name: 'Gin ' + id, sku: 'S' + id, url: '/gin-' + id + '.html', final_price: 20 }, extra),
+});
+// Product hits answer the dropdown's search, cross-sell searches (q '*' with an id or taste filter) the cards.
+const crossSellResponder = (body) => {
+    const first = body.searches[0];
+    if (first.q !== '*') {
+        return {
+            results: [
+                { found: 1, hits: [productHit(1, { type: ['Brandy'], volume_percent: ['42.0 %'], crosssell_ids: [5], taste: ['Pear'] })] },
+                { hits: [] },
+                { hits: [] },
+            ],
+        };
+    }
+    if (first.collection === 's') {
+        return { results: [{ hits: [{ document: { id: '1', query: 'pear' } }, { document: { id: '2', query: 'gin' } }] }] };
+    }
+
+    return {
+        results: body.searches.map(search => (search.filter_by.startsWith('id:[')
+            ? { hits: [productHit(5, { type: ['Liqueur'] })] }
+            : { hits: [productHit(8), productHit(9)] })),
+    };
+};
+
+test('product rows carry their meta line and the found total is worded for the header', async () => {
+    const env = createEnvironment(crossSellConfig);
+    env.responder = crossSellResponder;
+    const search = env.search();
+    env.type(search, 'gin');
+    await search.search();
+
+    search.row = search.sections.products[0];
+    assert.equal(search.rowMeta(), 'Brandy · 42 %');
+    assert.equal(search.hasRowMeta(), true);
+    assert.equal(search.foundText(), '%1 result'.replace('%1', 1));
+    search.found = 3;
+    assert.equal(search.foundText(), '3 results');
+});
+
+test('the top hit\'s cross-sells load after its hits are shown and fill up with fallback best sellers', async () => {
+    const env = createEnvironment(crossSellConfig);
+    let release;
+    env.responder = (body) => (body.searches[0].q === '*'
+        ? new Promise(resolve => { release = () => resolve(crossSellResponder(body)); })
+        : crossSellResponder(body));
+    const search = env.search();
+    env.type(search, 'gin');
+    await search.search();
+    await settle();
+
+    assert.equal(search.isOpen, true, 'the hits are shown before the cross-sells arrive');
+    assert.equal(search.hasCrossSells(), false);
+    assert.equal(env.requests.length, 2);
+    assert.deepEqual(Array.from(env.requests[1], s => s.filter_by), [
+        'id:[`5`] && in_stock:=true && visibility:[2,4]',
+        'taste:=[`Pear`] && in_stock:=true && visibility:[2,4] && id:!=[`1`,`5`]',
+    ]);
+
+    release();
+    await settle();
+    assert.deepEqual(Array.from(search.crossSells, card => card.key), ['crosssell-5', 'crosssell-8']);
+    search.card = search.crossSells[0];
+    assert.equal(search.cardMeta(), 'Liqueur');
+    assert.equal(search.hasCardMeta(), true);
+    assert.equal(search.cardPriceText(), 'EUR 20');
+    search.onCardClick();
+    assert.deepEqual(tracked(env, 'typesense:suggestion-click'), [{
+        type: 'crosssell', term: 'gin', name: 'Gin 5', url: '/gin-5.html', index: 0,
+        item: { item_id: 'S5', item_name: 'Gin 5', price: 20, index: 0, item_list_name: 'search_suggestions' },
+    }]);
+
+    env.type(search, 'gins');
+    await search.search();
+    await settle();
+    assert.equal(env.requests.length, 3, 'the same top hit reuses its cards');
+    assert.deepEqual(Array.from(search.crossSells, card => card.key), ['crosssell-5', 'crosssell-8']);
+});
+
+test('cross-sells of an older query never replace newer results and a failure keeps the hits', async () => {
+    const env = createEnvironment(crossSellConfig);
+    const pending = [];
+    env.responder = (body) => (body.searches[0].q === '*'
+        ? new Promise((resolve, reject) => pending.push({ resolve: () => resolve(crossSellResponder(body)), reject }))
+        : { results: [{ found: 1, hits: [productHit(1, { crosssell_ids: body.searches[0].q === 'rum' ? [6] : [5] })] }, { hits: [] }, { hits: [] }] });
+    const search = env.search();
+    env.type(search, 'gin');
+    await search.search();
+    await settle();
+    env.type(search, 'g');
+    pending[0].resolve();
+    await settle();
+    assert.equal(search.hasCrossSells(), false, 'a cleared query drops the late cards');
+
+    env.type(search, 'rum');
+    await search.search();
+    await settle();
+    pending[1].reject(new Error('Service Unavailable'));
+    await settle();
+    assert.equal(search.isOpen, true);
+    assert.equal(search.rows.length, 1);
+    assert.equal(search.hasCrossSells(), false);
+});
+
+test('focusing the empty input shows the popular searches, loaded once', async () => {
+    const env = createEnvironment(crossSellConfig);
+    env.responder = crossSellResponder;
+    const search = env.search();
+
+    assert.equal(search.isIdle(), true);
+    assert.equal(search.hasSearched(), false);
+    search.onFocus();
+    await settle();
+    assert.equal(search.isOpen, true);
+    assert.equal(search.hasPopular(), true);
+    assert.deepEqual(search.popular.map(chip => [chip.name, chip.url]), [
+        ['pear', '/catalogsearch/result/?q=pear'],
+        ['gin', '/catalogsearch/result/?q=gin'],
+    ]);
+    assert.equal(search.hasProducts(), false);
+
+    search.chip = search.popular[1];
+    search.onPopularClick();
+    assert.deepEqual(tracked(env, 'typesense:suggestion-click'), [
+        { type: 'popular', term: '', name: 'gin', url: '/catalogsearch/result/?q=gin', index: 1 },
+    ]);
+
+    search.close();
+    search.onFocus();
+    await settle();
+    assert.equal(search.isOpen, true, 'focus reopens them');
+    env.type(search, 'gi');
+    assert.equal(search.isOpen, true, 'a query below the minimum length keeps them open');
+    env.type(search, 'gin');
+    await search.search();
+    assert.equal(search.isIdle(), false);
+    assert.equal(search.hasSearched(), true);
+    assert.equal(search.hasPopular(), true, 'and they stay next to the results');
+    assert.equal(env.requests.filter(searches => searches[0].collection === 's' && searches[0].q === '*').length, 1);
+});
+
+test('without popular searches or cross-sells configured nothing extra is requested', async () => {
+    const env = createEnvironment();
+    env.responder = () => response('gin');
+    const search = env.search();
+
+    search.onFocus();
+    await settle();
+    assert.equal(search.isOpen, false);
+    env.type(search, 'gin');
+    await search.search();
+    await settle();
+    assert.equal(env.requests.length, 1);
+    assert.equal(search.hasCrossSells(), false);
+});
+
+test('the header search templates bind only CSP-safe property and method references', () => {
+    const files = ['form-mini.phtml', 'autocomplete/suggestion.phtml', 'autocomplete/popular.phtml', 'autocomplete/product.phtml',
+        'autocomplete/crosssell.phtml', 'autocomplete/category.phtml', 'autocomplete/page.phtml', 'autocomplete/see-all.phtml'];
+    for (const file of files) {
+        const source = readFileSync(moduleRoot + 'view/frontend/templates/search/' + file, 'utf8');
+        assert.doesNotMatch(source, /<script>|x-html|innerHTML/, file);
+        const expressions = [...source.matchAll(/\s(?:x-[a-z-]+|:[a-z-]+|@[a-z.-]+)="([^"]*)"/g)]
+            .map(match => match[1])
+            .filter(expression => !/^[a-zA-Z_$][\w$.]*( in [a-zA-Z_$][\w$.]*)?$/.test(expression));
+        assert.deepEqual(expressions, [], file);
+    }
 });

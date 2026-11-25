@@ -38,7 +38,7 @@ Open-source [Typesense](https://typesense.org) search integration for Magento 2 
 - Full-text search powered by Typesense with typo tolerance and instant results
 - Zero-downtime reindexing using collection versioning and atomic alias swaps
 - Multi-entity indexing: products, categories, CMS pages, search suggestions, orders, customers, store, and system config
-- Hyva-compatible autocomplete (CSP-safe Alpine.js) with multi-index results
+- Hyva-compatible autocomplete (CSP-safe Alpine.js) with multi-index results, the top hit's cross-sells and popular searches
 - Instant search page replacing the default Magento catalog search
 - Category page powered by Typesense with client-side filtering and sorting
 - Visual category merchandiser on the category edit page (Algolia-style sortable product table)
@@ -204,6 +204,13 @@ Store-view scope. These drive the search page, autocomplete product results and 
 | CMS Page Count | 2 | Max CMS page results |
 | Suggestion Count | 4 | Max query suggestion results |
 | Group Products By | — | Faceted product field sent as `group_by` (one product per value); ignored when not a faceted schema field |
+| Product Meta Line Fields | — | Comma-separated document fields shown below a product row's name, joined with " · " (see [Meta lines](#meta-lines)) |
+| Show Cross-Sells of the Top Hit | No | "Goes well with" cards: the first product hit's Magento cross-sells (see [Cross-sells](#cross-sells)) |
+| Cross-Sell Count | 4 | Number of cross-sell cards |
+| Cross-Sell Fallback Attribute | — | Product field whose values the fill-up products share with the top hit; empty = no fill-up; ignored when not in the product schema |
+| Cross-Sell Fallback Sort | `sales_count:desc` | Typesense `sort_by` of the fill-up products |
+| Cross-Sell Meta Line Fields | — | Like Product Meta Line Fields, for the cross-sell cards |
+| Popular Searches Count | 0 | The store's most popular search terms, also shown on focus with an empty input; 0 = off |
 
 ### Tracking Settings
 
@@ -410,6 +417,46 @@ All frontend components require the Hyva theme. They use Alpine.js for reactivit
 
 Replaces the template of Hyvä's `header-search` block (handle `typesense_autocomplete`, also over Hyva_SmileElasticsuite's) with `search/form-mini.phtml`: a GET form to the search page plus a dropdown with query suggestions, products, categories and CMS pages from one multi search, highlighted matches, "See all (N)" and keyboard navigation. Typesense errors hide the dropdown; Enter still submits the form. Configured via the autocomplete settings in admin.
 
+The templates are markup only. The Alpine CSP component `typesenseHeaderSearch` lives in `search/script/header-search.phtml`, rendered by the `typesense.autocomplete.script` block (alias `typesense_script`); a theme that overrides `search/form-mini.phtml` keeps `<?= $block->getChildHtml('typesense_script') ?>` and may place the section blocks anywhere inside the component (e.g. results left, suggestions right).
+
+| Section (alias) | Block name | Default template |
+|---|---|---|
+| `typesense_script` | `typesense.autocomplete.script` | `search/script/header-search.phtml` |
+| `typesense_suggestion` | `typesense.autocomplete.suggestion` | `search/autocomplete/suggestion.phtml` |
+| `typesense_popular` | `typesense.autocomplete.popular` | `search/autocomplete/popular.phtml` |
+| `typesense_product` | `typesense.autocomplete.product` | `search/autocomplete/product.phtml` |
+| `typesense_crosssell` | `typesense.autocomplete.crosssell` | `search/autocomplete/crosssell.phtml` |
+| `typesense_category` | `typesense.autocomplete.category` | `search/autocomplete/category.phtml` |
+| `typesense_page` | `typesense.autocomplete.page` | `search/autocomplete/page.phtml` |
+| `typesense_see_all` | `typesense.autocomplete.see-all` | `search/autocomplete/see-all.phtml` |
+
+Template API of `typesenseHeaderSearch` (all argument-free, CSP-safe):
+
+| State / method | Use |
+|---|---|
+| `isOpen`, `query`, `found`, `rows` | Dropdown state; `rows` are the arrow-key options (suggestions, products, categories, pages) |
+| `sections.{suggestions,products,categories,pages}` | Rows per section (`x-for="row in sections.products"`): `key`, `id`, `name`, `url`, `segments`, `domId`, `imageUrl`/`hasImage`, `price`/`hasPrice`, `meta`/`hasMeta` |
+| `rowSelected()`, `rowClasses()`, `rowPriceText()`, `rowMeta()`, `hasRowMeta()`, `activateRow()`, `onRowClick()` | Per `row` |
+| `crossSells`, `hasCrossSells()` | Cross-sell cards (`x-for="card in crossSells"`), same fields as product rows |
+| `cardPriceText()`, `cardMeta()`, `hasCardMeta()`, `onCardClick()` | Per `card` |
+| `popular`, `hasPopular()`, `onPopularClick()` | Popular searches (`x-for="chip in popular"`): `key`, `name`, `url` |
+| `hasSuggestions()`, `hasProducts()`, `hasCategories()`, `hasPages()` | Section visibility |
+| `isIdle()`, `hasSearched()` | No query searched yet (e.g. the empty input with only popular searches) and its opposite |
+| `foundText()`, `hasFound()`, `hasNoProducts()`, `noResultsText()`, `seeAllText()`, `seeAllUrl()`, `onSeeAllClick()` | "N results", "See all (N)" and the no-results line |
+| `onInput`, `onFocus`, `onKeydown`, `onSubmit`, `close`, `focusInput`, `ariaExpanded`, `activeDescendant` | Input and form bindings |
+
+#### Meta lines
+
+Product rows and cross-sell cards can show one line of document values, e.g. "Old Varieties · 42 % · Pear" (Product / Cross-Sell Meta Line Fields). Each field adds its value; missing or empty fields are left out. Lists (multiselect attributes, composite products) show their first value; whole decimals lose their zeros ("42.0 %" → "42 %", "42.50" → "42.5"). For a category, list `categories` for the name of the first assigned category, or `categories.lvl0`/`lvl1`/`lvl2` for the first category path at that depth, shown as its last name ("Spirits > Old Varieties" → "Old Varieties"); the second level is usually the most telling. The fields are added to `include_fields`; additional attributes must be in "Additional Attributes to Index".
+
+#### Cross-sells
+
+With "Show Cross-Sells of the Top Hit" on, the dropdown shows "Goes well with" cards for the first product hit, sent as a second multi search once its results are shown, so the hits are never delayed: its Magento cross-sell products (link position order) that are in stock and visible in the catalog (`visibility:[2,4]`), followed by in-stock, catalog-visible products sharing one of the top hit's values of the Cross-Sell Fallback Attribute, sorted by Cross-Sell Fallback Sort (best sellers first by default), until Cross-Sell Count cards. Products shown as rows are left out. Cards for the same request are cached for the page; a failing request only leaves the cards out. Product documents carry the cross-sell ids in `crosssell_ids` (`int32[]`, optional), loaded once per indexing batch (`ProductDataBuilder::preloadCrossSells()`); the product mview subscribes to `catalog_product_link`, so changed links reach the index. `sales_count` comes from Magento's bestsellers report (`sales_bestsellers_aggregated_daily`).
+
+#### Popular searches
+
+Popular Searches Count > 0 shows the store's most popular search terms (suggestion collection, `sort_by: popularity:desc`) as links to the search page. They are requested once per page, on the first focus, and shown with the results and alone while the query is shorter than the minimum length (e.g. when the search opens with an empty input). They need the suggestion index of the store.
+
 ### Instant Search Page
 
 Replaces the Magento search results page (`/catalogsearch/result`) with the storefront listing below (handle `typesense_search_result`, added only while the module and instant search are enabled). With "Cacheable Search Page" on, a URL holding only listing parameters (`q`, `page`, `sort`, `limit`, `price` and configured facets) is answered by a cacheable shell instead of the core search action, and the term is logged from the browser through `catalogsearch/searchTermsLog/save`. Search terms with a redirect URL still redirect.
@@ -532,7 +579,7 @@ Each listing renders its config as JSON in `<script type="application/json" data
 | `addToCartUrl`, `wishlistEnabled`, `wishlistAddUrl`, `wishlistUrl` | Tile actions (POST with form key) |
 | `imageWidth`, `imageHeight`, `noResultsCategoryId`, `seoTextSelector` | See Instant Search Settings |
 
-The header search reads `<script type="application/json" data-typesense-autocomplete-config>` (`AutocompleteConfigViewModel`): collections, counts, `minQueryLength`, `searchUrl`, `groupBy`, highlight and price settings.
+The header search reads `<script type="application/json" data-typesense-autocomplete-config>` (`AutocompleteConfigViewModel`): collections, counts, `minQueryLength`, `searchUrl`, `groupBy`, highlight and price settings, `productFields` (`include_fields`, with the meta line fields, `crosssell_ids` and the fallback field), `productMetaFields`, `crossSellCount` (0 when off), `crossSellFallbackField`, `crossSellFallbackSortBy`, `crossSellMetaFields` and `popularSearchCount` (0 without a suggestion index).
 
 #### Window events
 
@@ -542,7 +589,7 @@ The listing and the header search dispatch these `CustomEvent`s on `window`. Lis
 |---|---|---|
 | `typesense:results` | After every rendered result | `{context, listName, page, stateKey, items, documents}`; `items` are GA4 items (`item_id` = SKU, `item_name`, `price` when shown and > 0, `index`, `item_list_name`), `stateKey` the serialized URL state |
 | `typesense:select-item` | Shopper clicks a tile link | `{item, index, listName, document}` |
-| `typesense:suggestion-click` | Shopper clicks a header-search row | `{type, term, name, url, index, item?}`; `type` is `product`, `category`, `page`, `suggestion` or `see_all` (the "See all" link; `name` is the term), `item` only for products |
+| `typesense:suggestion-click` | Shopper clicks a header-search row | `{type, term, name, url, index, item?}`; `type` is `product`, `crosssell`, `category`, `page`, `suggestion`, `popular` or `see_all` (the "See all" link; `name` is the term), `item` only for products and cross-sells |
 | `typesense:sort-change` | Shopper changes the sort | `{context, listName, sort, previous}` |
 | `typesense:filter-change` | Shopper adds or removes filters | `{context, listName, added, removed}` with `{field, value}` entries (price as `min-max`) |
 
@@ -562,7 +609,7 @@ Projects with their own item shape leave the setting off and listen to the windo
 
 #### Index requirements
 
-Grouped tiles read `children` (`object[]`), which needs a product collection created with `enable_nested_fields: true`. The flag can only be set when a collection is created, so after upgrading run a full product reindex (`bin/magento typesense:reindex --entity=product`) with Zero-Downtime Reindex on, or delete the product collections first without it. The same reindex adds the `price` facet (slider stats), sortable `in_stock`, `is_new`, the ancestor category paths in `categories.lvlN` and the anchor ancestors in `category_ids` (faceted for the category facet).
+Grouped tiles read `children` (`object[]`), which needs a product collection created with `enable_nested_fields: true`. The flag can only be set when a collection is created, so after upgrading run a full product reindex (`bin/magento typesense:reindex --entity=product`) with Zero-Downtime Reindex on, or delete the product collections first without it. The same reindex adds the `price` facet (slider stats), sortable `in_stock`, `is_new`, the ancestor category paths in `categories.lvlN`, the anchor ancestors in `category_ids` (faceted for the category facet) and `crosssell_ids` (header search cross-sells).
 
 #### Hyvä Tailwind CSS
 

@@ -14,6 +14,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use RunAsRoot\TypeSense\Model\Config\TypeSenseConfigInterface;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Decompound\NameDecompounder;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\CompositeChildrenDataResolver;
+use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\CrossSellResolver;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\GroupedChildrenResolver;
 use RunAsRoot\TypeSense\Model\Indexer\Product\Resolver\SalableResolverInterface;
 
@@ -35,6 +36,7 @@ class ProductDataBuilder
         private readonly GroupedChildrenResolver $groupedChildrenResolver,
         private readonly NewProductResolverInterface $newProductResolver,
         private readonly CompositeChildrenDataResolver $compositeChildrenResolver,
+        private readonly CrossSellResolver $crossSellResolver,
     ) {
     }
 
@@ -53,6 +55,21 @@ class ProductDataBuilder
         }
 
         $this->compositeChildrenResolver->preload($parentIds, $storeId);
+    }
+
+    /**
+     * Resolves the cross-sells of the whole batch at once, so build() does not query them per product.
+     */
+    public function preloadCrossSells(ProductCollection $collection): void
+    {
+        $productIds = [];
+        /** @var Product[] $products */
+        $products = $collection->getItems();
+        foreach ($products as $product) {
+            $productIds[] = (int) $product->getId();
+        }
+
+        $this->crossSellResolver->preload($productIds);
     }
 
     /**
@@ -119,6 +136,7 @@ class ProductDataBuilder
         $document['sales_count'] = $this->salesCountResolver->getSalesCount($productId);
         $document['rating_summary'] = $this->reviewResolver->getRatingSummary($productId, $storeId);
         $document['review_count'] = $this->reviewResolver->getReviewCount($productId, $storeId);
+        $document['crosssell_ids'] = $this->crossSellResolver->getCrossSellIds($productId);
 
         $attributes = $this->attributeResolver->getExtraAttributes($product);
         if ($product->isComposite()) {

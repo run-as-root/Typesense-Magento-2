@@ -20,12 +20,22 @@ sequences this module after Hyva_Theme, so our layout_load_before observer adds 
             <action method="setTemplate">
                 <argument name="template" xsi:type="string">RunAsRoot_TypeSense::search/form-mini.phtml</argument>
             </action>
+            <!-- The Alpine component of the header search; theme overrides of the templates stay markup-only. -->
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.autocomplete.script" as="typesense_script"
+                   template="RunAsRoot_TypeSense::search/script/header-search.phtml"/>
             <block class="Magento\Framework\View\Element\Template"
                    name="typesense.autocomplete.suggestion" as="typesense_suggestion"
                    template="RunAsRoot_TypeSense::search/autocomplete/suggestion.phtml"/>
             <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.autocomplete.popular" as="typesense_popular"
+                   template="RunAsRoot_TypeSense::search/autocomplete/popular.phtml"/>
+            <block class="Magento\Framework\View\Element\Template"
                    name="typesense.autocomplete.product" as="typesense_product"
                    template="RunAsRoot_TypeSense::search/autocomplete/product.phtml"/>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="typesense.autocomplete.crosssell" as="typesense_crosssell"
+                   template="RunAsRoot_TypeSense::search/autocomplete/crosssell.phtml"/>
             <block class="Magento\Framework\View\Element\Template"
                    name="typesense.autocomplete.category" as="typesense_category"
                    template="RunAsRoot_TypeSense::search/autocomplete/category.phtml"/>

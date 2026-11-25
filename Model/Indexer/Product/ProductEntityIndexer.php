@@ -40,6 +40,7 @@ class ProductEntityIndexer implements EntityIndexerInterface, CollectionSettings
     {
         $collection = $this->dataBuilder->getProductCollection($entityIds, $storeId);
         $this->dataBuilder->preloadChildren($collection, $storeId);
+        $this->dataBuilder->preloadCrossSells($collection);
 
         /** @var Product $product */
         foreach ($collection as $product) {

@@ -1,7 +1,8 @@
 <?php
 /**
  * Header search dropdown: products section of `typesenseHeaderSearch`. Names are split into highlight segments
- * rendered with x-text; prices (only when the config allows them and above 0) via hyva.formatPrice.
+ * rendered with x-text, followed by the meta line of Product Meta Line Fields; prices (only when the config allows
+ * them and above 0) via hyva.formatPrice.
  */
 
 declare(strict_types=1);
@@ -28,6 +29,7 @@ use Magento\Framework\Escaper;
             </span>
             <span class="min-w-0 grow">
                 <span class="block truncate text-sm font-medium text-gray-800"><template x-for="segment in row.segments" :key="segment.key"><span><template x-if="segment.mark"><mark class="bg-transparent font-bold text-inherit" x-text="segment.text"></mark></template><template x-if="segment.plain"><span x-text="segment.text"></span></template></span></template></span>
+                <span x-show="hasRowMeta" class="block truncate text-xs text-gray-500" x-text="rowMeta"></span>
                 <template x-if="row.hasPrice">
                     <span class="block text-sm text-gray-600" x-text="rowPriceText"></span>
                 </template>

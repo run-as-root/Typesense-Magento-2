@@ -233,6 +233,15 @@ final class ProductSchemaProviderTest extends TestCase
         self::assertSame('int32', $field['type']);
     }
 
+    public function test_cross_sell_ids_are_an_optional_int32_array(): void
+    {
+        $field = $this->findField($this->sut->getFields(), 'crosssell_ids');
+
+        self::assertSame('int32[]', $field['type']);
+        self::assertTrue($field['optional']);
+        self::assertContains('crosssell_ids', ProductSchemaProvider::RESERVED_FIELDS);
+    }
+
     public function test_get_fields_contains_rating_summary_as_int32(): void
     {
         $fields = $this->sut->getFields();
@@ -327,7 +336,7 @@ final class ProductSchemaProviderTest extends TestCase
             'final_price', 'regular_price', 'description', 'short_description', 'categories', 'category_ids',
             'categories.lvl0', 'categories.lvl1', 'categories.lvl2', 'in_stock', 'is_new', 'type_id',
             'visibility', 'created_at', 'updated_at', 'sales_count', 'rating_summary', 'review_count',
-            'children', 'children_text', 'categories_text'];
+            'children', 'children_text', 'crosssell_ids', 'categories_text'];
 
         self::assertSame($coreNames, $fieldNames);
     }
