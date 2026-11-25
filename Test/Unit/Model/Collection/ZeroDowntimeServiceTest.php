@@ -396,6 +396,45 @@ final class ZeroDowntimeServiceTest extends TestCase
         $sut->finishReindex('product', 'de', 'rar_product_de_v2', 3);
     }
 
+    public function test_failing_applier_keeps_a_live_plain_collection_of_a_pre_versioning_install(): void
+    {
+        $this->nameResolver->method('resolve')->willReturn('rar_p');
+        $this->aliasManager->method('getAlias')->willThrowException(new ObjectNotFound());
+        $this->collectionManager->method('listCollections')->willReturn([]);
+        $this->collectionManager->method('collectionExists')->with('rar_p')->willReturn(true);
+        $this->aliasManager->method('aliasExists')->with('rar_p')->willReturn(false);
+        $this->applier->method('apply')->willThrowException(new \RuntimeException('typesense down'));
+        $this->aliasManager->expects(self::never())->method('upsertAlias');
+        $this->collectionManager->expects(self::never())->method('deleteCollection');
+
+        $this->expectException(ApplierFailedException::class);
+
+        $this->sut->finishReindex('p', 'de', 'rar_p_v1', 3);
+    }
+
+    public function test_fields_created_by_a_pattern_field_do_not_count_as_a_schema_change(): void
+    {
+        $pattern = ['name' => 'category_position_.*', 'type' => 'int32', 'sort' => true];
+        $this->useLiveCollectionWithFields(
+            [$pattern, ['name' => 'category_position_5', 'type' => 'int32', 'sort' => true]],
+            [$pattern, ['name' => 'category_position_5', 'type' => 'int32', 'sort' => true],
+                ['name' => 'category_position_9', 'type' => 'int32', 'sort' => true]],
+        );
+
+        self::assertFalse($this->sut->finishReindex('product', 'de', 'rar_product_de_v2', 3));
+    }
+
+    public function test_an_added_pattern_field_counts_as_a_schema_change(): void
+    {
+        $this->useLiveCollectionWithFields(
+            [['name' => 'name', 'type' => 'string']],
+            [['name' => 'name', 'type' => 'string'], ['name' => 'category_position_.*', 'type' => 'int32', 'sort' => true],
+                ['name' => 'category_position_5', 'type' => 'int32', 'sort' => true]],
+        );
+
+        self::assertTrue($this->sut->finishReindex('product', 'de', 'rar_product_de_v2', 3));
+    }
+
     public function test_finish_reindex_reports_a_changed_schema(): void
     {
         $this->useLiveCollectionWithFields(

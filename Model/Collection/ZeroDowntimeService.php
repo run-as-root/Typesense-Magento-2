@@ -51,12 +51,15 @@ class ZeroDowntimeService
         // Read before the swap: the version that was live is the only safe rollback target. The
         // highest lower number may be a half-built orphan or the version rolled away from.
         $previouslyLive = $this->getAliasTarget($aliasName);
+        // A plain collection squatting on the alias name blocks alias creation (pre-versioning installs).
+        $plainLive = $previouslyLive === null
+            && $this->collectionManager->collectionExists($aliasName)
+            && !$this->aliasManager->aliasExists($aliasName);
 
         // Synonyms and overrides live on the collection, so the new one must carry them before it goes live.
-        $this->runAppliers($entityType, $storeCode, $collectionName, $storeId, $previouslyLive !== null);
+        $this->runAppliers($entityType, $storeCode, $collectionName, $storeId, $previouslyLive !== null || $plainLive);
 
-        // A plain collection squatting on the alias name blocks alias creation (pre-versioning installs).
-        if ($this->collectionManager->collectionExists($aliasName) && !$this->aliasManager->aliasExists($aliasName)) {
+        if ($plainLive) {
             $this->collectionManager->deleteCollection($aliasName);
             $this->logger->info("One-time migration: deleted plain collection {$aliasName} to make way for the alias");
         }
@@ -71,7 +74,7 @@ class ZeroDowntimeService
         return $schemaChanged;
     }
 
-    // Compares the retrieved schemas, so fields that a pattern field (category_position_.*) created count too.
+    // Fields a pattern field (category_position_.*) created follow the data, so only declared fields count.
     private function schemaDiffers(string $previousCollection, string $newCollection): bool
     {
         try {
@@ -97,13 +100,35 @@ class ZeroDowntimeService
     {
         $signature = [];
         $fields = is_array($collection['fields'] ?? null) ? $collection['fields'] : [];
+        $patterns = array_values(array_filter(
+            array_map(static fn (array $field): string => (string) ($field['name'] ?? ''), $fields),
+            static fn (string $name): bool => str_contains($name, '.*'),
+        ));
         foreach ($fields as $field) {
+            $name = (string) ($field['name'] ?? '');
+            if ($this->isPatternCreated($name, $patterns)) {
+                continue;
+            }
             ksort($field);
-            $signature[(string) ($field['name'] ?? '')] = $field;
+            $signature[$name] = $field;
         }
         ksort($signature);
 
         return $signature;
+    }
+
+    /**
+     * @param list<string> $patterns
+     */
+    private function isPatternCreated(string $name, array $patterns): bool
+    {
+        foreach ($patterns as $pattern) {
+            if ($name !== $pattern && preg_match('/^(?:' . str_replace('/', '\\/', $pattern) . ')$/', $name) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function runAppliers(
