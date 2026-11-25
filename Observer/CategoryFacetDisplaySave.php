@@ -33,9 +33,10 @@ class CategoryFacetDisplaySave implements ObserverInterface
         }
 
         // Other categories saved in the same request (e.g. by a plugin) are not the one in the form.
-        $postedId = $this->request->getParam('entity_id');
+        $postedId = (int) $this->request->getParam('entity_id');
         $categoryId = (int) $category->getId();
-        if ($categoryId <= 0 || ($postedId !== null && $postedId !== '' && (int) $postedId !== $categoryId)) {
+        $isFormCategory = $postedId > 0 ? $postedId === $categoryId : $category->isObjectNew();
+        if ($categoryId <= 0 || !$isFormCategory) {
             return;
         }
 

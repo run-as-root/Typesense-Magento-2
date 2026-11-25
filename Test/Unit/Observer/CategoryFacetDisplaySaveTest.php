@@ -66,7 +66,8 @@ final class CategoryFacetDisplaySaveTest extends TestCase
 
         $this->facetDisplay->expects(self::once())->method('replace')->with(300, ['price' => 1]);
 
-        $this->sut->execute($this->observer(300));
+        $this->sut->execute($this->observer(300, true));
+        $this->sut->execute($this->observer(12));
     }
 
     public function test_saves_without_the_form_or_of_another_category_change_nothing(): void
@@ -80,10 +81,11 @@ final class CategoryFacetDisplaySaveTest extends TestCase
         $this->sut->execute($this->observer(12));
     }
 
-    private function observer(int $categoryId): Observer
+    private function observer(int $categoryId, bool $isNew = false): Observer
     {
         $category = $this->createMock(Category::class);
         $category->method('getId')->willReturn($categoryId);
+        $category->method('isObjectNew')->willReturn($isNew);
 
         return new Observer(['event' => new Event(['category' => $category])]);
     }

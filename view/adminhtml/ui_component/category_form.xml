@@ -43,7 +43,7 @@
                 <dndConfig>
                     <param name="enabled" xsi:type="boolean">false</param>
                 </dndConfig>
-                <label translate="true">Filters on this category page</label>
+                <label translate="true">Filters on this category page (all store views)</label>
             </settings>
             <container name="record" component="Magento_Ui/js/dynamic-rows/record">
                 <argument name="data" xsi:type="array">
@@ -65,6 +65,7 @@
                     <formElements>
                         <select>
                             <settings>
+                                <caption translate="true">-- Please Select --</caption>
                                 <options class="RunAsRoot\TypeSense\Model\Config\Source\FacetAttributeSource"/>
                             </settings>
                         </select>
